@@ -1,0 +1,248 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── FLIP CARD ───────────────────────────────────── */
+.flip-card { perspective: 1000px; }
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+.flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 1rem;
+}
+.flip-card-back { transform: rotateY(180deg); }
+
+/* ── FONT VARS ───────────────────────────────────── */
+:root {
+  --font-rajdhani: 'Times New Roman', serif;
+  --font-share-tech-mono: 'Times New Roman', serif;
+  --font-exo2: 'Times New Roman', serif;
+}
+
+/* ── LIGHT THEME (default) ───────────────────────── */
+:root, [data-theme="light"] {
+  --color-bg:      #edf2f7;
+  --color-panel:   #ffffff;
+  --color-surface: #f4f7fb;
+  --color-border:  #cbd5e0;
+  --color-text:    #1a2535;
+  --color-muted:   #718096;
+
+  --color-owner:   #c47d00;
+  --color-inputer: #0086b3;
+  --color-chemist: #00956a;
+
+  --scrollbar-track: #edf2f7;
+  --scrollbar-thumb: #cbd5e0;
+  --scrollbar-hover: #a0aec0;
+
+  --grid-line: rgba(0,150,200,0.06);
+
+  --glow-owner:   0 0 0 1px rgba(196,125,0,0.2),   0 4px 16px rgba(196,125,0,0.07);
+  --glow-inputer: 0 0 0 1px rgba(0,134,179,0.2),   0 4px 16px rgba(0,134,179,0.07);
+  --glow-chemist: 0 0 0 1px rgba(0,149,106,0.2),   0 4px 16px rgba(0,149,106,0.07);
+}
+
+/* ── DARK THEME ──────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg:      #0a0d12;
+  --color-panel:   #0f1520;
+  --color-surface: #131c2b;
+  --color-border:  #1e2d45;
+  --color-text:    #c8d8ea;
+  --color-muted:   #4a6080;
+
+  --color-owner:   #f0a500;
+  --color-inputer: #00c2ff;
+  --color-chemist: #00e5a0;
+
+  --scrollbar-track: #0a0d12;
+  --scrollbar-thumb: #1e2d45;
+  --scrollbar-hover: #2a3d55;
+
+  --grid-line: rgba(0,194,255,0.025);
+
+  --glow-owner:   0 0 0 1px rgba(240,165,0,0.3),   0 4px 20px rgba(240,165,0,0.1);
+  --glow-inputer: 0 0 0 1px rgba(0,194,255,0.3),   0 4px 20px rgba(0,194,255,0.1);
+  --glow-chemist: 0 0 0 1px rgba(0,229,160,0.3),   0 4px 20px rgba(0,229,160,0.1);
+}
+
+/* ── BASE ────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { transition: background 0.25s, color 0.25s; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Times New Roman', serif;
+  min-height: 100vh;
+}
+
+/* ── SCROLLBAR ───────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ── GRID BG ─────────────────────────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── INPUT ───────────────────────────────────────── */
+.input-field, .input {
+  @apply w-full rounded-lg px-4 py-3 text-sm outline-none transition-all duration-200;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+/* Select gets extra right padding so the chevron never overlaps text */
+select.input-field, select.input {
+  @apply appearance-none pr-10;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.input-dark {
+  background: color-mix(in srgb, var(--color-text) 10%, var(--color-panel));
+  border-color: color-mix(in srgb, var(--color-border) 90%, transparent);
+}
+.input-dark::placeholder { color: color-mix(in srgb, var(--color-muted) 85%, transparent); }
+.input-field::placeholder, .input::placeholder { color: var(--color-muted); }
+.input-field:focus, .input:focus { border-color: var(--color-inputer); box-shadow: 0 0 0 2px rgba(0,194,255,0.15); }
+.input-field.owner-focus:focus, .input.owner-focus:focus { border-color: var(--color-owner);   box-shadow: 0 0 0 2px rgba(240,165,0,0.15); }
+.input-field.chemist-focus:focus { border-color: var(--color-chemist); box-shadow: 0 0 0 2px rgba(0,229,160,0.15); }
+/* Touch targets for input */
+@media (max-width: 1024px) {
+  .input, .input-field { @apply min-h-[44px]; }
+}
+
+/* ── CARD ────────────────────────────────────────── */
+.card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  @apply rounded-xl;
+}
+
+/* ── ROLE COLOR HELPERS ──────────────────────────── */
+.role-owner   { color: var(--color-owner); }
+.role-inputer { color: var(--color-inputer); }
+.role-chemist { color: var(--color-chemist); }
+
+/* ── GLOW BORDERS ────────────────────────────────── */
+.glow-border-owner   { box-shadow: var(--glow-owner); }
+.glow-border-inputer { box-shadow: var(--glow-inputer); }
+.glow-border-chemist { box-shadow: var(--glow-chemist); }
+
+/* ── TABLE ───────────────────────────────────────── */
+.data-table { @apply w-full text-sm; }
+.data-table th {
+  @apply text-left text-xs font-mono uppercase tracking-widest px-4 py-3 border-b whitespace-nowrap;
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+.data-table td {
+  @apply px-4 py-3 border-b text-sm;
+  border-color: color-mix(in srgb, var(--color-border) 50%, transparent);
+}
+.data-table tr:hover td { background: rgba(128,128,128,0.04); }
+
+/* ── TABLE → CARD (mobile) ───────────────────────── */
+.data-card-list { @apply space-y-3; }
+.data-card {
+  @apply rounded-lg px-4 py-3 space-y-2;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.data-card-header { @apply flex items-center justify-between; }
+.data-card-title { @apply font-mono text-sm; }
+.data-card-meta  { @apply text-muted text-[11px]; }
+.data-card-grid  { @apply grid grid-cols-2 gap-x-4 gap-y-2 text-xs; }
+.data-card-label { @apply text-muted uppercase tracking-[0.08em]; }
+.data-card-value { @apply text-right text-primary; }
+/* ── BADGE ───────────────────────────────────────── */
+.badge {
+  @apply inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded-full border;
+}
+.badge-owner   { background: color-mix(in srgb, var(--color-owner)   15%, transparent); color: var(--color-owner);   border-color: color-mix(in srgb, var(--color-owner)   30%, transparent); }
+.badge-inputer { background: color-mix(in srgb, var(--color-inputer) 15%, transparent); color: var(--color-inputer); border-color: color-mix(in srgb, var(--color-inputer) 30%, transparent); }
+.badge-chemist { background: color-mix(in srgb, var(--color-chemist) 15%, transparent); color: var(--color-chemist); border-color: color-mix(in srgb, var(--color-chemist) 30%, transparent); }
+.badge-muted   { background: rgba(128,128,128,0.08); color: var(--color-muted); border-color: var(--color-border); }
+
+/* ── BUTTONS ─────────────────────────────────────── */
+.btn {
+  @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
+         transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed;
+}
+.btn-owner   { background: color-mix(in srgb, var(--color-owner)   15%, transparent); color: var(--color-owner);   border: 1px solid color-mix(in srgb, var(--color-owner)   35%, transparent); }
+.btn-owner:hover   { background: color-mix(in srgb, var(--color-owner)   25%, transparent); }
+.btn-inputer { background: color-mix(in srgb, var(--color-inputer) 15%, transparent); color: var(--color-inputer); border: 1px solid color-mix(in srgb, var(--color-inputer) 35%, transparent); }
+.btn-inputer:hover { background: color-mix(in srgb, var(--color-inputer) 25%, transparent); }
+.btn-chemist { background: color-mix(in srgb, var(--color-chemist) 15%, transparent); color: var(--color-chemist); border: 1px solid color-mix(in srgb, var(--color-chemist) 35%, transparent); }
+.btn-chemist:hover { background: color-mix(in srgb, var(--color-chemist) 25%, transparent); }
+.btn-danger  { background: rgba(239,68,68,0.10); color: #f87171; border: 1px solid rgba(239,68,68,0.30); }
+.btn-danger:hover  { background: rgba(239,68,68,0.20); }
+.btn-ghost   { background: transparent; color: var(--color-muted); border: 1px solid var(--color-border); }
+.btn-ghost:hover   { border-color: rgba(128,128,128,0.4); color: var(--color-text); }
+.btn svg,
+.badge svg,
+.data-card svg,
+.data-card-header svg,
+nav svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ── RICH TEXT EDITOR ────────────────────────────── */
+[contenteditable] ul { list-style: disc; padding-left: 1.25rem; }
+[contenteditable] li { margin: 2px 0; }
+[contenteditable] p  { margin: 2px 0; }
+
+/* ── ANIMATIONS ──────────────────────────────────── */
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(12px);  } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── TOUCH TARGETS ───────────────────────────────── */
+@media (max-width: 1024px) {
+  .btn { @apply min-h-[44px]; }
+  nav a { @apply min-h-[44px]; }
+}
+
+/* ── THEME-AWARE UTILITIES ───────────────────────────────────────────────────
+   Use these instead of hard-coded bg-white/* or text-white so both themes work
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Primary text — replaces text-white everywhere */
+.text-primary { color: var(--color-text); }
+
+/* Subtle layered backgrounds — replaces bg-white/2, bg-white/3, bg-white/5 */
+.bg-layer-xs  { background: color-mix(in srgb, var(--color-text)  2%, transparent); }
+.bg-layer-sm  { background: color-mix(in srgb, var(--color-text)  4%, transparent); }
+.bg-layer     { background: color-mix(in srgb, var(--color-text)  6%, transparent); }
+
+/* Hover backgrounds */
+.hover\:bg-layer:hover    { background: color-mix(in srgb, var(--color-text)  6%, transparent); }
+.hover\:bg-layer-sm:hover { background: color-mix(in srgb, var(--color-text)  4%, transparent); }
+
+/* Hover text */
+.hover\:text-primary:hover { color: var(--color-text); }
+
+/* group-hover */
+.group:hover .group-hover\:text-primary { color: var(--color-text); }
+
+/* Dimmed primary text (replaces text-white/70) */
+.text-primary-70 { color: color-mix(in srgb, var(--color-text) 70%, transparent); }

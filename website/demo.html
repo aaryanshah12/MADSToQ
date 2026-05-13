@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Schedule Demo | MADSToQ</title>
+    <meta
+      name="description"
+      content="Schedule a product demo with MADSToQ by submitting your details."
+    />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/MADSToQ.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a href="index.html" class="brand" aria-label="MADSToQ Home">
+          <img src="MADSToQ.png" alt="MADSToQ logo" class="brand-logo" />
+        </a>
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="services.html">Services</a>
+          <a href="inventory.html">Inventory</a>
+          <a href="io.html">Inward-Outward</a>
+          <a href="about.html">About</a>
+        </nav>
+        <div class="nav-actions">
+          <a href="demo.html" class="nav-demo">Schedule Demo</a>
+          <a href="contact.html" class="nav-cta">Contact Us</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="contact-section container reveal">
+        <div class="contact-layout">
+          <div class="contact-copy">
+            <p class="eyebrow">Schedule A Demo</p>
+            <h1>Submit your details to book a demo call.</h1>
+            <p class="subtitle">
+              Fill this form and our team will reach out to schedule a suitable
+              demo slot.
+            </p>
+            <p class="subtitle">
+              Demo requests are sent to
+              <strong>inquries@madstoq.com</strong>.
+            </p>
+          </div>
+
+          <form
+            class="contact-form"
+            action="mailto:inquries@madstoq.com?subject=Schedule%20Demo%20Request"
+            method="post"
+            enctype="text/plain"
+          >
+            <label>
+              Full Name
+              <input type="text" name="Full Name" required />
+            </label>
+            <label>
+              Work Email
+              <input type="email" name="Work Email" required />
+            </label>
+            <label>
+              Phone Number
+              <input type="tel" name="Phone Number" required />
+            </label>
+            <label>
+              Company Name
+              <input type="text" name="Company Name" required />
+            </label>
+            <label>
+              Product Interest
+              <select name="Product Interest" required>
+                <option value="">Select a product</option>
+                <option value="Inventory">Inventory</option>
+                <option value="Inward-Outward">Inward-Outward</option>
+                <option value="Both">Both</option>
+              </select>
+            </label>
+            <label>
+              Preferred Time / Notes
+              <textarea
+                name="Preferred Time Notes"
+                rows="5"
+                placeholder="Add your preferred schedule and key requirements..."
+                required
+              ></textarea>
+            </label>
+            <button type="submit" class="btn btn-primary">
+              Send Demo Request
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <h4>MADSToQ</h4>
+          <p>Focused SaaS products for inventory and operational control.</p>
+        </div>
+        <div>
+          <h4>Products</h4>
+          <a class="footer-link" href="inventory.html">Inventory</a>
+          <a class="footer-link" href="io.html">Inward-Outward</a>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <a class="footer-link" href="about.html">About</a>
+          <a class="footer-link" href="contact.html">Contact</a>
+        </div>
+        <div>
+          <h4>Email</h4>
+          <a href="mailto:inquries@madstoq.com" class="footer-link"
+            >inquries@madstoq.com</a
+          >
+        </div>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

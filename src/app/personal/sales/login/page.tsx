@@ -31,7 +31,6 @@ export default function SalesLoginPage() {
     setLoading(true)
 
     clearSalesReadCache()
-    await supabase.auth.signOut({ scope: 'local' })
 
     const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
     if (signInErr || !data.user) {

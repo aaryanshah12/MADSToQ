@@ -52,11 +52,10 @@ export async function getCurrentSalesUser(): Promise<{
   membership: SalesUser | null
   org: SalesOrg | null
 }> {
-  // Use `getUser()` so a corrupted or stale local session does not hang the portal;
-  // it revalidates with Supabase instead of trusting only local storage.
-  const { data: userData, error: userErr } = await supabase.auth.getUser()
-  const auth = userData.user
-  if (userErr || !auth) return { user: { id: '', email: null }, membership: null, org: null }
+  // `getSession()` is local/fast — enough for a responsive UI after sign-in.
+  const { data: sessionData } = await supabase.auth.getSession()
+  const auth = sessionData.session?.user
+  if (!auth?.id) return { user: { id: '', email: null }, membership: null, org: null }
 
   const { data: members } = await supabase
     .from('sales_users')
@@ -64,6 +63,9 @@ export async function getCurrentSalesUser(): Promise<{
     .eq('user_id', auth.id)
     .eq('is_active', true)
     .limit(1)
+
+  // Revalidate JWT with Supabase in the background (does not block login/dashboard paint).
+  void supabase.auth.getUser()
 
   const m = (members ?? [])[0] as any
   return {

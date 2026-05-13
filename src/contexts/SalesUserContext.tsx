@@ -40,7 +40,6 @@ export function SalesUserProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     inFlight.current = (async () => {
       try {
-        clearSalesReadCache()
         const { user, membership: m, org: o } = await getCurrentSalesUser()
         setAuthUserId(user.id || null)
         setAuthEmail(user.email)
@@ -59,14 +58,6 @@ export function SalesUserProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(() => refresh())
     return () => sub.subscription.unsubscribe()
   }, [])
-
-  // Bust client read cache on every interaction so lists stay fresh and stale cache cannot block UX.
-  useEffect(() => {
-    if (!pathname.startsWith('/personal/sales')) return
-    const onPointerDown = () => clearSalesReadCache()
-    document.addEventListener('pointerdown', onPointerDown, true)
-    return () => document.removeEventListener('pointerdown', onPointerDown, true)
-  }, [pathname])
 
   // Redirect to login when not signed in or not provisioned.
   useEffect(() => {

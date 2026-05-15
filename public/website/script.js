@@ -82,10 +82,177 @@ if (allowMotionCursor) {
   document.body.appendChild(cursor);
   document.body.classList.add("custom-cursor-active");
 
-  document.addEventListener("mousemove", (event) => {
-    cursor.style.left = `${event.clientX}px`;
-    cursor.style.top = `${event.clientY}px`;
-  });
+  const LUMINANCE_THRESHOLD = 0.42;
+  const DARK_SURFACE_SELECTOR =
+    ".portfolio-design-card, .portfolio-browser-bar, .portfolio-screen-overlay, .portfolio-teaser-domain, .btn-primary, .nav-cta";
+
+  const parseColor = (value) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (trimmed === "transparent") return null;
+
+    const hex = trimmed.match(/^#([0-9a-f]{3,8})$/i);
+    if (hex) {
+      let h = hex[1];
+      if (h.length === 3) {
+        h = h
+          .split("")
+          .map((c) => c + c)
+          .join("");
+      }
+      const int = parseInt(h.slice(0, 6), 16);
+      return {
+        r: (int >> 16) & 255,
+        g: (int >> 8) & 255,
+        b: int & 255,
+        a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1,
+      };
+    }
+
+    const rgb = trimmed.match(/rgba?\(([^)]+)\)/i);
+    if (!rgb) return null;
+    const parts = rgb[1].split(",").map((part) => part.trim());
+    if (parts.length < 3) return null;
+    return {
+      r: Number(parts[0]),
+      g: Number(parts[1]),
+      b: Number(parts[2]),
+      a: parts[3] !== undefined ? Number(parts[3]) : 1,
+    };
+  };
+
+  const relativeLuminance = ({ r, g, b }) => {
+    const channel = (c) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  };
+
+  const averageColorLuminance = (colors) => {
+    if (!colors.length) return null;
+    let weight = 0;
+    let total = 0;
+    colors.forEach((color) => {
+      const alpha = Number.isFinite(color.a) ? Math.max(0, Math.min(1, color.a)) : 1;
+      if (alpha < 0.04) return;
+      total += relativeLuminance(color) * alpha;
+      weight += alpha;
+    });
+    return weight ? total / weight : null;
+  };
+
+  const colorsFromBackground = (style) => {
+    const colors = [];
+    const bgColor = parseColor(style.backgroundColor);
+    if (bgColor) colors.push(bgColor);
+
+    const bgImage = style.backgroundImage;
+    if (bgImage && bgImage !== "none") {
+      const matches = bgImage.matchAll(/(#[0-9a-f]{3,8}|rgba?\([^)]+\))/gi);
+      for (const match of matches) {
+        const parsed = parseColor(match[0]);
+        if (parsed) colors.push(parsed);
+      }
+    }
+    return colors;
+  };
+
+  const imageSampleCanvas = document.createElement("canvas");
+  imageSampleCanvas.width = 1;
+  imageSampleCanvas.height = 1;
+  const imageSampleCtx = imageSampleCanvas.getContext("2d", { willReadFrequently: true });
+
+  const sampleImageLuminance = (img, clientX, clientY) => {
+    if (!img.complete || !img.naturalWidth) return null;
+    const rect = img.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    if (
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    ) {
+      return null;
+    }
+
+    const x = ((clientX - rect.left) / rect.width) * img.naturalWidth;
+    const y = ((clientY - rect.top) / rect.height) * img.naturalHeight;
+
+    try {
+      imageSampleCtx.clearRect(0, 0, 1, 1);
+      imageSampleCtx.drawImage(img, x, y, 1, 1, 0, 0, 1, 1);
+      const [r, g, b, a] = imageSampleCtx.getImageData(0, 0, 1, 1).data;
+      if (a < 12) return null;
+      return relativeLuminance({ r, g, b });
+    } catch {
+      return null;
+    }
+  };
+
+  const resolveSurfaceTheme = (clientX, clientY) => {
+    const stack = document
+      .elementsFromPoint(clientX, clientY)
+      .filter((el) => el !== cursor && !cursor.contains(el));
+
+    for (const el of stack) {
+      const themed = el.closest("[data-cursor-theme]");
+      if (themed) {
+        return themed.dataset.cursorTheme === "dark" ? "dark" : "light";
+      }
+    }
+
+    for (const el of stack) {
+      if (el.matches?.(DARK_SURFACE_SELECTOR)) {
+        return "dark";
+      }
+
+      if (el.tagName === "IMG") {
+        const imageLum = sampleImageLuminance(el, clientX, clientY);
+        if (imageLum !== null) {
+          return imageLum < LUMINANCE_THRESHOLD ? "dark" : "light";
+        }
+      }
+
+      const style = getComputedStyle(el);
+      const colors = colorsFromBackground(style);
+      const lum = averageColorLuminance(colors);
+      if (lum !== null) {
+        return lum < LUMINANCE_THRESHOLD ? "dark" : "light";
+      }
+    }
+
+    return "light";
+  };
+
+  let cursorX = window.innerWidth / 2;
+  let cursorY = window.innerHeight / 2;
+  let pendingCursorUpdate = false;
+
+  const updateCursorTheme = () => {
+    pendingCursorUpdate = false;
+    const theme = resolveSurfaceTheme(cursorX, cursorY);
+    cursor.classList.toggle("is-on-dark", theme === "dark");
+  };
+
+  const scheduleCursorThemeUpdate = () => {
+    if (!pendingCursorUpdate) {
+      pendingCursorUpdate = true;
+      requestAnimationFrame(updateCursorTheme);
+    }
+  };
+
+  document.addEventListener(
+    "mousemove",
+    (event) => {
+      cursorX = event.clientX;
+      cursorY = event.clientY;
+      cursor.style.left = `${cursorX}px`;
+      cursor.style.top = `${cursorY}px`;
+      scheduleCursorThemeUpdate();
+    },
+    { passive: true }
+  );
 
   const interactiveElements = document.querySelectorAll(
     "a, button, .tilt-card, .gallery-grid img"
@@ -100,8 +267,11 @@ if (allowMotionCursor) {
     });
   });
 
-  cursor.style.left = `${window.innerWidth / 2}px`;
-  cursor.style.top = `${window.innerHeight / 2}px`;
+  cursor.style.left = `${cursorX}px`;
+  cursor.style.top = `${cursorY}px`;
+  scheduleCursorThemeUpdate();
+  window.addEventListener("scroll", scheduleCursorThemeUpdate, { passive: true });
+  window.addEventListener("resize", scheduleCursorThemeUpdate, { passive: true });
 }
 
 const allowScrollFx = window.matchMedia(

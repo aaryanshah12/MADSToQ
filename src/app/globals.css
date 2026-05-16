@@ -52,6 +52,7 @@
   --glow-owner:   0 0 0 1px rgba(196,125,0,0.2),   0 4px 16px rgba(196,125,0,0.07);
   --glow-inputer: 0 0 0 1px rgba(0,134,179,0.2),   0 4px 16px rgba(0,134,179,0.07);
   --glow-chemist: 0 0 0 1px rgba(0,149,106,0.2),   0 4px 16px rgba(0,149,106,0.07);
+  --glow-pmc:     0 0 0 1px rgba(109,40,217,0.2),   0 4px 16px rgba(109,40,217,0.07);
 }
 
 /* ── DARK THEME ──────────────────────────────────── */
@@ -77,6 +78,7 @@
   --glow-owner:   0 0 0 1px rgba(240,165,0,0.3),   0 4px 20px rgba(240,165,0,0.1);
   --glow-inputer: 0 0 0 1px rgba(0,194,255,0.3),   0 4px 20px rgba(0,194,255,0.1);
   --glow-chemist: 0 0 0 1px rgba(0,229,160,0.3),   0 4px 20px rgba(0,229,160,0.1);
+  --glow-pmc:     0 0 0 1px rgba(167,139,250,0.3), 0 4px 20px rgba(167,139,250,0.1);
 }
 
 /* ── BASE ────────────────────────────────────────── */
@@ -128,6 +130,7 @@ select.input-field, select.input {
 .input-field:focus, .input:focus { border-color: var(--color-inputer); box-shadow: 0 0 0 2px rgba(0,194,255,0.15); }
 .input-field.owner-focus:focus, .input.owner-focus:focus { border-color: var(--color-owner);   box-shadow: 0 0 0 2px rgba(240,165,0,0.15); }
 .input-field.chemist-focus:focus { border-color: var(--color-chemist); box-shadow: 0 0 0 2px rgba(0,229,160,0.15); }
+.input-field.pmc-focus:focus, .input.pmc-focus:focus { border-color: var(--color-pmc); box-shadow: 0 0 0 2px rgba(109,40,217,0.15); }
 /* Touch targets for input */
 @media (max-width: 1024px) {
   .input, .input-field { @apply min-h-[44px]; }
@@ -144,11 +147,13 @@ select.input-field, select.input {
 .role-owner   { color: var(--color-owner); }
 .role-inputer { color: var(--color-inputer); }
 .role-chemist { color: var(--color-chemist); }
+.role-pmc     { color: var(--color-pmc); }
 
 /* ── GLOW BORDERS ────────────────────────────────── */
 .glow-border-owner   { box-shadow: var(--glow-owner); }
 .glow-border-inputer { box-shadow: var(--glow-inputer); }
 .glow-border-chemist { box-shadow: var(--glow-chemist); }
+.glow-border-pmc     { box-shadow: var(--glow-pmc); }
 
 /* ── TABLE ───────────────────────────────────────── */
 .data-table { @apply w-full text-sm; }
@@ -183,6 +188,7 @@ select.input-field, select.input {
 .badge-owner   { background: color-mix(in srgb, var(--color-owner)   15%, transparent); color: var(--color-owner);   border-color: color-mix(in srgb, var(--color-owner)   30%, transparent); }
 .badge-inputer { background: color-mix(in srgb, var(--color-inputer) 15%, transparent); color: var(--color-inputer); border-color: color-mix(in srgb, var(--color-inputer) 30%, transparent); }
 .badge-chemist { background: color-mix(in srgb, var(--color-chemist) 15%, transparent); color: var(--color-chemist); border-color: color-mix(in srgb, var(--color-chemist) 30%, transparent); }
+.badge-pmc     { background: color-mix(in srgb, var(--color-pmc) 15%, transparent); color: var(--color-pmc); border-color: color-mix(in srgb, var(--color-pmc) 30%, transparent); }
 .badge-muted   { background: rgba(128,128,128,0.08); color: var(--color-muted); border-color: var(--color-border); }
 
 /* ── BUTTONS ─────────────────────────────────────── */
@@ -196,6 +202,8 @@ select.input-field, select.input {
 .btn-inputer:hover { background: color-mix(in srgb, var(--color-inputer) 25%, transparent); }
 .btn-chemist { background: color-mix(in srgb, var(--color-chemist) 15%, transparent); color: var(--color-chemist); border: 1px solid color-mix(in srgb, var(--color-chemist) 35%, transparent); }
 .btn-chemist:hover { background: color-mix(in srgb, var(--color-chemist) 25%, transparent); }
+.btn-pmc     { background: color-mix(in srgb, var(--color-pmc) 15%, transparent); color: var(--color-pmc); border: 1px solid color-mix(in srgb, var(--color-pmc) 35%, transparent); }
+.btn-pmc:hover { background: color-mix(in srgb, var(--color-pmc) 25%, transparent); }
 .btn-danger  { background: rgba(239,68,68,0.10); color: #f87171; border: 1px solid rgba(239,68,68,0.30); }
 .btn-danger:hover  { background: rgba(239,68,68,0.20); }
 .btn-ghost   { background: transparent; color: var(--color-muted); border: 1px solid var(--color-border); }
@@ -248,3 +256,16 @@ nav svg {
 
 /* Dimmed primary text (replaces text-white/70) */
 .text-primary-70 { color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+
+/* ── PMC portal helpers ──────────────────────────── */
+.pmc-table-wrap {
+  @apply overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0;
+  -webkit-overflow-scrolling: touch;
+}
+.pmc-table-wrap table { @apply min-w-[32rem]; }
+.pmc-page { @apply max-w-5xl mx-auto w-full min-w-0 space-y-6; }
+.pmc-page-title { @apply text-xl sm:text-2xl font-bold text-primary; }
+.pmc-card { @apply card p-4 sm:p-5; }
+.pmc-nav-active {
+  @apply text-primary font-medium bg-pmc/15 border border-pmc/30;
+}

@@ -86,5 +86,6 @@ create index if not exists idx_pmc_params_product on pmc_product_params(product_
 
 -- RMC formula (app layer):
 -- material_total = SUM(product_material.qty * reference_price.price)
--- unit_before_overhead = material_total / yield_value
+-- yield_divisor = yield_value * 1000   (e.g. 0.108 → 1080)
+-- unit_before_overhead = material_total / yield_divisor
 -- final_rmc = unit_before_overhead + overhead

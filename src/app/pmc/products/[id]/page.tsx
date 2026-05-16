@@ -3,8 +3,14 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
+import clsx from 'clsx'
+import { Download } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
+import {
+  exportPricingSheetToXlsx,
+  exportProductPricingSheetsToXlsx,
+} from '@/lib/pmc/exportSheet'
 import { formatINR, formatQty } from '@/lib/pmc/pricing'
 
 export default function PMCProductDetailPage() {
@@ -24,11 +30,47 @@ export default function PMCProductDetailPage() {
     return pmcApi.pricingSheetForProduct(id)
   }, [id, tick])
 
+  const exportableSheets = useMemo(
+    () =>
+      sheet
+        .filter((row): row is typeof row & { result: NonNullable<typeof row.result> } => !!row.result)
+        .map(({ reference, result }) => ({ reference, result })),
+    [sheet]
+  )
+
+  const [exporting, setExporting] = useState<string | null>(null)
+
+  async function handleExportOne(referenceId: string) {
+    if (!product) return
+    const row = sheet.find((s) => s.reference.id === referenceId)
+    if (!row?.result) return
+    setExporting(referenceId)
+    try {
+      await exportPricingSheetToXlsx({
+        product,
+        reference: row.reference,
+        result: row.result,
+      })
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  async function handleExportAll() {
+    if (!product || !exportableSheets.length) return
+    setExporting('all')
+    try {
+      await exportProductPricingSheetsToXlsx(product, exportableSheets)
+    } finally {
+      setExporting(null)
+    }
+  }
+
   if (!product) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="pmc-page">
         <p className="text-muted">Product not found.</p>
-        <Link href="/pmc/products" className="text-sm mt-4 inline-block" style={{ color: 'var(--color-pmc)' }}>
+        <Link href="/pmc/products" className="text-sm mt-4 inline-block text-pmc hover:underline">
           ← Back to products
         </Link>
       </div>
@@ -66,17 +108,32 @@ export default function PMCProductDetailPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <Link href="/pmc/products" className="text-xs text-muted hover:text-primary">
-          ← Products
-        </Link>
-        <h1 className="text-2xl font-bold text-primary mt-2">{product.name}</h1>
-        <p className="text-sm text-muted">Pricing sheet per reference (RMC = material total ÷ yield + overhead)</p>
+    <div className="pmc-page">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
+          <Link href="/pmc/products" className="text-xs text-muted hover:text-primary">
+            ← Products
+          </Link>
+          <h1 className="pmc-page-title mt-2 break-words">{product.name}</h1>
+          <p className="text-sm text-muted">
+            Pricing sheet per reference (RMC = material total ÷ (yield × 1000) + overhead)
+          </p>
+        </div>
+        {exportableSheets.length > 0 && (
+          <button
+            type="button"
+            onClick={handleExportAll}
+            disabled={exporting !== null}
+            className="btn btn-ghost w-full sm:w-auto justify-center shrink-0"
+          >
+            <Download size={16} />
+            {exporting === 'all' ? 'Exporting…' : `Export all (${exportableSheets.length})`}
+          </button>
+        )}
       </div>
 
       {sheet.length === 0 ? (
-        <p className="text-sm text-muted bg-panel border border-border rounded-xl p-6">
+        <p className="text-sm text-muted pmc-card">
           Create a reference with raw-material prices first.
         </p>
       ) : (
@@ -85,21 +142,21 @@ export default function PMCProductDetailPage() {
             const d = getDraft(reference.id)
             const open = expandedRef === reference.id
             return (
-              <article key={reference.id} className="bg-panel border border-border rounded-xl overflow-hidden">
+              <article key={reference.id} className="pmc-card p-0 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setExpandedRef(open ? null : reference.id)}
-                  className="w-full flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-left hover:bg-layer-sm"
+                  className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]"
                 >
-                  <div>
-                    <span className="font-mono font-semibold">{reference.ref_number}</span>
-                    <span className="text-xs text-muted ml-3">
+                  <div className="min-w-0">
+                    <span className="font-mono font-semibold break-all">{reference.ref_number}</span>
+                    <span className="text-xs text-muted sm:ml-3 block sm:inline mt-0.5 sm:mt-0">
                       {new Date(reference.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right shrink-0">
                     {result ? (
-                      <span className="text-lg font-bold" style={{ color: 'var(--color-pmc)' }}>
+                      <span className="text-lg font-bold text-pmc">
                         RMC {formatINR(result.final_rmc)}
                       </span>
                     ) : (
@@ -109,8 +166,8 @@ export default function PMCProductDetailPage() {
                 </button>
 
                 {open && (
-                  <div className="px-5 pb-5 border-t border-border space-y-5">
-                    <div className="grid sm:grid-cols-3 gap-4 pt-4">
+                  <div className="px-4 sm:px-5 pb-5 border-t border-border space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
                       <Field
                         label="Overhead"
                         value={d.overhead}
@@ -132,7 +189,7 @@ export default function PMCProductDetailPage() {
                         }
                       />
                       <Field
-                        label="Yield value"
+                        label="Yield value (×1000 for divisor)"
                         value={d.yield_value}
                         onChange={(v) =>
                           setDraft((prev) => ({
@@ -142,18 +199,31 @@ export default function PMCProductDetailPage() {
                         }
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => saveParams(reference.id)}
-                      className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-                      style={{ background: 'var(--color-pmc)' }}
-                    >
-                      Save for this reference
-                    </button>
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveParams(reference.id)}
+                        className="btn btn-pmc w-full sm:w-auto justify-center"
+                      >
+                        Save for this reference
+                      </button>
+                      {result && (
+                        <button
+                          type="button"
+                          onClick={() => handleExportOne(reference.id)}
+                          disabled={exporting !== null}
+                          className="btn btn-ghost w-full sm:w-auto justify-center"
+                        >
+                          <Download size={16} />
+                          {exporting === reference.id ? 'Exporting…' : 'Export sheet'}
+                        </button>
+                      )}
+                    </div>
 
                     {result && (
                       <>
-                        <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+                        <div className="pmc-table-wrap mx-0 px-0">
+                        <table className="data-table w-full text-sm border border-border rounded-lg overflow-hidden">
                           <thead>
                             <tr className="bg-layer text-muted text-left">
                               <th className="px-3 py-2">Raw material</th>
@@ -183,9 +253,11 @@ export default function PMCProductDetailPage() {
                             </tr>
                           </tbody>
                         </table>
-                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                           <SummaryRow label="Material total" value={formatINR(result.material_total)} />
-                          <SummaryRow label="Yield (divisor)" value={formatQty(result.yield_value)} />
+                          <SummaryRow label="Yield (entered)" value={formatQty(result.yield_value)} />
+                          <SummaryRow label="Yield divisor (×1000)" value={formatQty(result.yield_divisor)} />
                           <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
                           <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
                           <SummaryRow
@@ -230,7 +302,7 @@ function Field({
         step="any"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg border border-border bg-layer text-sm"
+        className="input w-full pmc-focus"
       />
     </div>
   )
@@ -250,7 +322,7 @@ function SummaryRow({
       className={`flex justify-between px-3 py-2 rounded-lg border border-border ${highlight ? 'bg-layer font-semibold' : 'bg-layer-sm'}`}
     >
       <span className="text-muted">{label}</span>
-      <span className="font-mono" style={highlight ? { color: 'var(--color-pmc)' } : undefined}>
+      <span className={clsx('font-mono', highlight && 'text-pmc')}>
         {value}
       </span>
     </div>

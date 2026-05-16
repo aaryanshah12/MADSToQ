@@ -14,18 +14,18 @@ export default function PMCProductsPage() {
   }, [tick])
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="pmc-page max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-primary">Products</h1>
+        <h1 className="pmc-page-title">Products</h1>
         <p className="text-sm text-muted mt-1">
           Open a product to enter overhead, tons/kg, and yield per reference and view final RMC.
         </p>
       </div>
 
       {products.length === 0 ? (
-        <p className="text-sm text-muted bg-panel border border-border rounded-xl p-6">
+        <p className="text-sm text-muted pmc-card">
           No products yet. Add products and raw materials in{' '}
-          <Link href="/pmc/master" className="underline" style={{ color: 'var(--color-pmc)' }}>
+          <Link href="/pmc/master" className="text-pmc hover:underline">
             Master
           </Link>
           .
@@ -39,9 +39,9 @@ export default function PMCProductsPage() {
               <li key={p.id}>
                 <Link
                   href={`/pmc/products/${p.id}`}
-                  className="flex items-center justify-between bg-panel border border-border rounded-xl px-5 py-4 hover:border-[var(--color-pmc)] transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pmc-card hover:border-pmc/40 transition-colors min-h-[44px]"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <span className="font-semibold text-primary">{p.name}</span>
                     {p.code && (
                       <span className="ml-2 text-xs text-muted font-mono">{p.code}</span>
@@ -51,9 +51,7 @@ export default function PMCProductsPage() {
                       reference{refCount !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-pmc)' }}>
-                    Pricing sheet →
-                  </span>
+                  <span className="text-sm font-medium text-pmc shrink-0">Pricing sheet →</span>
                 </Link>
               </li>
             )

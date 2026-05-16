@@ -60,7 +60,10 @@ export interface PMCPricingResult {
   lines: PMCLineBreakdown[]
   material_total: number
   tons_kg: number
+  /** Yield as entered (e.g. 0.108) */
   yield_value: number
+  /** yield_value × 1000 — used as division divisor (e.g. 1080) */
+  yield_divisor: number
   overhead: number
   unit_before_overhead: number
   final_rmc: number

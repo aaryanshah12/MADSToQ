@@ -27,38 +27,34 @@ export default function PMCMasterProductsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="pmc-page max-w-3xl">
       <div>
         <Link href="/pmc/master" className="text-xs text-muted hover:text-primary">
           ← Master
         </Link>
-        <h1 className="text-2xl font-bold text-primary mt-2">Products</h1>
+        <h1 className="pmc-page-title mt-2">Products</h1>
         <p className="text-sm text-muted">Add products, then assign raw materials and quantities.</p>
       </div>
 
-      <form onSubmit={handleAdd} className="bg-panel border border-border rounded-xl p-5 flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[140px]">
-          <label className="block text-xs text-muted mb-1">Product name</label>
+      <form onSubmit={handleAdd} className="pmc-card flex flex-col sm:flex-row flex-wrap gap-3 sm:items-end">
+        <div className="flex-1 min-w-0 w-full sm:min-w-[140px]">
+          <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">Product name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-layer text-sm"
+            className="input w-full pmc-focus"
             required
           />
         </div>
-        <div className="w-32">
-          <label className="block text-xs text-muted mb-1">Code (optional)</label>
+        <div className="w-full sm:w-32">
+          <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">Code (optional)</label>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-layer text-sm"
+            className="input w-full pmc-focus"
           />
         </div>
-        <button
-          type="submit"
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ background: 'var(--color-pmc)' }}
-        >
+        <button type="submit" className="btn btn-pmc w-full sm:w-auto justify-center">
           Add product
         </button>
       </form>
@@ -68,12 +64,10 @@ export default function PMCMasterProductsPage() {
           <li key={p.id}>
             <Link
               href={`/pmc/master/products/${p.id}`}
-              className="flex justify-between items-center bg-panel border border-border rounded-xl px-5 py-3 hover:border-[var(--color-pmc)]"
+              className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pmc-card hover:border-pmc/40"
             >
               <span className="font-medium">{p.name}</span>
-              <span className="text-xs" style={{ color: 'var(--color-pmc)' }}>
-                Edit recipe →
-              </span>
+              <span className="text-xs text-pmc shrink-0">Edit recipe →</span>
             </Link>
           </li>
         ))}

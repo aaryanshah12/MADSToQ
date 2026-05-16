@@ -34,7 +34,7 @@ export function seedPMCDemoIfEmpty(): boolean {
     reference_id: ref.id,
     overhead: 30,
     tons_kg: 1080,
-    yield_value: 1080,
+    yield_value: 0.108,
   })
 
   return true

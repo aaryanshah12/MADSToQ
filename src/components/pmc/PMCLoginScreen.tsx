@@ -1,16 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { LogIn, Eye, EyeOff } from 'lucide-react'
 import { usePMC } from '@/contexts/PMCContext'
+
+const THEME_KEY = 'theme'
 
 export default function PMCLoginScreen() {
   const router = useRouter()
   const { signIn, loading, email } = usePMC()
   const [formEmail, setFormEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const saved =
+      (localStorage.getItem(THEME_KEY) as 'dark' | 'light' | null) ??
+      (localStorage.getItem('pmc-theme') as 'dark' | 'light' | null) ??
+      'light'
+    document.documentElement.dataset.theme = saved
+    setPassword('')
+  }, [])
 
   if (!loading && email) {
     router.replace('/pmc/dashboard')
@@ -32,50 +45,93 @@ export default function PMCLoginScreen() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center px-4 grid-bg"
       style={{ background: 'var(--color-bg)' }}
     >
-      <div className="w-full max-w-md bg-panel border border-border rounded-2xl p-8 shadow-lg">
-        <p className="text-xs font-mono tracking-widest text-muted uppercase mb-2">MADSToQ</p>
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--color-pmc)' }}>
-          PMC Portal
-        </h1>
-        <p className="text-sm text-muted mb-8">
-          Product pricing — references, raw materials &amp; RMC sheets
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-muted mb-1.5">Email</label>
-            <input
-              type="email"
-              required
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-border bg-layer text-primary text-sm"
-              autoComplete="email"
-            />
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col items-center mb-8">
+          <div className="text-5xl mb-4" aria-hidden>
+            📊
           </div>
-          <div>
-            <label className="block text-xs font-medium text-muted mb-1.5">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-border bg-layer text-primary text-sm"
-              autoComplete="current-password"
-            />
+          <div className="font-display text-2xl font-bold text-primary tracking-wider uppercase text-center">
+            P/<span className="text-pmc">M</span>C Portal
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
-            style={{ background: 'var(--color-pmc)' }}
-          >
-            {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+          <div className="font-mono text-[11px] text-muted tracking-widest mt-1 uppercase text-center">
+            Product pricing · RMC sheets
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                required
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="username"
+                className="input w-full pmc-focus"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  className="input w-full pr-10 pmc-focus"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+            {error && (
+              <div
+                className="text-xs text-red-400 rounded-lg px-3 py-2"
+                style={{
+                  background: 'rgba(239,68,68,0.10)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                }}
+              >
+                {error}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn btn-pmc w-full justify-center mt-2 min-h-[44px]"
+            >
+              {submitting ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <LogIn size={15} /> Sign in
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted text-center">Software is managed by MADSToQ</p>
+          </div>
+        </div>
       </div>
     </div>
   )

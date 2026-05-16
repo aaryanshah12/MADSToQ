@@ -26,43 +26,39 @@ export default function PMCRawMaterialsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="pmc-page max-w-3xl">
       <div>
         <Link href="/pmc/master" className="text-xs text-muted hover:text-primary">
           ← Master
         </Link>
-        <h1 className="text-2xl font-bold text-primary mt-2">Raw materials</h1>
+        <h1 className="pmc-page-title mt-2">Raw materials</h1>
       </div>
 
-      <form onSubmit={handleAdd} className="bg-panel border border-border rounded-xl p-5 flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[140px]">
-          <label className="block text-xs text-muted mb-1">Name</label>
+      <form onSubmit={handleAdd} className="pmc-card flex flex-col sm:flex-row flex-wrap gap-3 sm:items-end">
+        <div className="flex-1 min-w-0 w-full sm:min-w-[140px]">
+          <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-layer text-sm"
+            className="input w-full pmc-focus"
             placeholder="e.g. ONT"
             required
           />
         </div>
-        <div className="w-24">
-          <label className="block text-xs text-muted mb-1">Unit</label>
+        <div className="w-full sm:w-24">
+          <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">Unit</label>
           <input
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-layer text-sm"
+            className="input w-full pmc-focus"
           />
         </div>
-        <button
-          type="submit"
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ background: 'var(--color-pmc)' }}
-        >
+        <button type="submit" className="btn btn-pmc w-full sm:w-auto justify-center">
           Add
         </button>
       </form>
 
-      <ul className="bg-panel border border-border rounded-xl divide-y divide-border">
+      <ul className="pmc-card divide-y divide-border p-0 overflow-hidden">
         {materials.length === 0 ? (
           <li className="px-5 py-8 text-center text-sm text-muted">No raw materials yet.</li>
         ) : (

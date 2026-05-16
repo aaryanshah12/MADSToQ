@@ -8,6 +8,11 @@ import type {
   PMCRawMaterial,
 } from './types'
 
+/** Divisor for RMC: entered yield (e.g. 0.108) × 1000 → 1080 */
+export function yieldDivisor(yieldValue: number): number {
+  return yieldValue * 1000
+}
+
 export function calculateProductPricing(
   reference: PMCReference,
   materials: PMCProductMaterial[],
@@ -37,7 +42,8 @@ export function calculateProductPricing(
   })
 
   const material_total = lines.reduce((sum, l) => sum + l.line_total, 0)
-  const unit_before_overhead = material_total / params.yield_value
+  const divisor = yieldDivisor(params.yield_value)
+  const unit_before_overhead = material_total / divisor
   const final_rmc = unit_before_overhead + params.overhead
 
   return {
@@ -47,6 +53,7 @@ export function calculateProductPricing(
     material_total,
     tons_kg: params.tons_kg,
     yield_value: params.yield_value,
+    yield_divisor: divisor,
     overhead: params.overhead,
     unit_before_overhead,
     final_rmc,

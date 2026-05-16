@@ -67,27 +67,28 @@ export default function PMCMasterProductRecipePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="pmc-page max-w-3xl">
       <div>
         <Link href="/pmc/master/products" className="text-xs text-muted hover:text-primary">
           ← Products
         </Link>
-        <h1 className="text-2xl font-bold text-primary mt-2">{product.name}</h1>
+        <h1 className="pmc-page-title mt-2">{product.name}</h1>
         <p className="text-sm text-muted">Raw materials consumed (qty per batch)</p>
       </div>
 
       {materials.length === 0 ? (
         <p className="text-sm text-muted">
           Add raw materials first in{' '}
-          <Link href="/pmc/master/raw-materials" className="underline" style={{ color: 'var(--color-pmc)' }}>
+          <Link href="/pmc/master/raw-materials" className="text-pmc hover:underline">
             Raw materials
           </Link>
           .
         </p>
       ) : (
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="bg-panel border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="pmc-card p-0 overflow-hidden">
+            <div className="pmc-table-wrap mx-0 px-0">
+            <table className="data-table w-full text-sm min-w-[28rem]">
               <thead>
                 <tr className="bg-layer border-b border-border text-left text-muted">
                   <th className="px-4 py-2">Raw material</th>
@@ -102,7 +103,7 @@ export default function PMCMasterProductRecipePage() {
                       <select
                         value={row.raw_material_id}
                         onChange={(e) => updateRow(i, { raw_material_id: e.target.value })}
-                        className="w-full px-2 py-1.5 rounded border border-border bg-layer"
+                        className="input w-full pmc-focus py-2"
                         required
                       >
                         <option value="">Select…</option>
@@ -120,7 +121,7 @@ export default function PMCMasterProductRecipePage() {
                         step="any"
                         value={row.qty}
                         onChange={(e) => updateRow(i, { qty: e.target.value })}
-                        className="w-full px-2 py-1.5 rounded border border-border bg-layer"
+                        className="input w-full pmc-focus py-2"
                         required
                       />
                     </td>
@@ -128,7 +129,7 @@ export default function PMCMasterProductRecipePage() {
                       <button
                         type="button"
                         onClick={() => removeRow(i)}
-                        className="text-muted hover:text-red-500 text-xs"
+                        className="text-muted hover:text-red-500 text-xs min-h-[44px] min-w-[44px]"
                         aria-label="Remove row"
                       >
                         ✕
@@ -138,16 +139,13 @@ export default function PMCMasterProductRecipePage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={addRow} className="px-3 py-2 text-sm border border-border rounded-lg">
+            <button type="button" onClick={addRow} className="btn btn-ghost w-full sm:w-auto justify-center">
               + Add row
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: 'var(--color-pmc)' }}
-            >
+            <button type="submit" className="btn btn-pmc w-full sm:w-auto justify-center">
               Save recipe
             </button>
           </div>

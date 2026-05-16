@@ -1,8 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
+
 export default function PMCReferencesPage() {
   const { refresh } = usePMC()
   const { tick } = usePMCData()
@@ -56,48 +58,40 @@ export default function PMCReferencesPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Reference Number</h1>
+    <div className="pmc-page max-w-4xl">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="pmc-page-title">Reference Number</h1>
           <p className="text-sm text-muted mt-1">
             A new reference is created whenever you save updated raw-material prices.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openForm}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ background: 'var(--color-pmc)' }}
-        >
-          New reference
+        <button type="button" onClick={openForm} className="btn btn-pmc shrink-0 w-full sm:w-auto justify-center">
+          <Plus size={15} /> New reference
         </button>
       </div>
 
       {showForm && (
-        <form
-          onSubmit={handleSave}
-          className="bg-panel border border-border rounded-xl p-6 space-y-4"
-        >
+        <form onSubmit={handleSave} className="pmc-card space-y-4">
           <h2 className="font-semibold text-primary">Raw material price list</h2>
           <p className="text-xs text-muted">
             Next reference number will be assigned automatically on save.
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="pmc-table-wrap">
+            <table className="data-table w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-muted">
-                  <th className="py-2 pr-4">Material</th>
-                  <th className="py-2 pr-4">Unit</th>
-                  <th className="py-2">Price</th>
+                <tr>
+                  <th>Material</th>
+                  <th>Unit</th>
+                  <th>Price</th>
                 </tr>
               </thead>
               <tbody>
                 {materials.map((m) => (
-                  <tr key={m.id} className="border-b border-border/60">
-                    <td className="py-2 pr-4 font-medium">{m.name}</td>
-                    <td className="py-2 pr-4 text-muted">{m.unit}</td>
-                    <td className="py-2">
+                  <tr key={m.id}>
+                    <td className="font-medium">{m.name}</td>
+                    <td className="text-muted">{m.unit}</td>
+                    <td>
                       <input
                         type="number"
                         min={0}
@@ -107,7 +101,7 @@ export default function PMCReferencesPage() {
                         onChange={(e) =>
                           setPrices((p) => ({ ...p, [m.id]: e.target.value }))
                         }
-                        className="w-28 px-2 py-1.5 rounded border border-border bg-layer"
+                        className="input w-full min-w-[5rem] max-w-[8rem] pmc-focus py-2"
                       />
                     </td>
                   </tr>
@@ -116,62 +110,85 @@ export default function PMCReferencesPage() {
             </table>
           </div>
           <div>
-            <label className="block text-xs text-muted mb-1">Notes (optional)</label>
+            <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">
+              Notes (optional)
+            </label>
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-layer text-sm"
+              className="input w-full pmc-focus"
             />
           </div>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
-              style={{ background: 'var(--color-pmc)' }}
-            >
-              {saving ? 'Saving…' : 'Save reference'}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={saving} className="btn btn-pmc justify-center min-w-[8rem]">
+              {saving ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Save reference'
+              )}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-lg text-sm border border-border"
-            >
+            <button type="button" onClick={() => setShowForm(false)} className="btn btn-ghost">
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      <section className="bg-panel border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-layer border-b border-border text-left text-muted">
-              <th className="px-4 py-3">Reference #</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {references.length === 0 ? (
+      <section className="pmc-card p-0 overflow-hidden">
+        <div className="hidden md:block pmc-table-wrap mx-0 px-0">
+          <table className="data-table w-full">
+            <thead>
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-muted">
-                  No references yet.
-                </td>
+                <th>Reference #</th>
+                <th>Created</th>
+                <th>Notes</th>
               </tr>
-            ) : (
-              references.map((r) => (
-                <tr key={r.id} className="border-b border-border/60 hover:bg-layer-sm">
-                  <td className="px-4 py-3 font-mono font-medium">{r.ref_number}</td>
-                  <td className="px-4 py-3 text-muted">
-                    {new Date(r.created_at).toLocaleString()}
+            </thead>
+            <tbody>
+              {references.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="text-center text-muted py-8">
+                    No references yet.
                   </td>
-                  <td className="px-4 py-3 text-muted">{r.notes || '—'}</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                references.map((r) => (
+                  <tr key={r.id}>
+                    <td className="font-mono font-medium">{r.ref_number}</td>
+                    <td className="text-muted">{new Date(r.created_at).toLocaleString()}</td>
+                    <td className="text-muted">{r.notes || '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="md:hidden data-card-list p-4">
+          {references.length === 0 ? (
+            <p className="text-sm text-muted text-center py-4">No references yet.</p>
+          ) : (
+            references.map((r) => (
+              <article key={r.id} className="data-card">
+                <div className="data-card-header">
+                  <span className="data-card-title font-mono">{r.ref_number}</span>
+                </div>
+                <div className="data-card-grid">
+                  <div>
+                    <p className="data-card-label">Created</p>
+                    <p className="data-card-value text-left mt-0.5">
+                      {new Date(r.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="data-card-label">Notes</p>
+                    <p className="data-card-value text-left mt-0.5">{r.notes || '—'}</p>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
       </section>
     </div>
   )

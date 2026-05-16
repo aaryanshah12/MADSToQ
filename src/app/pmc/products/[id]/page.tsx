@@ -156,8 +156,9 @@ export default function PMCProductDetailPage() {
                   </div>
                   <div className="text-left sm:text-right shrink-0">
                     {result ? (
-                      <span className="text-lg font-bold text-pmc">
-                        RMC {formatINR(result.final_rmc)}
+                      <span className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-base sm:text-lg font-bold text-pmc pmc-rmc-result tabular-nums">
+                        <span className="text-[10px] font-mono uppercase tracking-widest opacity-80">RMC</span>
+                        {formatINR(result.final_rmc)}
                       </span>
                     ) : (
                       <span className="text-sm text-muted">Enter yield to calculate</span>
@@ -260,17 +261,17 @@ export default function PMCProductDetailPage() {
                           <SummaryRow label="Actual" value={formatQty(result.yield_divisor)} />
                           <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
                           <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
-                          <SummaryRow
-                            label="Final RMC"
-                            value={formatINR(result.final_rmc)}
-                            highlight
-                          />
                           {result.tons_kg > 0 && (
                             <SummaryRow
                               label="Tons / Kgs (recorded)"
                               value={formatQty(result.tons_kg)}
                             />
                           )}
+                          <SummaryRow
+                            label="Final RMC"
+                            value={formatINR(result.final_rmc)}
+                            highlight
+                          />
                         </div>
                       </>
                     )}
@@ -317,14 +318,19 @@ function SummaryRow({
   value: string
   highlight?: boolean
 }) {
+  if (highlight) {
+    return (
+      <div className="sm:col-span-2 pmc-rmc-result flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-4 rounded-xl">
+        <span className="text-sm font-semibold text-pmc uppercase tracking-wide">{label}</span>
+        <span className="font-mono text-2xl sm:text-3xl font-bold text-pmc tabular-nums">{value}</span>
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={`flex justify-between px-3 py-2 rounded-lg border border-border ${highlight ? 'bg-layer font-semibold' : 'bg-layer-sm'}`}
-    >
+    <div className="flex justify-between px-3 py-2 rounded-lg border border-border bg-layer-sm">
       <span className="text-muted">{label}</span>
-      <span className={clsx('font-mono', highlight && 'text-pmc')}>
-        {value}
-      </span>
+      <span className="font-mono text-primary tabular-nums">{value}</span>
     </div>
   )
 }

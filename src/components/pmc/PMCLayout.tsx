@@ -88,7 +88,7 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
           </span>
           <div className="min-w-0">
             <div className="font-display text-base sm:text-lg font-bold text-primary tracking-wider uppercase truncate">
-              P/<span className="text-pmc">M</span>C Portal
+              <span className="text-pmc">PMC</span> Portal
             </div>
             <div className="font-mono text-[10px] text-muted tracking-widest">PRODUCT PRICING</div>
           </div>
@@ -204,7 +204,7 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <div className="text-sm font-bold text-primary flex-1 min-w-0 truncate pr-1">
-            P/<span className="text-pmc">M</span>C Portal
+            <span className="text-pmc">PMC</span> Portal
           </div>
           <button
             type="button"

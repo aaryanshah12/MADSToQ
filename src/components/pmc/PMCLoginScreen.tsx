@@ -54,7 +54,7 @@ export default function PMCLoginScreen() {
             📊
           </div>
           <div className="font-display text-2xl font-bold text-primary tracking-wider uppercase text-center">
-            P/<span className="text-pmc">M</span>C Portal
+            <span className="text-pmc">PMC</span> Portal
           </div>
           <div className="font-mono text-[11px] text-muted tracking-widest mt-1 uppercase text-center">
             Product pricing · RMC sheets

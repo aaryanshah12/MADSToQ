@@ -276,3 +276,8 @@ nav svg {
 .bg-pmc-20 { background: color-mix(in srgb, var(--color-pmc) 20%, transparent); }
 .border-pmc-30 { border-color: color-mix(in srgb, var(--color-pmc) 30%, transparent); }
 .hover\:border-pmc-40:hover { border-color: color-mix(in srgb, var(--color-pmc) 40%, transparent); }
+.pmc-rmc-result {
+  background: color-mix(in srgb, var(--color-pmc) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-pmc) 40%, transparent);
+  box-shadow: var(--glow-pmc);
+}

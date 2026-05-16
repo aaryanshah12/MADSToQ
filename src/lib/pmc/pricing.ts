@@ -8,9 +8,9 @@ import type {
   PMCRawMaterial,
 } from './types'
 
-/** Divisor for RMC: entered yield (e.g. 10.8) × 100 → 1080 */
+/** Divisor for RMC: entered yield (e.g. 0.108) × 10000 → 1080 */
 export function yieldDivisor(yieldValue: number): number {
-  return yieldValue * 100
+  return yieldValue * 10000
 }
 
 export function calculateProductPricing(

@@ -62,7 +62,7 @@ export interface PMCPricingResult {
   tons_kg: number
   /** Yield as entered (e.g. 0.108) */
   yield_value: number
-  /** yield_value × 100 — used as division divisor (e.g. 10.8 → 1080) */
+  /** yield_value × 10000 — used as division divisor (e.g. 0.108 → 1080) */
   yield_divisor: number
   overhead: number
   unit_before_overhead: number

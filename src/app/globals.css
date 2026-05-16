@@ -267,5 +267,12 @@ nav svg {
 .pmc-page-title { @apply text-xl sm:text-2xl font-bold text-primary; }
 .pmc-card { @apply card p-4 sm:p-5; }
 .pmc-nav-active {
-  @apply text-primary font-medium bg-pmc/15 border border-pmc/30;
+  @apply text-primary font-medium border;
+  background: color-mix(in srgb, var(--color-pmc) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-pmc) 30%, transparent);
 }
+.bg-pmc-10 { background: color-mix(in srgb, var(--color-pmc) 10%, transparent); }
+.bg-pmc-15 { background: color-mix(in srgb, var(--color-pmc) 15%, transparent); }
+.bg-pmc-20 { background: color-mix(in srgb, var(--color-pmc) 20%, transparent); }
+.border-pmc-30 { border-color: color-mix(in srgb, var(--color-pmc) 30%, transparent); }
+.hover\:border-pmc-40:hover { border-color: color-mix(in srgb, var(--color-pmc) 40%, transparent); }

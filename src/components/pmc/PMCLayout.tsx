@@ -114,8 +114,8 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="px-4 py-4 border-b border-border shrink-0">
-        <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 border text-pmc border-pmc/30 bg-pmc/10">
-          <div className="w-8 h-8 rounded-lg bg-pmc/20 flex items-center justify-center text-sm font-bold flex-shrink-0 text-pmc">
+        <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 border text-pmc border-pmc-30 bg-pmc-10">
+          <div className="w-8 h-8 rounded-lg bg-pmc-20 flex items-center justify-center text-sm font-bold flex-shrink-0 text-pmc">
             {email?.charAt(0).toUpperCase() ?? '?'}
           </div>
           <div className="flex-1 min-w-0">

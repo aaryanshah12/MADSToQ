@@ -64,7 +64,7 @@ export default function PMCMasterProductsPage() {
           <li key={p.id}>
             <Link
               href={`/pmc/master/products/${p.id}`}
-              className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pmc-card hover:border-pmc/40"
+              className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pmc-card hover:border-pmc-40"
             >
               <span className="font-medium">{p.name}</span>
               <span className="text-xs text-pmc shrink-0">Edit recipe →</span>

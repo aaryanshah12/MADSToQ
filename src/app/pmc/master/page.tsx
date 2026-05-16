@@ -27,7 +27,7 @@ export default function PMCMasterPage() {
           <li key={item.href}>
             <Link
               href={item.href}
-              className="block pmc-card hover:border-pmc/40 transition-colors"
+              className="block pmc-card hover:border-pmc-40 transition-colors"
             >
               <h2 className="font-semibold text-primary">{item.title}</h2>
               <p className="text-sm text-muted mt-1">{item.desc}</p>

@@ -39,7 +39,7 @@ export default function PMCProductsPage() {
               <li key={p.id}>
                 <Link
                   href={`/pmc/products/${p.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pmc-card hover:border-pmc/40 transition-colors min-h-[44px]"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pmc-card hover:border-pmc-40 transition-colors min-h-[44px]"
                 >
                   <div className="min-w-0">
                     <span className="font-semibold text-primary">{p.name}</span>

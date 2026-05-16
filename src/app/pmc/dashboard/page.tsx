@@ -88,7 +88,7 @@ export default function PMCDashboardPage() {
 
 function StatCard({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    <Link href={href} className="block pmc-card hover:border-pmc/40 transition-colors glow-border-pmc">
+    <Link href={href} className="block pmc-card hover:border-pmc-40 transition-colors glow-border-pmc">
       <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
       <p className="text-3xl font-bold mt-2 text-pmc">{value}</p>
     </Link>

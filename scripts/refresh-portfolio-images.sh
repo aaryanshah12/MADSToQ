@@ -24,4 +24,9 @@ curl -fsSL -A "Mozilla/5.0" \
   "https://image.thum.io/get/width/1200/crop/675/noanimate/https://www.zenithdyechem.com" \
   -o "$OUT/zenithdyechem-screenshot.png"
 
+echo "→ Nilesh Desai & Co. (full-page screenshot)"
+curl -fsSL -A "Mozilla/5.0" \
+  "https://image.thum.io/get/width/1200/crop/675/noanimate/https://www.nileshdesaiandco.com" \
+  -o "$OUT/nileshdesaiandco-screenshot.png"
+
 echo "Done. Files in $OUT"

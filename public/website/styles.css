@@ -868,6 +868,10 @@ h2 {
   color: #f0d4a8;
 }
 
+.portfolio-browser[data-theme="ca"] .portfolio-tag {
+  color: #c8d8f0;
+}
+
 .portfolio-project-copy {
   min-width: 0;
 }
@@ -947,8 +951,14 @@ h2 {
 
 .portfolio-teaser-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.2rem;
+}
+
+@media (max-width: 1100px) {
+  .portfolio-teaser-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 960px) {

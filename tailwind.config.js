@@ -19,6 +19,7 @@ module.exports = {
         owner:   'var(--color-owner)',
         inputer: 'var(--color-inputer)',
         chemist: 'var(--color-chemist)',
+        pmc:     'var(--color-pmc)',
         muted:   'var(--color-muted)',
         surface: 'var(--color-surface)',
         text:    'var(--color-text)',

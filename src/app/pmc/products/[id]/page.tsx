@@ -257,7 +257,7 @@ export default function PMCProductDetailPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                           <SummaryRow label="Material total" value={formatINR(result.material_total)} />
                           <SummaryRow label="Yield (entered)" value={formatQty(result.yield_value)} />
-                          <SummaryRow label="Yield divisor (×10000)" value={formatQty(result.yield_divisor)} />
+                          <SummaryRow label="Actual" value={formatQty(result.yield_divisor)} />
                           <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
                           <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
                           <SummaryRow

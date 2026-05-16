@@ -116,7 +116,7 @@ export default function PMCProductDetailPage() {
           </Link>
           <h1 className="pmc-page-title mt-2 break-words">{product.name}</h1>
           <p className="text-sm text-muted">
-            Pricing sheet per reference (RMC = material total ÷ (yield × 1000) + overhead)
+            Pricing sheet per reference (RMC = material total ÷ (yield × 100) + overhead)
           </p>
         </div>
         {exportableSheets.length > 0 && (
@@ -189,7 +189,7 @@ export default function PMCProductDetailPage() {
                         }
                       />
                       <Field
-                        label="Yield value (×1000 for divisor)"
+                        label="Yield value (×100 for divisor)"
                         value={d.yield_value}
                         onChange={(v) =>
                           setDraft((prev) => ({
@@ -257,7 +257,7 @@ export default function PMCProductDetailPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                           <SummaryRow label="Material total" value={formatINR(result.material_total)} />
                           <SummaryRow label="Yield (entered)" value={formatQty(result.yield_value)} />
-                          <SummaryRow label="Yield divisor (×1000)" value={formatQty(result.yield_divisor)} />
+                          <SummaryRow label="Yield divisor (×100)" value={formatQty(result.yield_divisor)} />
                           <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
                           <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
                           <SummaryRow

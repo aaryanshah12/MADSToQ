@@ -41,7 +41,7 @@ async function buildWorkbook(sheets: SheetExportInput[]) {
     ws.addRow(['Overhead', result.overhead])
     ws.addRow(['Tons / Kgs required', result.tons_kg])
     ws.addRow(['Yield (entered)', result.yield_value])
-    ws.addRow(['Yield divisor (×1000)', result.yield_divisor])
+    ws.addRow(['Yield divisor (×100)', result.yield_divisor])
     ws.addRow([])
 
     const headers = ['Raw material', 'Qty', 'Price', 'Line total']

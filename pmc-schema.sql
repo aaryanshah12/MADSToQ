@@ -49,6 +49,7 @@ create table if not exists pmc_product_materials (
   product_id      uuid not null references pmc_products(id) on delete cascade,
   raw_material_id uuid not null references pmc_raw_materials(id),
   qty             numeric(14,4) not null check (qty > 0),
+  is_primary      boolean not null default false,
   sort_order      int not null default 0,
   unique (product_id, raw_material_id)
 );
@@ -74,9 +75,9 @@ create table if not exists pmc_product_params (
   id           uuid primary key default gen_random_uuid(),
   product_id   uuid not null references pmc_products(id) on delete cascade,
   reference_id uuid not null references pmc_references(id) on delete cascade,
-  overhead     numeric(14,4) not null default 0,
-  tons_kg      numeric(14,4) not null default 0,
-  yield_value  numeric(14,4) not null default 1,
+  overhead          numeric(14,4) not null default 0,
+  batch_multiplier  numeric(14,4) not null default 1,
+  yield_value       numeric(14,4) not null default 1,
   updated_at   timestamptz default now(),
   unique (product_id, reference_id)
 );
@@ -85,7 +86,8 @@ create index if not exists idx_pmc_ref_created on pmc_references(created_at desc
 create index if not exists idx_pmc_params_product on pmc_product_params(product_id);
 
 -- RMC formula (app layer):
--- material_total = SUM(product_material.qty * reference_price.price)
--- yield_divisor = yield_value * 10000  (e.g. 0.108 → 1080)
--- unit_before_overhead = material_total / yield_divisor
+-- effective_qty = recipe_qty * batch_multiplier
+-- material_total = SUM(effective_qty * reference_price.price)
+-- real_final_product = yield_value * primary_recipe_qty
+-- unit_before_overhead = material_total / real_final_product
 -- final_rmc = unit_before_overhead + overhead

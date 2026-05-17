@@ -26,15 +26,17 @@ export function seedPMCDemoIfEmpty(): boolean {
     materials.map((m, i) => ({
       raw_material_id: m.id,
       qty: [2000, 200, 2050, 2250, 3500][i],
+      is_primary: i === 0,
     }))
   )
 
+  // yield × primary (2000) = 1080 → RMC ≈ 536.1 with batch multiplier 1
   pmcApi.upsertProductParams({
     product_id: product.id,
     reference_id: ref.id,
     overhead: 30,
-    tons_kg: 1080,
-    yield_value: 0.108,
+    batch_multiplier: 1,
+    yield_value: 0.54,
   })
 
   return true

@@ -281,3 +281,56 @@ nav svg {
   border: 1px solid color-mix(in srgb, var(--color-pmc) 40%, transparent);
   box-shadow: var(--glow-pmc);
 }
+.pmc-primary-row {
+  background: color-mix(in srgb, var(--color-pmc) 12%, transparent);
+}
+.pmc-latest-ref {
+  background: color-mix(in srgb, var(--color-pmc) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-pmc) 35%, transparent);
+}
+.pmc-sheet-sticky-rmc {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--color-panel);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-pmc) 35%, transparent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+[data-theme='dark'] .pmc-sheet-sticky-rmc {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.pmc-mobile-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  background: var(--color-panel);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+}
+[data-theme='dark'] .pmc-mobile-dock {
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+}
+.pmc-page-sheet-open {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .pmc-mobile-dock {
+    display: none;
+  }
+  .pmc-page-sheet-open {
+    padding-bottom: 0;
+  }
+}
+.pmc-metric-chip {
+  @apply rounded-lg border border-border bg-layer-sm px-3 py-2 min-w-[7.5rem] shrink-0;
+}
+.pmc-line-card {
+  @apply rounded-lg border border-border bg-layer-sm p-3 space-y-2;
+}
+.pmc-line-card.is-primary {
+  background: color-mix(in srgb, var(--color-pmc) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-pmc) 35%, transparent);
+}

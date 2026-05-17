@@ -111,21 +111,46 @@ export const pmcApi = {
 
   setProductMaterials(
     productId: string,
-    rows: { raw_material_id: string; qty: number }[]
+    rows: { raw_material_id: string; qty: number; is_primary: boolean }[]
   ): void {
     const store = read()
+    const valid = rows.filter((r) => r.raw_material_id && r.qty > 0)
+    const primaryCount = valid.filter((r) => r.is_primary).length
+    if (valid.length > 0 && primaryCount !== 1) {
+      throw new Error('Select exactly one primary raw material (Yes).')
+    }
     store.product_materials = store.product_materials.filter((m) => m.product_id !== productId)
-    rows.forEach((row, i) => {
-      if (!row.raw_material_id || row.qty <= 0) return
+    valid.forEach((row, i) => {
       store.product_materials.push({
         id: newId(),
         product_id: productId,
         raw_material_id: row.raw_material_id,
         qty: row.qty,
         sort_order: i,
+        is_primary: row.is_primary,
       })
     })
     write(store)
+  },
+
+  getPrimaryMaterial(productId: string): PMCProductMaterial | undefined {
+    return pmcApi.listProductMaterials(productId).find((m) => m.is_primary)
+  },
+
+  getReferenceDetail(referenceId: string) {
+    const reference = pmcApi.getReference(referenceId)
+    if (!reference) return null
+    const prices = pmcApi.getReferencePrices(referenceId)
+    const materials = pmcApi.listRawMaterials()
+    const nameById = new Map(materials.map((m) => [m.id, m]))
+    return {
+      reference,
+      prices: prices.map((p) => ({
+        ...p,
+        material_name: nameById.get(p.raw_material_id)?.name ?? '—',
+        unit: nameById.get(p.raw_material_id)?.unit ?? 'Kg',
+      })),
+    }
   },
 
   // ─── References ──────────────────────────────────────────
@@ -195,7 +220,7 @@ export const pmcApi = {
     product_id: string
     reference_id: string
     overhead: number
-    tons_kg: number
+    batch_multiplier: number
     yield_value: number
   }): PMCProductParams {
     const store = read()
@@ -207,7 +232,7 @@ export const pmcApi = {
       product_id: input.product_id,
       reference_id: input.reference_id,
       overhead: input.overhead,
-      tons_kg: input.tons_kg,
+      batch_multiplier: input.batch_multiplier > 0 ? input.batch_multiplier : 1,
       yield_value: input.yield_value,
       updated_at: new Date().toISOString(),
     }

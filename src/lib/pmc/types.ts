@@ -20,6 +20,7 @@ export interface PMCProductMaterial {
   raw_material_id: string
   qty: number
   sort_order: number
+  is_primary: boolean
 }
 
 export interface PMCReference {
@@ -41,17 +42,22 @@ export interface PMCProductParams {
   product_id: string
   reference_id: string
   overhead: number
-  tons_kg: number
+  /** Multiplies every recipe qty for this reference's cost sheet */
+  batch_multiplier: number
   yield_value: number
   updated_at: string
+  /** @deprecated migrated to batch_multiplier */
+  tons_kg?: number
 }
 
 export interface PMCLineBreakdown {
   raw_material_id: string
   raw_material_name: string
-  qty: number
+  base_qty: number
+  effective_qty: number
   price: number
   line_total: number
+  is_primary: boolean
 }
 
 export interface PMCPricingResult {
@@ -59,11 +65,11 @@ export interface PMCPricingResult {
   ref_number: string
   lines: PMCLineBreakdown[]
   material_total: number
-  tons_kg: number
-  /** Yield as entered (e.g. 0.108) */
+  batch_multiplier: number
   yield_value: number
-  /** yield_value × 10000 — used as division divisor (e.g. 0.108 → 1080) */
-  yield_divisor: number
+  primary_material_name: string
+  primary_material_qty: number
+  real_final_product: number
   overhead: number
   unit_before_overhead: number
   final_rmc: number

@@ -39,22 +39,30 @@ async function buildWorkbook(sheets: SheetExportInput[]) {
     const paramHeader = ws.addRow(['Parameter', 'Value'])
     paramHeader.font = { bold: true }
     ws.addRow(['Overhead', result.overhead])
-    ws.addRow(['Tons / Kgs required', result.tons_kg])
-    ws.addRow(['Yield (entered)', result.yield_value])
-    ws.addRow(['Actual', result.yield_divisor])
+    ws.addRow(['Batch multiplier', result.batch_multiplier])
+    ws.addRow(['Yield', result.yield_value])
+    ws.addRow(['Primary material', `${result.primary_material_name} (${result.primary_material_qty})`])
+    ws.addRow(['Real Final Product', result.real_final_product])
     ws.addRow([])
 
-    const headers = ['Raw material', 'Qty', 'Price', 'Line total']
+    const headers = ['Raw material', 'Primary', 'Base qty', 'Effective qty', 'Price', 'Line total']
     const hRow = ws.addRow(headers)
     hRow.font = { bold: true, size: 11 }
     hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E0F7' } }
     hRow.alignment = { vertical: 'middle' }
 
     for (const line of result.lines) {
-      ws.addRow([line.raw_material_name, line.qty, line.price, line.line_total])
+      ws.addRow([
+        line.raw_material_name,
+        line.is_primary ? 'Yes' : 'No',
+        line.base_qty,
+        line.effective_qty,
+        line.price,
+        line.line_total,
+      ])
     }
 
-    const totalRow = ws.addRow(['Material total', '', '', result.material_total])
+    const totalRow = ws.addRow(['Material total', '', '', '', '', result.material_total])
     totalRow.font = { bold: true }
     ws.addRow([])
     ws.addRow(['Unit before overhead', result.unit_before_overhead])
@@ -63,12 +71,13 @@ async function buildWorkbook(sheets: SheetExportInput[]) {
     rmcRow.font = { bold: true, size: 12 }
 
     ws.columns.forEach((col, i) => {
-      const widths = [28, 14, 14, 16]
+      const widths = [28, 10, 12, 14, 12, 16]
       col.width = widths[i] ?? 14
     })
-    ws.getColumn(2).numFmt = '#,##0.00'
     ws.getColumn(3).numFmt = '#,##0.00'
     ws.getColumn(4).numFmt = '#,##0.00'
+    ws.getColumn(5).numFmt = '#,##0.00'
+    ws.getColumn(6).numFmt = '#,##0.00'
   }
 
   return wb

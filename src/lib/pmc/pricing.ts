@@ -8,11 +8,6 @@ import type {
   PMCRawMaterial,
 } from './types'
 
-/** Divisor for RMC: entered yield (e.g. 0.108) × 10000 → 1080 */
-export function yieldDivisor(yieldValue: number): number {
-  return yieldValue * 10000
-}
-
 export function calculateProductPricing(
   reference: PMCReference,
   materials: PMCProductMaterial[],
@@ -21,6 +16,15 @@ export function calculateProductPricing(
   params: PMCProductParams | null
 ): PMCPricingResult | null {
   if (!params || params.yield_value <= 0) return null
+
+  const primaryRow = materials.find((m) => m.is_primary)
+  if (!primaryRow || primaryRow.qty <= 0) return null
+
+  const batchMultiplier =
+    params.batch_multiplier > 0 ? params.batch_multiplier : 1
+
+  const real_final_product = params.yield_value * primaryRow.qty
+  if (real_final_product <= 0) return null
 
   const priceByMaterial = new Map(
     referencePrices
@@ -32,18 +36,20 @@ export function calculateProductPricing(
 
   const lines: PMCLineBreakdown[] = materials.map((row) => {
     const price = priceByMaterial.get(row.raw_material_id) ?? 0
+    const effective_qty = row.qty * batchMultiplier
     return {
       raw_material_id: row.raw_material_id,
       raw_material_name: nameById.get(row.raw_material_id) ?? '—',
-      qty: row.qty,
+      base_qty: row.qty,
+      effective_qty,
       price,
-      line_total: row.qty * price,
+      line_total: effective_qty * price,
+      is_primary: row.is_primary,
     }
   })
 
   const material_total = lines.reduce((sum, l) => sum + l.line_total, 0)
-  const divisor = yieldDivisor(params.yield_value)
-  const unit_before_overhead = material_total / divisor
+  const unit_before_overhead = material_total / real_final_product
   const final_rmc = unit_before_overhead + params.overhead
 
   return {
@@ -51,9 +57,11 @@ export function calculateProductPricing(
     ref_number: reference.ref_number,
     lines,
     material_total,
-    tons_kg: params.tons_kg,
+    batch_multiplier: batchMultiplier,
     yield_value: params.yield_value,
-    yield_divisor: divisor,
+    primary_material_name: nameById.get(primaryRow.raw_material_id) ?? '—',
+    primary_material_qty: primaryRow.qty,
+    real_final_product,
     overhead: params.overhead,
     unit_before_overhead,
     final_rmc,

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useMemo, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { Download, ChevronDown, ChevronUp, Eye } from 'lucide-react'
+import { Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
 import {
@@ -184,22 +184,21 @@ export default function PMCProductDetailPage() {
             return (
               <article
                 key={reference.id}
-                className={clsx('pmc-card p-0 overflow-hidden', isLatest && 'pmc-latest-ref')}
+                className="pmc-card p-0 overflow-hidden"
               >
-                <div className="flex items-stretch">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (open) {
-                        setExpandedRef(null)
-                        setRefDetailsOpen(null)
-                      } else {
-                        setExpandedRef(reference.id)
-                        setRefDetailsOpen(null)
-                      }
-                    }}
-                    className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]"
-                  >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (open) {
+                      setExpandedRef(null)
+                      setRefDetailsOpen(null)
+                    } else {
+                      setExpandedRef(reference.id)
+                      setRefDetailsOpen(null)
+                    }
+                  }}
+                  className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]"
+                >
                     <div className="min-w-0 flex flex-wrap items-center gap-2">
                       <span className="font-mono font-semibold break-all">{reference.ref_number}</span>
                       {isLatest && (
@@ -225,23 +224,7 @@ export default function PMCProductDetailPage() {
                       </span>
                     )}
                   </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!open) setExpandedRef(reference.id)
-                      setRefDetailsOpen((prev) => (prev === reference.id ? null : reference.id))
-                    }}
-                    className={clsx(
-                      'shrink-0 flex items-center justify-center min-w-[48px] px-3 border-l border-border hover:bg-layer-sm transition-colors',
-                      refDetailsOpen === reference.id && 'bg-pmc-10 text-pmc'
-                    )}
-                    aria-label={`View prices for ${reference.ref_number}`}
-                    title="View reference price list"
-                  >
-                    <Eye size={18} />
-                  </button>
-                </div>
+                </button>
 
                 {open && (
                   <div className="border-t border-border">
@@ -506,9 +489,9 @@ function PricingSummaryCompact({
 
   return (
     <div className="space-y-3">
-      <div className="pmc-rmc-result flex items-center justify-between gap-3 px-4 py-3 rounded-xl">
-        <span className="text-xs font-semibold text-pmc uppercase tracking-wide">Final RMC</span>
-        <span className="font-mono text-2xl font-bold text-pmc tabular-nums">{formatINR(result.final_rmc)}</span>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-border bg-layer-sm">
+        <span className="text-xs font-semibold text-muted uppercase tracking-wide">Final RMC</span>
+        <span className="font-mono text-2xl font-bold text-primary tabular-nums">{formatINR(result.final_rmc)}</span>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         <MetricChip label="Material" value={formatINR(result.material_total)} />
@@ -538,12 +521,13 @@ function PricingSummaryGrid({ result, compact }: { result: PMCPricingResult; com
       <SummaryRow
         label="Primary material"
         value={`${result.primary_material_name} (${formatQty(result.primary_material_qty)})`}
+        primary
       />
       <SummaryRow label="Real Final Product" value={formatQty(result.real_final_product)} />
       <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
       <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
       {!compact && (
-        <SummaryRow label="Final RMC" value={formatINR(result.final_rmc)} highlight />
+        <SummaryRow label="Final RMC" value={formatINR(result.final_rmc)} emphasis />
       )}
     </div>
   )
@@ -667,17 +651,28 @@ function Field({
 function SummaryRow({
   label,
   value,
-  highlight,
+  primary,
+  emphasis,
 }: {
   label: string
   value: string
-  highlight?: boolean
+  primary?: boolean
+  emphasis?: boolean
 }) {
-  if (highlight) {
+  if (primary) {
     return (
-      <div className="sm:col-span-2 pmc-rmc-result flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-4 rounded-xl">
-        <span className="text-sm font-semibold text-pmc uppercase tracking-wide">{label}</span>
-        <span className="font-mono text-2xl sm:text-3xl font-bold text-pmc tabular-nums">{value}</span>
+      <div className="flex justify-between px-3 py-2 rounded-lg border gap-3 pmc-primary-row border-pmc-30">
+        <span className="text-pmc font-medium shrink-0">{label}</span>
+        <span className="font-mono text-pmc font-semibold tabular-nums text-right break-all">{value}</span>
+      </div>
+    )
+  }
+
+  if (emphasis) {
+    return (
+      <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3 rounded-lg border border-border bg-layer-sm">
+        <span className="text-sm font-semibold text-primary">{label}</span>
+        <span className="font-mono text-xl sm:text-2xl font-bold text-primary tabular-nums">{value}</span>
       </div>
     )
   }

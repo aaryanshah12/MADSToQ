@@ -42,6 +42,19 @@ function migrateStore(store: PMCStore): PMCStore {
     if (rows.length > 0) rows[0].is_primary = true
   })
 
+  const needsRefMigrate = store.references.some(
+    (r) => !/^REF-\d{3}$/.test(r.ref_number)
+  )
+  if (needsRefMigrate && store.references.length > 0) {
+    const sorted = [...store.references].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+    sorted.forEach((r, i) => {
+      const row = store.references.find((x) => x.id === r.id)
+      if (row) row.ref_number = `REF-${String(i + 1).padStart(3, '0')}`
+    })
+  }
+
   return store
 }
 
@@ -65,9 +78,12 @@ export function newId(): string {
   return crypto.randomUUID()
 }
 
+/** Sequential reference ids: REF-001, REF-002, … */
 export function nextRefNumber(references: { ref_number: string }[]): string {
-  const prefix = `REF-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-`
-  const today = references.filter((r) => r.ref_number.startsWith(prefix))
-  const seq = today.length + 1
-  return `${prefix}${String(seq).padStart(3, '0')}`
+  let max = 0
+  for (const r of references) {
+    const m = r.ref_number.match(/^REF-(\d{3})$/)
+    if (m) max = Math.max(max, parseInt(m[1], 10))
+  }
+  return `REF-${String(max + 1).padStart(3, '0')}`
 }

@@ -26,6 +26,11 @@ export default function PMCReferencesPage() {
     return pmcApi.listReferences()
   }, [tick])
 
+  const latestRefId = useMemo(() => {
+    void tick
+    return pmcApi.getLatestReference()?.id ?? null
+  }, [tick])
+
   const latestPrices = useMemo(() => {
     const latest = pmcApi.getLatestReference()
     if (!latest) return new Map<string, number>()
@@ -66,7 +71,8 @@ export default function PMCReferencesPage() {
         <div className="min-w-0">
           <h1 className="pmc-page-title">Reference Number</h1>
           <p className="text-sm text-muted mt-1">
-            A new reference is created whenever you save updated raw-material prices.
+            A new reference is created whenever you save updated raw-material prices. Numbers are
+            sequential (REF-001, REF-002, …).
           </p>
         </div>
         <button type="button" onClick={openForm} className="btn btn-pmc shrink-0 w-full sm:w-auto justify-center">
@@ -145,13 +151,12 @@ export default function PMCReferencesPage() {
                 <th>Reference #</th>
                 <th>Created</th>
                 <th>Notes</th>
-                <th className="w-12" aria-label="View prices" />
               </tr>
             </thead>
             <tbody>
               {references.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center text-muted py-8">
+                  <td colSpan={3} className="text-center text-muted py-8">
                     No references yet.
                   </td>
                 </tr>
@@ -164,6 +169,7 @@ export default function PMCReferencesPage() {
                       refNumber={r.ref_number}
                       createdAt={r.created_at}
                       notes={r.notes}
+                      isLatest={r.id === latestRefId}
                       open={viewRefId === r.id}
                       detail={detail}
                       onToggleView={() => setViewRefId(viewRefId === r.id ? null : r.id)}
@@ -185,19 +191,26 @@ export default function PMCReferencesPage() {
               return (
                 <article key={r.id} className="data-card">
                   <div className="data-card-header">
-                    <span className="data-card-title font-mono">{r.ref_number}</span>
-                    <button
-                      type="button"
-                      onClick={() => setViewRefId(open ? null : r.id)}
-                      className={clsx(
-                        'p-2 rounded-lg border border-border hover:bg-layer-sm min-h-[40px] min-w-[40px] flex items-center justify-center',
-                        open && 'bg-pmc-10 text-pmc border-pmc-30'
+                    <span className="data-card-title font-mono flex flex-wrap items-center gap-2">
+                      {r.ref_number}
+                      {r.id === latestRefId && (
+                        <span className="badge badge-pmc text-[10px] uppercase tracking-wide">
+                          Latest
+                        </span>
                       )}
-                      aria-label={`View prices for ${r.ref_number}`}
-                      title="View price list"
-                    >
-                      <Eye size={16} />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewRefId(open ? null : r.id)}
+                        className={clsx(
+                          'inline-flex items-center justify-center min-h-[32px] min-w-[32px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc',
+                          open && 'bg-pmc-10 text-pmc border-pmc-30'
+                        )}
+                        aria-label={`View prices for ${r.ref_number}`}
+                        title="View price list"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </span>
                   </div>
                   <div className="data-card-grid">
                     <div>
@@ -228,6 +241,7 @@ function ReferenceRow({
   refNumber,
   createdAt,
   notes,
+  isLatest,
   open,
   detail,
   onToggleView,
@@ -235,6 +249,7 @@ function ReferenceRow({
   refNumber: string
   createdAt: string
   notes: string | null
+  isLatest?: boolean
   open: boolean
   detail: ReturnType<typeof pmcApi.getReferenceDetail> | null
   onToggleView: () => void
@@ -242,27 +257,34 @@ function ReferenceRow({
   return (
     <>
       <tr className={open ? 'bg-layer-sm' : undefined}>
-        <td className="font-mono font-medium">{refNumber}</td>
+        <td className="font-mono font-medium">
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span>{refNumber}</span>
+            {isLatest && (
+              <span className="badge badge-pmc text-[10px] uppercase tracking-wide font-sans">
+                Latest
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onToggleView}
+              className={clsx(
+                'inline-flex items-center justify-center min-h-[32px] min-w-[32px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc',
+                open && 'bg-pmc-10 text-pmc border-pmc-30'
+              )}
+              aria-label={`View prices for ${refNumber}`}
+              title="View price list"
+            >
+              <Eye size={16} />
+            </button>
+          </span>
+        </td>
         <td className="text-muted">{new Date(createdAt).toLocaleString()}</td>
         <td className="text-muted">{notes || '—'}</td>
-        <td className="text-right">
-          <button
-            type="button"
-            onClick={onToggleView}
-            className={clsx(
-              'inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg border border-border hover:bg-layer-sm transition-colors',
-              open && 'bg-pmc-10 text-pmc border-pmc-30'
-            )}
-            aria-label={`View prices for ${refNumber}`}
-            title="View price list"
-          >
-            <Eye size={16} />
-          </button>
-        </td>
       </tr>
       {open && detail && (
         <tr>
-          <td colSpan={4} className="p-0 bg-layer-sm/50">
+          <td colSpan={3} className="p-0 bg-layer-sm/50">
             <ReferencePriceList detail={detail} className="p-4" />
           </td>
         </tr>

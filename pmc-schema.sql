@@ -55,12 +55,18 @@ create table if not exists pmc_product_materials (
 );
 
 -- ─── REFERENCE (price snapshot) ────────────────────────────
+-- ref_number: sequential REF-001, REF-002, … (not date-based)
 create table if not exists pmc_references (
   id         uuid primary key default gen_random_uuid(),
-  ref_number text not null unique,
+  ref_number text not null unique
+    check (ref_number ~ '^REF-[0-9]{3}$'),
   notes      text,
   created_at timestamptz default now()
 );
+
+-- Optional: allocate next ref in SQL (app uses same logic in storage.ts)
+-- select 'REF-' || lpad((coalesce(max(substring(ref_number from 5)::int), 0) + 1)::text, 3, '0')
+-- from pmc_references;
 
 create table if not exists pmc_reference_prices (
   id              uuid primary key default gen_random_uuid(),
@@ -92,3 +98,18 @@ create index if not exists idx_pmc_params_product on pmc_product_params(product_
 -- real_final_product = yield_value * primary_effective_qty
 -- unit_before_overhead = material_total / real_final_product
 -- final_rmc = unit_before_overhead + overhead
+
+-- ─── MIGRATION: date-based refs → REF-001, REF-002 ─────────
+-- Run once if upgrading from REF-YYYYMMDD-NNN format:
+--
+-- with ordered as (
+--   select id, row_number() over (order by created_at) as n
+--   from pmc_references
+-- )
+-- update pmc_references r
+-- set ref_number = 'REF-' || lpad(o.n::text, 3, '0')
+-- from ordered o where r.id = o.id;
+--
+-- alter table pmc_references
+--   add constraint pmc_references_ref_number_format
+--   check (ref_number ~ '^REF-[0-9]{3}$');

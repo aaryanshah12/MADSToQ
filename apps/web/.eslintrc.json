@@ -1,0 +1,23 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "overrides": [
+    {
+      "files": ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}", "src/hooks/**/*.{ts,tsx}", "src/contexts/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
+      "excludedFiles": ["src/app/api/**", "src/lib/server/**", "src/lib/sales/server.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "MemberExpression[object.name='supabase'][property.name='from']",
+            "message": "Use /api routes for database access. Browser must not call supabase.from()."
+          },
+          {
+            "selector": "MemberExpression[object.name='supabase'][property.name='rpc']",
+            "message": "Use /api routes for database access. Browser must not call supabase.rpc()."
+          }
+        ]
+      }
+    }
+  ]
+}
+

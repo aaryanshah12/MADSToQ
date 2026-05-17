@@ -1,0 +1,10 @@
+/**
+ * Browser Supabase client — authentication and realtime only.
+ * Do not use .from() or .rpc(); all data access goes through /api routes.
+ */
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+export const authClient = createClient(supabaseUrl, supabaseAnonKey)

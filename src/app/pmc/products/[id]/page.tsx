@@ -53,6 +53,7 @@ export default function PMCProductDetailPage() {
   )
 
   const [exporting, setExporting] = useState<string | null>(null)
+  const [savingRef, setSavingRef] = useState<string | null>(null)
 
   async function handleExportOne(referenceId: string) {
     if (!product) return
@@ -105,7 +106,7 @@ export default function PMCProductDetailPage() {
     }
   }
 
-  function saveParams(referenceId: string) {
+  async function saveParams(referenceId: string) {
     const d = getDraft(referenceId)
     const overhead = Number(d.overhead) || 0
     const batch_multiplier = Number(d.batch_multiplier) || 0
@@ -122,20 +123,25 @@ export default function PMCProductDetailPage() {
       alert('Set a primary raw material in Master → Products → recipe (Yes).')
       return
     }
-    pmcApi.upsertProductParams({
-      product_id: id,
-      reference_id: referenceId,
-      overhead,
-      batch_multiplier,
-      yield_value,
-    })
-    refresh()
+    setSavingRef(referenceId)
+    try {
+      await pmcApi.upsertProductParams({
+        product_id: id,
+        reference_id: referenceId,
+        overhead,
+        batch_multiplier,
+        yield_value,
+      })
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not save parameters.')
+    } finally {
+      setSavingRef(null)
+    }
   }
 
-  const dockRow = expandedRef ? sheet.find((s) => s.reference.id === expandedRef) : null
-
   return (
-    <div className={clsx('pmc-page', expandedRef && 'pmc-page-sheet-open')}>
+    <div className="pmc-page">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
           <Link href="/pmc/products" className="text-xs text-muted hover:text-primary">
@@ -231,12 +237,8 @@ export default function PMCProductDetailPage() {
 
                 {open && (
                   <div className="border-t border-border">
-                    <div className="lg:hidden pmc-sheet-sticky-rmc px-4 py-3">
-                      <PricingSummaryCompact result={result} pending={!result} />
-                    </div>
-
                     <div className="px-4 sm:px-5 pb-5 space-y-4">
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 pt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
                         <Field
                           label="Overhead"
                           value={d.overhead}
@@ -259,7 +261,6 @@ export default function PMCProductDetailPage() {
                         />
                         <Field
                           label="Yield value"
-                          className="col-span-2 lg:col-span-1"
                           value={d.yield_value}
                           onChange={(v) =>
                             setDraft((prev) => ({
@@ -270,20 +271,21 @@ export default function PMCProductDetailPage() {
                         />
                       </div>
 
-                      <div className="hidden lg:flex flex-wrap gap-2">
+                      <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => saveParams(reference.id)}
-                          className="btn btn-pmc justify-center"
+                          disabled={savingRef === reference.id}
+                          className="btn btn-pmc w-full sm:w-auto justify-center"
                         >
-                          Save for this reference
+                          {savingRef === reference.id ? 'Saving…' : 'Save for this reference'}
                         </button>
                         {result && (
                           <button
                             type="button"
                             onClick={() => handleExportOne(reference.id)}
                             disabled={exporting !== null}
-                            className="btn btn-ghost justify-center"
+                            className="btn btn-ghost w-full sm:w-auto justify-center"
                           >
                             <Download size={16} />
                             {exporting === reference.id ? 'Exporting…' : 'Export sheet'}
@@ -293,11 +295,7 @@ export default function PMCProductDetailPage() {
 
                       <MaterialBreakdownSection result={result} />
 
-                      {result && (
-                        <div className="hidden lg:block">
-                          <PricingSummaryGrid result={result} />
-                        </div>
-                      )}
+                      {result && <PricingSummaryGrid result={result} />}
 
                       <CollapsibleSection
                         id={`ref-prices-${reference.id}`}
@@ -315,23 +313,7 @@ export default function PMCProductDetailPage() {
                                 {refDetail.reference.notes}
                               </p>
                             )}
-                            <div className="lg:hidden p-3 space-y-0">
-                              {refDetail.prices.map((p) => (
-                                <div
-                                  key={p.id}
-                                  className="flex justify-between gap-3 text-sm py-2.5 border-b border-border/60 last:border-0"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="font-medium">{p.material_name}</p>
-                                    <p className="text-xs text-muted">{p.unit}</p>
-                                  </div>
-                                  <p className="font-mono font-medium tabular-nums shrink-0">
-                                    {formatINR(p.price)}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="hidden lg:block pmc-table-wrap mx-0 px-0">
+                            <div className="pmc-table-wrap mx-0 px-0">
                               <table className="data-table w-full text-sm">
                                 <thead>
                                   <tr>
@@ -357,11 +339,7 @@ export default function PMCProductDetailPage() {
                         ) : null}
                       </CollapsibleSection>
 
-                      {result && (
-                        <div className="lg:hidden pt-1">
-                          <PricingSummaryGrid result={result} compact />
-                        </div>
-                      )}
+
                     </div>
                   </div>
                 )}
@@ -371,44 +349,6 @@ export default function PMCProductDetailPage() {
         </div>
       )}
 
-      {expandedRef && dockRow && (
-        <div className="pmc-mobile-dock lg:hidden">
-          <div className="flex items-center gap-3 max-w-3xl mx-auto">
-            <div className="flex-1 min-w-0">
-              {dockRow.result ? (
-                <>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-muted">Final RMC</p>
-                  <p className="font-mono text-xl font-bold text-pmc tabular-nums truncate">
-                    {formatINR(dockRow.result.final_rmc)}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted leading-snug">
-                  {!hasPrimary ? 'Set primary in recipe' : 'Save parameters to calculate RMC'}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => saveParams(expandedRef)}
-              className="btn btn-pmc shrink-0 px-4"
-            >
-              Save
-            </button>
-            {dockRow.result && (
-              <button
-                type="button"
-                onClick={() => handleExportOne(expandedRef)}
-                disabled={exporting !== null}
-                className="btn btn-ghost shrink-0 px-3"
-                aria-label="Export sheet"
-              >
-                <Download size={18} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -424,14 +364,9 @@ function MaterialBreakdownSection({ result }: { result: PMCPricingResult | null 
       </div>
       <div className="p-4">
         {result ? (
-          <>
-            <div className="lg:hidden space-y-2">
-              <LineItemsMobile result={result} />
-            </div>
-            <div className="hidden lg:block pmc-table-wrap mx-0 px-0">
-              <LineItemsTable result={result} />
-            </div>
-          </>
+          <div className="pmc-table-wrap mx-0 px-0">
+            <LineItemsTable result={result} />
+          </div>
         ) : (
           <p className="text-sm text-muted">Save parameters above to calculate the breakdown.</p>
         )}
@@ -475,47 +410,7 @@ function CollapsibleSection({
   )
 }
 
-function PricingSummaryCompact({
-  result,
-  pending,
-}: {
-  result: PMCPricingResult | null
-  pending?: boolean
-}) {
-  if (pending || !result) {
-    return (
-      <p className="text-sm text-muted">
-        Enter overhead, batch multiplier, and yield — then tap Save.
-      </p>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-border bg-layer-sm">
-        <span className="text-xs font-semibold text-muted uppercase tracking-wide">Final RMC</span>
-        <span className="font-mono text-2xl font-bold text-primary tabular-nums">{formatINR(result.final_rmc)}</span>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        <MetricChip label="Material" value={formatINR(result.material_total)} />
-        <MetricChip label="Real output" value={formatQty(result.real_final_product)} />
-        <MetricChip label="Yield" value={formatQty(result.yield_value)} />
-        <MetricChip label="Batch ×" value={formatQty(result.batch_multiplier)} />
-      </div>
-    </div>
-  )
-}
-
-function MetricChip({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="pmc-metric-chip">
-      <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
-      <p className="font-mono text-sm font-semibold text-primary tabular-nums mt-0.5">{value}</p>
-    </div>
-  )
-}
-
-function PricingSummaryGrid({ result, compact }: { result: PMCPricingResult; compact?: boolean }) {
+function PricingSummaryGrid({ result }: { result: PMCPricingResult }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
       <SummaryRow label="Material total" value={formatINR(result.material_total)} />
@@ -529,55 +424,7 @@ function PricingSummaryGrid({ result, compact }: { result: PMCPricingResult; com
       <SummaryRow label="Real Final Product" value={formatQty(result.real_final_product)} />
       <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
       <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
-      {!compact && (
-        <SummaryRow label="Final RMC" value={formatINR(result.final_rmc)} emphasis />
-      )}
-    </div>
-  )
-}
-
-function LineItemsMobile({ result }: { result: PMCPricingResult }) {
-  return (
-    <div className="space-y-2">
-      {result.lines.map((line) => (
-        <div
-          key={line.raw_material_id}
-          className={clsx('pmc-line-card', line.is_primary && 'is-primary')}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <p className="font-medium text-sm leading-snug">
-              {line.raw_material_name}
-              {line.is_primary && (
-                <span className="ml-2 badge badge-pmc text-[10px]">Primary</span>
-              )}
-            </p>
-            <p className="font-mono font-semibold text-sm tabular-nums shrink-0">{formatINR(line.line_total)}</p>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-xs text-muted">
-            <div>
-              <span className="block text-[10px] uppercase">Base</span>
-              <span className="font-mono text-primary">{formatQty(line.base_qty)}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] uppercase">Effective</span>
-              <span className="font-mono text-primary">{formatQty(line.effective_qty)}</span>
-            </div>
-            <div className="text-right">
-              <span className="block text-[10px] uppercase">Price</span>
-              <span className="font-mono text-primary">{formatINR(line.price)}</span>
-            </div>
-          </div>
-        </div>
-      ))}
-      <div className="flex justify-between items-center px-3 py-3 rounded-lg border border-border bg-layer font-semibold text-sm">
-        <span>
-          Material total
-          {result.batch_multiplier !== 1 && (
-            <span className="text-muted font-normal text-xs ml-1">(×{formatQty(result.batch_multiplier)})</span>
-          )}
-        </span>
-        <span className="font-mono">{formatINR(result.material_total)}</span>
-      </div>
+      <SummaryRow label="Final RMC" value={formatINR(result.final_rmc)} emphasis />
     </div>
   )
 }

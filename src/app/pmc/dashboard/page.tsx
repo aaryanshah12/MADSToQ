@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
 import { seedPMCDemoIfEmpty } from '@/lib/pmc/seed'
@@ -8,13 +9,22 @@ import { seedPMCDemoIfEmpty } from '@/lib/pmc/seed'
 export default function PMCDashboardPage() {
   const { refresh } = usePMC()
   const { tick } = usePMCData()
+  const [seeding, setSeeding] = useState(false)
   void tick
 
   const stats = pmcApi.dashboardStats()
 
-  function loadDemo() {
-    if (seedPMCDemoIfEmpty()) refresh()
-    else alert('Data already exists.')
+  async function loadDemo() {
+    if (seeding) return
+    setSeeding(true)
+    try {
+      if (await seedPMCDemoIfEmpty()) refresh()
+      else alert('Data already exists.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not load sample data.')
+    } finally {
+      setSeeding(false)
+    }
   }
 
   return (
@@ -23,8 +33,13 @@ export default function PMCDashboardPage() {
         <h1 className="pmc-page-title">Dashboard</h1>
         <p className="text-sm text-muted mt-1">Reference counts, products, and recent activity</p>
         {stats.referenceCount === 0 && (
-          <button type="button" onClick={loadDemo} className="mt-3 text-xs text-pmc hover:underline">
-            Load sample data from pricing sheet
+          <button
+            type="button"
+            onClick={loadDemo}
+            disabled={seeding}
+            className="mt-3 text-xs text-pmc hover:underline disabled:opacity-50"
+          >
+            {seeding ? 'Loading sample…' : 'Load sample data from pricing sheet'}
           </button>
         )}
       </div>

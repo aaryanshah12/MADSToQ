@@ -1,29 +1,39 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
 
 export default function PMCMasterProductsPage() {
+  const router = useRouter()
   const { refresh } = usePMC()
   const { tick } = usePMCData()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const products = useMemo(() => {
     void tick
     return pmcApi.listProducts()
   }, [tick])
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
-    const p = pmcApi.upsertProduct({ name, code: code || undefined })
-    setName('')
-    setCode('')
-    refresh()
-    window.location.href = `/pmc/master/products/${p.id}`
+    if (!name.trim() || saving) return
+    setSaving(true)
+    try {
+      const p = await pmcApi.upsertProduct({ name, code: code || undefined })
+      setName('')
+      setCode('')
+      refresh()
+      router.push(`/pmc/master/products/${p.id}`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not save product.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -54,8 +64,8 @@ export default function PMCMasterProductsPage() {
             className="input w-full pmc-focus"
           />
         </div>
-        <button type="submit" className="btn btn-pmc w-full sm:w-auto justify-center">
-          Add product
+        <button type="submit" disabled={saving} className="btn btn-pmc w-full sm:w-auto justify-center">
+          {saving ? 'Saving…' : 'Add product'}
         </button>
       </form>
 

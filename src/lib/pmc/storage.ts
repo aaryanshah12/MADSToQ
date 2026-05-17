@@ -1,6 +1,6 @@
 import type { PMCStore } from './types'
 
-const STORAGE_KEY = 'pmc-store-v1'
+export const STORAGE_KEY = 'pmc-store-v1'
 
 const emptyStore = (): PMCStore => ({
   raw_materials: [],
@@ -11,7 +11,7 @@ const emptyStore = (): PMCStore => ({
   product_params: [],
 })
 
-function migrateStore(store: PMCStore): PMCStore {
+export function migrateStore(store: PMCStore): PMCStore {
   store.product_params = store.product_params.map((p) => {
     const legacy = (p as { tons_kg?: number }).tons_kg
     const batch_multiplier =
@@ -58,6 +58,7 @@ function migrateStore(store: PMCStore): PMCStore {
   return store
 }
 
+/** Read legacy localStorage snapshot (one-time migration only). */
 export function loadStore(): PMCStore {
   if (typeof window === 'undefined') return emptyStore()
   try {
@@ -67,23 +68,4 @@ export function loadStore(): PMCStore {
   } catch {
     return emptyStore()
   }
-}
-
-export function saveStore(store: PMCStore): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
-}
-
-export function newId(): string {
-  return crypto.randomUUID()
-}
-
-/** Sequential reference ids: REF-001, REF-002, … */
-export function nextRefNumber(references: { ref_number: string }[]): string {
-  let max = 0
-  for (const r of references) {
-    const m = r.ref_number.match(/^REF-(\d{3})$/)
-    if (m) max = Math.max(max, parseInt(m[1], 10))
-  }
-  return `REF-${String(max + 1).padStart(3, '0')}`
 }

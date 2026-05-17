@@ -16,6 +16,7 @@ export default function PMCMasterProductRecipePage() {
   const [rows, setRows] = useState<Row[]>([
     { raw_material_id: '', qty: '', is_primary: true },
   ])
+  const [saving, setSaving] = useState(false)
 
   const product = useMemo(() => {
     void tick
@@ -68,7 +69,7 @@ export default function PMCMasterProductRecipePage() {
     })
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     const parsed = rows
       .filter((r) => r.raw_material_id && Number(r.qty) > 0)
@@ -85,12 +86,15 @@ export default function PMCMasterProductRecipePage() {
       alert('Select exactly one primary raw material (Yes).')
       return
     }
+    setSaving(true)
     try {
-      pmcApi.setProductMaterials(id, parsed)
+      await pmcApi.setProductMaterials(id, parsed)
       refresh()
       alert('Recipe saved.')
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not save recipe.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -194,8 +198,8 @@ export default function PMCMasterProductRecipePage() {
             <button type="button" onClick={addRow} className="btn btn-ghost w-full sm:w-auto justify-center">
               + Add row
             </button>
-            <button type="submit" className="btn btn-pmc w-full sm:w-auto justify-center">
-              Save recipe
+            <button type="submit" disabled={saving} className="btn btn-pmc w-full sm:w-auto justify-center">
+              {saving ? 'Saving…' : 'Save recipe'}
             </button>
           </div>
         </form>

@@ -1,18 +1,21 @@
 import { pmcApi } from './api'
 
 /** Sample data matching the pricing sheet example (optional demo). */
-export function seedPMCDemoIfEmpty(): boolean {
+export async function seedPMCDemoIfEmpty(): Promise<boolean> {
   if (pmcApi.listRawMaterials().length > 0) return false
 
-  const materials = [
+  const materials = []
+  for (const m of [
     { name: 'ONT', unit: 'Kg' },
     { name: 'SUPLHURIC 98 %', unit: 'Kg' },
     { name: 'OLEUM 65 %', unit: 'Kg' },
     { name: 'CAUSTIC LYE', unit: 'Kg' },
     { name: 'SPENT', unit: 'Kg' },
-  ].map((m) => pmcApi.upsertRawMaterial(m))
+  ]) {
+    materials.push(await pmcApi.upsertRawMaterial(m))
+  }
 
-  const ref = pmcApi.createReference(
+  const ref = await pmcApi.createReference(
     materials.map((m, i) => ({
       raw_material_id: m.id,
       price: [165, 32, 39, 47, 7][i],
@@ -20,8 +23,8 @@ export function seedPMCDemoIfEmpty(): boolean {
     'Initial reference'
   )
 
-  const product = pmcApi.upsertProduct({ name: 'Sample dye batch', code: 'SAMPLE' })
-  pmcApi.setProductMaterials(
+  const product = await pmcApi.upsertProduct({ name: 'Sample dye batch', code: 'SAMPLE' })
+  await pmcApi.setProductMaterials(
     product.id,
     materials.map((m, i) => ({
       raw_material_id: m.id,
@@ -30,8 +33,7 @@ export function seedPMCDemoIfEmpty(): boolean {
     }))
   )
 
-  // yield × primary (2000 × batch 1) = 1080 → RMC ≈ 536.1 with batch multiplier 1
-  pmcApi.upsertProductParams({
+  await pmcApi.upsertProductParams({
     product_id: product.id,
     reference_id: ref.id,
     overhead: 30,

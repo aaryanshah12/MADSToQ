@@ -40,7 +40,7 @@ function readTheme(): 'dark' | 'light' {
 export default function PMCLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { loading, email, signOut } = usePMC()
+  const { loading, dataReady, dataError, email, signOut, reloadData } = usePMC()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [themeMounted, setThemeMounted] = useState(false)
@@ -65,13 +65,27 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => setSidebarOpen(false), [pathname])
 
-  if (loading || !email) {
+  if (loading || !email || !dataReady) {
     return (
       <div
         className="min-h-screen flex items-center justify-center grid-bg"
         style={{ background: 'var(--color-bg)' }}
       >
         <div className="w-8 h-8 border-2 border-pmc border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (dataError) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 grid-bg"
+        style={{ background: 'var(--color-bg)' }}
+      >
+        <p className="text-sm text-muted text-center max-w-md">{dataError}</p>
+        <button type="button" onClick={() => reloadData()} className="btn btn-pmc">
+          Retry
+        </button>
       </div>
     )
   }

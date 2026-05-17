@@ -55,14 +55,19 @@ export default function PMCReferencesPage() {
       return
     }
     setSaving(true)
-    const rows = materials.map((m) => ({
-      raw_material_id: m.id,
-      price: Number(prices[m.id]) || 0,
-    }))
-    pmcApi.createReference(rows, notes)
-    setSaving(false)
-    setShowForm(false)
-    refresh()
+    try {
+      const rows = materials.map((m) => ({
+        raw_material_id: m.id,
+        price: Number(prices[m.id]) || 0,
+      }))
+      await pmcApi.createReference(rows, notes)
+      setShowForm(false)
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not create reference.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

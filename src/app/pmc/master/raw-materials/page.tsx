@@ -10,19 +10,27 @@ export default function PMCRawMaterialsPage() {
   const { tick } = usePMCData()
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('Kg')
+  const [saving, setSaving] = useState(false)
 
   const materials = useMemo(() => {
     void tick
     return pmcApi.listAllRawMaterials()
   }, [tick])
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
-    pmcApi.upsertRawMaterial({ name, unit })
-    setName('')
-    setUnit('Kg')
-    refresh()
+    if (!name.trim() || saving) return
+    setSaving(true)
+    try {
+      await pmcApi.upsertRawMaterial({ name, unit })
+      setName('')
+      setUnit('Kg')
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not save raw material.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -53,8 +61,8 @@ export default function PMCRawMaterialsPage() {
             className="input w-full pmc-focus"
           />
         </div>
-        <button type="submit" className="btn btn-pmc w-full sm:w-auto justify-center">
-          Add
+        <button type="submit" disabled={saving} className="btn btn-pmc w-full sm:w-auto justify-center">
+          {saving ? 'Saving…' : 'Add'}
         </button>
       </form>
 

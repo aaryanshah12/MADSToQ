@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "generate-favicon": "node scripts/generate-favicon.js"
+    "generate-favicon": "node scripts/generate-favicon.js",
+    "pmc:register-user": "node scripts/register-pmc-user.js"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",

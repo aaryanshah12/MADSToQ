@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useMemo, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { Download, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, ChevronDown, ChevronUp, Eye } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
 import {
@@ -20,7 +20,6 @@ export default function PMCProductDetailPage() {
   const { tick } = usePMCData()
   const [expandedRef, setExpandedRef] = useState<string | null>(null)
   const [refDetailsOpen, setRefDetailsOpen] = useState<string | null>(null)
-  const [lineBreakdownOpen, setLineBreakdownOpen] = useState(false)
   const [draft, setDraft] = useState<
     Record<string, { overhead: string; batch_multiplier: string; yield_value: string }>
   >({})
@@ -144,8 +143,8 @@ export default function PMCProductDetailPage() {
           </Link>
           <h1 className="pmc-page-title mt-2 break-words">{product.name}</h1>
           <p className="text-sm text-muted">
-            RMC = material total ÷ (yield × primary qty) + overhead. Batch multiplier scales all
-            recipe qtys.
+            RMC = material total ÷ (yield × primary qty × batch multiplier) + overhead. Batch
+            multiplier scales all recipe qtys including primary for real final product.
           </p>
           {!hasPrimary && (
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
@@ -187,32 +186,31 @@ export default function PMCProductDetailPage() {
                 key={reference.id}
                 className={clsx('pmc-card p-0 overflow-hidden', isLatest && 'pmc-latest-ref')}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (open) {
-                      setExpandedRef(null)
-                      setRefDetailsOpen(null)
-                      setLineBreakdownOpen(false)
-                    } else {
-                      setExpandedRef(reference.id)
-                      setRefDetailsOpen(null)
-                      setLineBreakdownOpen(false)
-                    }
-                  }}
-                  className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]"
-                >
-                  <div className="min-w-0 flex flex-wrap items-center gap-2">
-                    <span className="font-mono font-semibold break-all">{reference.ref_number}</span>
-                    {isLatest && (
-                      <span className="badge badge-pmc text-[10px] uppercase tracking-wide">
-                        Latest
+                <div className="flex items-stretch">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (open) {
+                        setExpandedRef(null)
+                        setRefDetailsOpen(null)
+                      } else {
+                        setExpandedRef(reference.id)
+                        setRefDetailsOpen(null)
+                      }
+                    }}
+                    className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]"
+                  >
+                    <div className="min-w-0 flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-semibold break-all">{reference.ref_number}</span>
+                      {isLatest && (
+                        <span className="badge badge-pmc text-[10px] uppercase tracking-wide">
+                          Latest
+                        </span>
+                      )}
+                      <span className="text-xs text-muted w-full sm:w-auto sm:ml-1">
+                        {new Date(reference.created_at).toLocaleString()}
                       </span>
-                    )}
-                    <span className="text-xs text-muted w-full sm:w-auto sm:ml-1">
-                      {new Date(reference.created_at).toLocaleString()}
-                    </span>
-                  </div>
+                    </div>
                   <div className="text-left sm:text-right shrink-0">
                     {result ? (
                       <span className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-base sm:text-lg font-bold text-pmc pmc-rmc-result tabular-nums">
@@ -227,7 +225,23 @@ export default function PMCProductDetailPage() {
                       </span>
                     )}
                   </div>
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!open) setExpandedRef(reference.id)
+                      setRefDetailsOpen((prev) => (prev === reference.id ? null : reference.id))
+                    }}
+                    className={clsx(
+                      'shrink-0 flex items-center justify-center min-w-[48px] px-3 border-l border-border hover:bg-layer-sm transition-colors',
+                      refDetailsOpen === reference.id && 'bg-pmc-10 text-pmc'
+                    )}
+                    aria-label={`View prices for ${reference.ref_number}`}
+                    title="View reference price list"
+                  >
+                    <Eye size={18} />
+                  </button>
+                </div>
 
                 {open && (
                   <div className="border-t border-border">
@@ -291,6 +305,8 @@ export default function PMCProductDetailPage() {
                         )}
                       </div>
 
+                      <MaterialBreakdownSection result={result} />
+
                       {result && (
                         <div className="hidden lg:block">
                           <PricingSummaryGrid result={result} />
@@ -298,28 +314,7 @@ export default function PMCProductDetailPage() {
                       )}
 
                       <CollapsibleSection
-                        title="Material breakdown"
-                        open={lineBreakdownOpen}
-                        onToggle={() => setLineBreakdownOpen((v) => !v)}
-                        badge={result ? `${result.lines.length} items` : undefined}
-                      >
-                        {result ? (
-                          <>
-                            <div className="lg:hidden space-y-2">
-                              <LineItemsMobile result={result} />
-                            </div>
-                            <div className="hidden lg:block pmc-table-wrap mx-0 px-0">
-                              <LineItemsTable result={result} />
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-sm text-muted py-2">
-                            Save parameters above to calculate the breakdown.
-                          </p>
-                        )}
-                      </CollapsibleSection>
-
-                      <CollapsibleSection
+                        id={`ref-prices-${reference.id}`}
                         title="Reference price list"
                         open={refDetailsOpen === reference.id}
                         onToggle={() =>
@@ -432,13 +427,42 @@ export default function PMCProductDetailPage() {
   )
 }
 
+function MaterialBreakdownSection({ result }: { result: PMCPricingResult | null }) {
+  return (
+    <section className="rounded-xl border border-border overflow-hidden bg-layer-sm/50">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-layer-sm">
+        <h3 className="text-sm font-semibold text-primary">Material breakdown</h3>
+        {result && (
+          <span className="badge badge-pmc text-[10px] font-normal">{result.lines.length} items</span>
+        )}
+      </div>
+      <div className="p-4">
+        {result ? (
+          <>
+            <div className="lg:hidden space-y-2">
+              <LineItemsMobile result={result} />
+            </div>
+            <div className="hidden lg:block pmc-table-wrap mx-0 px-0">
+              <LineItemsTable result={result} />
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted">Save parameters above to calculate the breakdown.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function CollapsibleSection({
+  id,
   title,
   open,
   onToggle,
   badge,
   children,
 }: {
+  id?: string
   title: string
   open: boolean
   onToggle: () => void
@@ -446,7 +470,7 @@ function CollapsibleSection({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-xl border border-border overflow-hidden">
+    <section id={id} className="rounded-xl border border-border overflow-hidden">
       <button
         type="button"
         onClick={onToggle}

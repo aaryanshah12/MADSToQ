@@ -88,6 +88,7 @@ create index if not exists idx_pmc_params_product on pmc_product_params(product_
 -- RMC formula (app layer):
 -- effective_qty = recipe_qty * batch_multiplier
 -- material_total = SUM(effective_qty * reference_price.price)
--- real_final_product = yield_value * primary_recipe_qty
+-- primary_effective_qty = primary_recipe_qty * batch_multiplier
+-- real_final_product = yield_value * primary_effective_qty
 -- unit_before_overhead = material_total / real_final_product
 -- final_rmc = unit_before_overhead + overhead

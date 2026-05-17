@@ -23,7 +23,8 @@ export function calculateProductPricing(
   const batchMultiplier =
     params.batch_multiplier > 0 ? params.batch_multiplier : 1
 
-  const real_final_product = params.yield_value * primaryRow.qty
+  const primary_effective_qty = primaryRow.qty * batchMultiplier
+  const real_final_product = params.yield_value * primary_effective_qty
   if (real_final_product <= 0) return null
 
   const priceByMaterial = new Map(
@@ -60,7 +61,7 @@ export function calculateProductPricing(
     batch_multiplier: batchMultiplier,
     yield_value: params.yield_value,
     primary_material_name: nameById.get(primaryRow.raw_material_id) ?? '—',
-    primary_material_qty: primaryRow.qty,
+    primary_material_qty: primary_effective_qty,
     real_final_product,
     overhead: params.overhead,
     unit_before_overhead,

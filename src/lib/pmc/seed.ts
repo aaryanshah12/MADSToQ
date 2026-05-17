@@ -30,7 +30,7 @@ export function seedPMCDemoIfEmpty(): boolean {
     }))
   )
 
-  // yield × primary (2000) = 1080 → RMC ≈ 536.1 with batch multiplier 1
+  // yield × primary (2000 × batch 1) = 1080 → RMC ≈ 536.1 with batch multiplier 1
   pmcApi.upsertProductParams({
     product_id: product.id,
     reference_id: ref.id,

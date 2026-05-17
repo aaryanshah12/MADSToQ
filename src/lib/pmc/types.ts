@@ -68,6 +68,7 @@ export interface PMCPricingResult {
   batch_multiplier: number
   yield_value: number
   primary_material_name: string
+  /** Primary recipe qty after batch multiplier (base × batch_multiplier) */
   primary_material_qty: number
   real_final_product: number
   overhead: number

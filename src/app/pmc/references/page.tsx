@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Eye } from 'lucide-react'
+import clsx from 'clsx'
+import { formatINR } from '@/lib/pmc/pricing'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@/lib/pmc/api'
 
@@ -12,6 +14,7 @@ export default function PMCReferencesPage() {
   const [notes, setNotes] = useState('')
   const [prices, setPrices] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [viewRefId, setViewRefId] = useState<string | null>(null)
 
   const materials = useMemo(() => {
     void tick
@@ -142,23 +145,31 @@ export default function PMCReferencesPage() {
                 <th>Reference #</th>
                 <th>Created</th>
                 <th>Notes</th>
+                <th className="w-12" aria-label="View prices" />
               </tr>
             </thead>
             <tbody>
               {references.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="text-center text-muted py-8">
+                  <td colSpan={4} className="text-center text-muted py-8">
                     No references yet.
                   </td>
                 </tr>
               ) : (
-                references.map((r) => (
-                  <tr key={r.id}>
-                    <td className="font-mono font-medium">{r.ref_number}</td>
-                    <td className="text-muted">{new Date(r.created_at).toLocaleString()}</td>
-                    <td className="text-muted">{r.notes || '—'}</td>
-                  </tr>
-                ))
+                references.map((r) => {
+                  const detail = viewRefId === r.id ? pmcApi.getReferenceDetail(r.id) : null
+                  return (
+                    <ReferenceRow
+                      key={r.id}
+                      refNumber={r.ref_number}
+                      createdAt={r.created_at}
+                      notes={r.notes}
+                      open={viewRefId === r.id}
+                      detail={detail}
+                      onToggleView={() => setViewRefId(viewRefId === r.id ? null : r.id)}
+                    />
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -168,28 +179,130 @@ export default function PMCReferencesPage() {
           {references.length === 0 ? (
             <p className="text-sm text-muted text-center py-4">No references yet.</p>
           ) : (
-            references.map((r) => (
-              <article key={r.id} className="data-card">
-                <div className="data-card-header">
-                  <span className="data-card-title font-mono">{r.ref_number}</span>
-                </div>
-                <div className="data-card-grid">
-                  <div>
-                    <p className="data-card-label">Created</p>
-                    <p className="data-card-value text-left mt-0.5">
-                      {new Date(r.created_at).toLocaleString()}
-                    </p>
+            references.map((r) => {
+              const open = viewRefId === r.id
+              const detail = open ? pmcApi.getReferenceDetail(r.id) : null
+              return (
+                <article key={r.id} className="data-card">
+                  <div className="data-card-header">
+                    <span className="data-card-title font-mono">{r.ref_number}</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewRefId(open ? null : r.id)}
+                      className={clsx(
+                        'p-2 rounded-lg border border-border hover:bg-layer-sm min-h-[40px] min-w-[40px] flex items-center justify-center',
+                        open && 'bg-pmc-10 text-pmc border-pmc-30'
+                      )}
+                      aria-label={`View prices for ${r.ref_number}`}
+                      title="View price list"
+                    >
+                      <Eye size={16} />
+                    </button>
                   </div>
-                  <div>
-                    <p className="data-card-label">Notes</p>
-                    <p className="data-card-value text-left mt-0.5">{r.notes || '—'}</p>
+                  <div className="data-card-grid">
+                    <div>
+                      <p className="data-card-label">Created</p>
+                      <p className="data-card-value text-left mt-0.5">
+                        {new Date(r.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="data-card-label">Notes</p>
+                      <p className="data-card-value text-left mt-0.5">{r.notes || '—'}</p>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))
+                  {open && detail && (
+                    <ReferencePriceList detail={detail} className="mt-3 pt-3 border-t border-border" />
+                  )}
+                </article>
+              )
+            })
           )}
         </div>
       </section>
+    </div>
+  )
+}
+
+function ReferenceRow({
+  refNumber,
+  createdAt,
+  notes,
+  open,
+  detail,
+  onToggleView,
+}: {
+  refNumber: string
+  createdAt: string
+  notes: string | null
+  open: boolean
+  detail: ReturnType<typeof pmcApi.getReferenceDetail> | null
+  onToggleView: () => void
+}) {
+  return (
+    <>
+      <tr className={open ? 'bg-layer-sm' : undefined}>
+        <td className="font-mono font-medium">{refNumber}</td>
+        <td className="text-muted">{new Date(createdAt).toLocaleString()}</td>
+        <td className="text-muted">{notes || '—'}</td>
+        <td className="text-right">
+          <button
+            type="button"
+            onClick={onToggleView}
+            className={clsx(
+              'inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg border border-border hover:bg-layer-sm transition-colors',
+              open && 'bg-pmc-10 text-pmc border-pmc-30'
+            )}
+            aria-label={`View prices for ${refNumber}`}
+            title="View price list"
+          >
+            <Eye size={16} />
+          </button>
+        </td>
+      </tr>
+      {open && detail && (
+        <tr>
+          <td colSpan={4} className="p-0 bg-layer-sm/50">
+            <ReferencePriceList detail={detail} className="p-4" />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function ReferencePriceList({
+  detail,
+  className,
+}: {
+  detail: NonNullable<ReturnType<typeof pmcApi.getReferenceDetail>>
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      {detail.reference.notes && (
+        <p className="text-sm text-muted mb-3">{detail.reference.notes}</p>
+      )}
+      <div className="pmc-table-wrap mx-0 px-0">
+        <table className="data-table w-full text-sm">
+          <thead>
+            <tr>
+              <th>Material</th>
+              <th>Unit</th>
+              <th className="text-right">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.prices.map((p) => (
+              <tr key={p.id}>
+                <td className="font-medium">{p.material_name}</td>
+                <td className="text-muted">{p.unit}</td>
+                <td className="text-right font-mono">{formatINR(p.price)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

@@ -2,13 +2,14 @@
   "name": "madstoq-platform",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo build",
+    "build": "turbo run build --filter=@madstoq/web",
     "start": "npm run start --workspace=@madstoq/web",
     "lint": "turbo lint",
     "generate-favicon": "node scripts/generate-favicon.js",

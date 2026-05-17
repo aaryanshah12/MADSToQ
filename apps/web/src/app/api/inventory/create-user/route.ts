@@ -1,16 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@madstoq/database'
 import { NextResponse } from 'next/server'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function POST(request: Request) {
   try {
     const { email, password, full_name, role, phone } = await request.json()
 
     // Create auth user using admin API
+    const supabaseAdmin = getSupabaseAdmin()
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,

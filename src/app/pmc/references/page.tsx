@@ -151,12 +151,13 @@ export default function PMCReferencesPage() {
                 <th>Reference #</th>
                 <th>Created</th>
                 <th>Notes</th>
+                <th className="w-16 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {references.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="text-center text-muted py-8">
+                  <td colSpan={4} className="text-center text-muted py-8">
                     No references yet.
                   </td>
                 </tr>
@@ -198,19 +199,19 @@ export default function PMCReferencesPage() {
                           Latest
                         </span>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setViewRefId(open ? null : r.id)}
-                        className={clsx(
-                          'inline-flex items-center justify-center min-h-[32px] min-w-[32px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc',
-                          open && 'bg-pmc-10 text-pmc border-pmc-30'
-                        )}
-                        aria-label={`View prices for ${r.ref_number}`}
-                        title="View price list"
-                      >
-                        <Eye size={16} />
-                      </button>
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setViewRefId(open ? null : r.id)}
+                      className={clsx(
+                        'inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc shrink-0',
+                        open && 'bg-pmc-10 text-pmc border-pmc-30'
+                      )}
+                      aria-label={`View prices for ${r.ref_number}`}
+                      title="View price list"
+                    >
+                      <Eye size={16} />
+                    </button>
                   </div>
                   <div className="data-card-grid">
                     <div>
@@ -265,26 +266,28 @@ function ReferenceRow({
                 Latest
               </span>
             )}
-            <button
-              type="button"
-              onClick={onToggleView}
-              className={clsx(
-                'inline-flex items-center justify-center min-h-[32px] min-w-[32px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc',
-                open && 'bg-pmc-10 text-pmc border-pmc-30'
-              )}
-              aria-label={`View prices for ${refNumber}`}
-              title="View price list"
-            >
-              <Eye size={16} />
-            </button>
           </span>
         </td>
         <td className="text-muted">{new Date(createdAt).toLocaleString()}</td>
         <td className="text-muted">{notes || '—'}</td>
+        <td className="text-right">
+          <button
+            type="button"
+            onClick={onToggleView}
+            className={clsx(
+              'inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc',
+              open && 'bg-pmc-10 text-pmc border-pmc-30'
+            )}
+            aria-label={`View prices for ${refNumber}`}
+            title="View price list"
+          >
+            <Eye size={16} />
+          </button>
+        </td>
       </tr>
       {open && detail && (
         <tr>
-          <td colSpan={3} className="p-0 bg-layer-sm/50">
+          <td colSpan={4} className="p-0 bg-layer-sm/50">
             <ReferencePriceList detail={detail} className="p-4" />
           </td>
         </tr>

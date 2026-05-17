@@ -197,7 +197,10 @@ export default function PMCProductDetailPage() {
                       setRefDetailsOpen(null)
                     }
                   }}
-                  className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]"
+                  className={clsx(
+                    'w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]',
+                    isLatest && !open && 'pmc-ref-list-latest'
+                  )}
                 >
                     <div className="min-w-0 flex flex-wrap items-center gap-2">
                       <span className="font-mono font-semibold break-all">{reference.ref_number}</span>

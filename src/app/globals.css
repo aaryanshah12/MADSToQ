@@ -288,6 +288,14 @@ nav svg {
   background: color-mix(in srgb, var(--color-pmc) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-pmc) 35%, transparent);
 }
+/* Product sheet: latest ref row in collapsed list only */
+.pmc-ref-list-latest {
+  background: color-mix(in srgb, var(--color-pmc) 5%, var(--color-panel));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-pmc) 45%, transparent);
+}
+[data-theme='dark'] .pmc-ref-list-latest {
+  background: color-mix(in srgb, var(--color-pmc) 8%, var(--color-panel));
+}
 .pmc-sheet-sticky-rmc {
   position: sticky;
   top: 0;

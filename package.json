@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo run build --filter=@madstoq/web",
+    "build": "turbo run build --filter=@madstoq/web && cp -r apps/web/.next .next",
     "start": "npm run start --workspace=@madstoq/web",
     "lint": "turbo lint",
     "generate-favicon": "node scripts/generate-favicon.js",

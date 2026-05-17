@@ -2,6 +2,7 @@
 const path = require('path')
 
 const nextConfig = {
+  transpilePackages: ['@madstoq/auth', '@madstoq/core', '@madstoq/database'],
   images: {
     domains: ['your-project.supabase.co'],
   },

@@ -198,6 +198,45 @@ export async function deactivateRawMaterialDb(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+export async function deactivateProductDb(id: string): Promise<void> {
+  const { error } = await getServerDb().from('pmc_products').update({ is_active: false }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function updateReferenceDb(
+  id: string,
+  prices: { raw_material_id: string; price: number }[],
+  notes?: string
+): Promise<void> {
+  const { error: refError } = await getServerDb()
+    .from('pmc_references')
+    .update({ notes: notes?.trim() || null })
+    .eq('id', id)
+  if (refError) throw new Error(refError.message)
+
+  const { error: delError } = await getServerDb()
+    .from('pmc_reference_prices')
+    .delete()
+    .eq('reference_id', id)
+  if (delError) throw new Error(delError.message)
+
+  if (prices.length > 0) {
+    const { error: priceError } = await getServerDb().from('pmc_reference_prices').insert(
+      prices.map((p) => ({
+        reference_id: id,
+        raw_material_id: p.raw_material_id,
+        price: p.price,
+      }))
+    )
+    if (priceError) throw new Error(priceError.message)
+  }
+}
+
+export async function deleteReferenceDb(id: string): Promise<void> {
+  const { error } = await getServerDb().from('pmc_references').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function upsertProductDb(input: {
   id?: string
   name: string

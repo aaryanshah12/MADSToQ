@@ -46,6 +46,22 @@ export async function deactivateRawMaterialDb(id: string): Promise<void> {
   await rpcPost(RPC, 'deactivateRawMaterialDb', { id })
 }
 
+export async function deactivateProductDb(id: string): Promise<void> {
+  await rpcPost(RPC, 'deactivateProductDb', { id })
+}
+
+export async function updateReferenceDb(
+  id: string,
+  prices: { raw_material_id: string; price: number }[],
+  notes?: string
+): Promise<void> {
+  await rpcPost(RPC, 'updateReferenceDb', { id, input: { prices, notes } })
+}
+
+export async function deleteReferenceDb(id: string): Promise<void> {
+  await rpcPost(RPC, 'deleteReferenceDb', { id })
+}
+
 export async function upsertProductDb(input: {
   id?: string
   name: string

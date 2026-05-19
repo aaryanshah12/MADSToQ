@@ -1,16 +1,18 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, Eye } from 'lucide-react'
-import clsx from 'clsx'
+import { Plus } from 'lucide-react'
 import { formatINR } from '@madstoq/pmc-system/lib/pricing'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@madstoq/pmc-system/api'
+import type { PMCReference } from '@madstoq/pmc-system/types'
+import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 
 export default function PMCReferencesPage() {
   const { refresh } = usePMC()
   const { tick } = usePMCData()
   const [showForm, setShowForm] = useState(false)
+  const [editingRef, setEditingRef] = useState<PMCReference | null>(null)
   const [notes, setNotes] = useState('')
   const [prices, setPrices] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -37,7 +39,17 @@ export default function PMCReferencesPage() {
     return pmcApi.getPricesForReference(latest.id)
   }, [tick])
 
+  function priceMapFromReference(refId: string) {
+    const initial: Record<string, string> = {}
+    materials.forEach((m) => {
+      const price = pmcApi.getReferencePrices(refId).find((p) => p.raw_material_id === m.id)?.price
+      initial[m.id] = price !== undefined ? String(price) : ''
+    })
+    return initial
+  }
+
   function openForm() {
+    setEditingRef(null)
     const initial: Record<string, string> = {}
     materials.forEach((m) => {
       const prev = latestPrices.get(m.id)
@@ -46,6 +58,21 @@ export default function PMCReferencesPage() {
     setPrices(initial)
     setNotes('')
     setShowForm(true)
+  }
+
+  function openEdit(ref: PMCReference) {
+    setShowForm(false)
+    setViewRefId(null)
+    setEditingRef(ref)
+    setPrices(priceMapFromReference(ref.id))
+    setNotes(ref.notes ?? '')
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingRef(null)
+    setNotes('')
+    setPrices({})
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -60,15 +87,39 @@ export default function PMCReferencesPage() {
         raw_material_id: m.id,
         price: Number(prices[m.id]) || 0,
       }))
-      await pmcApi.createReference(rows, notes)
-      setShowForm(false)
+      if (editingRef) {
+        await pmcApi.updateReference(editingRef.id, rows, notes)
+      } else {
+        await pmcApi.createReference(rows, notes)
+      }
+      closeForm()
       refresh()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not create reference.')
+      alert(err instanceof Error ? err.message : 'Could not save reference.')
     } finally {
       setSaving(false)
     }
   }
+
+  async function handleDelete(ref: PMCReference) {
+    if (
+      !confirm(
+        `Delete reference ${ref.ref_number}? Product pricing params tied to this reference will also be removed.`
+      )
+    ) {
+      return
+    }
+    try {
+      await pmcApi.deleteReference(ref.id)
+      if (viewRefId === ref.id) setViewRefId(null)
+      if (editingRef?.id === ref.id) closeForm()
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete reference.')
+    }
+  }
+
+  const formOpen = showForm || editingRef !== null
 
   return (
     <div className="pmc-page max-w-4xl">
@@ -85,44 +136,21 @@ export default function PMCReferencesPage() {
         </button>
       </div>
 
-      {showForm && (
+      {formOpen && (
         <form onSubmit={handleSave} className="pmc-card space-y-4">
-          <h2 className="font-semibold text-primary">Raw material price list</h2>
+          <h2 className="font-semibold text-primary">
+            {editingRef ? `Edit ${editingRef.ref_number}` : 'Raw material price list'}
+          </h2>
           <p className="text-xs text-muted">
-            Next reference number will be assigned automatically on save.
+            {editingRef
+              ? 'Update prices and notes for this reference.'
+              : 'Next reference number will be assigned automatically on save.'}
           </p>
-          <div className="pmc-table-wrap">
-            <table className="data-table w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Material</th>
-                  <th>Unit</th>
-                  <th>Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {materials.map((m) => (
-                  <tr key={m.id}>
-                    <td className="font-medium">{m.name}</td>
-                    <td className="text-muted">{m.unit}</td>
-                    <td>
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        required
-                        value={prices[m.id] ?? ''}
-                        onChange={(e) =>
-                          setPrices((p) => ({ ...p, [m.id]: e.target.value }))
-                        }
-                        className="input w-full min-w-[5rem] max-w-[8rem] pmc-focus py-2"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ReferencePriceInputs
+            materials={materials}
+            prices={prices}
+            onPriceChange={(id, value) => setPrices((p) => ({ ...p, [id]: value }))}
+          />
           <div>
             <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">
               Notes (optional)
@@ -137,11 +165,13 @@ export default function PMCReferencesPage() {
             <button type="submit" disabled={saving} className="btn btn-pmc justify-center min-w-[8rem]">
               {saving ? (
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : editingRef ? (
+                'Update reference'
               ) : (
                 'Save reference'
               )}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="btn btn-ghost">
+            <button type="button" onClick={closeForm} className="btn btn-ghost">
               Cancel
             </button>
           </div>
@@ -156,7 +186,7 @@ export default function PMCReferencesPage() {
                 <th>Reference #</th>
                 <th>Created</th>
                 <th>Notes</th>
-                <th className="w-16 text-right">Actions</th>
+                <th className="text-right w-32">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +208,9 @@ export default function PMCReferencesPage() {
                       isLatest={r.id === latestRefId}
                       open={viewRefId === r.id}
                       detail={detail}
-                      onToggleView={() => setViewRefId(viewRefId === r.id ? null : r.id)}
+                      onView={() => setViewRefId(viewRefId === r.id ? null : r.id)}
+                      onEdit={() => openEdit(r)}
+                      onDelete={() => handleDelete(r)}
                     />
                   )
                 })
@@ -197,7 +229,7 @@ export default function PMCReferencesPage() {
               return (
                 <article key={r.id} className="data-card">
                   <div className="data-card-header">
-                    <span className="data-card-title font-mono flex flex-wrap items-center gap-2">
+                    <span className="data-card-title font-mono flex flex-wrap items-center gap-2 min-w-0">
                       {r.ref_number}
                       {r.id === latestRefId && (
                         <span className="badge badge-pmc text-[10px] uppercase tracking-wide">
@@ -205,18 +237,11 @@ export default function PMCReferencesPage() {
                         </span>
                       )}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setViewRefId(open ? null : r.id)}
-                      className={clsx(
-                        'inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc shrink-0',
-                        open && 'bg-pmc-10 text-pmc border-pmc-30'
-                      )}
-                      aria-label={`View prices for ${r.ref_number}`}
-                      title="View price list"
-                    >
-                      <Eye size={16} />
-                    </button>
+                    <PmcRowActions
+                      onView={() => setViewRefId(open ? null : r.id)}
+                      onEdit={() => openEdit(r)}
+                      onDelete={() => handleDelete(r)}
+                    />
                   </div>
                   <div className="data-card-grid">
                     <div>
@@ -243,6 +268,49 @@ export default function PMCReferencesPage() {
   )
 }
 
+function ReferencePriceInputs({
+  materials,
+  prices,
+  onPriceChange,
+}: {
+  materials: ReturnType<typeof pmcApi.listRawMaterials>
+  prices: Record<string, string>
+  onPriceChange: (materialId: string, value: string) => void
+}) {
+  return (
+    <div className="pmc-table-wrap">
+      <table className="data-table w-full text-sm">
+        <thead>
+          <tr>
+            <th>Material</th>
+            <th>Unit</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {materials.map((m) => (
+            <tr key={m.id}>
+              <td className="font-medium">{m.name}</td>
+              <td className="text-muted">{m.unit}</td>
+              <td>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  required
+                  value={prices[m.id] ?? ''}
+                  onChange={(e) => onPriceChange(m.id, e.target.value)}
+                  className="input w-full min-w-[5rem] max-w-[8rem] pmc-focus py-2"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function ReferenceRow({
   refNumber,
   createdAt,
@@ -250,7 +318,9 @@ function ReferenceRow({
   isLatest,
   open,
   detail,
-  onToggleView,
+  onView,
+  onEdit,
+  onDelete,
 }: {
   refNumber: string
   createdAt: string
@@ -258,7 +328,9 @@ function ReferenceRow({
   isLatest?: boolean
   open: boolean
   detail: ReturnType<typeof pmcApi.getReferenceDetail> | null
-  onToggleView: () => void
+  onView: () => void
+  onEdit: () => void
+  onDelete: () => void
 }) {
   return (
     <>
@@ -276,18 +348,7 @@ function ReferenceRow({
         <td className="text-muted">{new Date(createdAt).toLocaleString()}</td>
         <td className="text-muted">{notes || '—'}</td>
         <td className="text-right">
-          <button
-            type="button"
-            onClick={onToggleView}
-            className={clsx(
-              'inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg border border-border hover:bg-layer-sm transition-colors text-muted hover:text-pmc',
-              open && 'bg-pmc-10 text-pmc border-pmc-30'
-            )}
-            aria-label={`View prices for ${refNumber}`}
-            title="View price list"
-          >
-            <Eye size={16} />
-          </button>
+          <PmcRowActions onView={onView} onEdit={onEdit} onDelete={onDelete} className="justify-end" />
         </td>
       </tr>
       {open && detail && (

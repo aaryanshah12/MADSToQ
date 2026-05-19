@@ -92,7 +92,7 @@
 25:40  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
 
 ./src/app/pmc/references/page.tsx
-38:6  Warning: React Hook useMemo has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+40:6  Warning: React Hook useMemo has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
 
 ./src/app/website.tsx
 480:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
@@ -203,16 +203,16 @@ Route (app)                               Size     First Load JS
 ├ ƒ /personal/sales/purchase-orders/[id]  327 B           295 kB
 ├ ○ /personal/sales/quotations            276 B           157 kB
 ├ ƒ /personal/sales/quotations/[id]       324 B           295 kB
-├ ○ /pmc                                  2.44 kB         151 kB
-├ ○ /pmc/dashboard                        1.61 kB         157 kB
+├ ○ /pmc                                  2.44 kB         152 kB
+├ ○ /pmc/dashboard                        3.22 kB         159 kB
 ├ ○ /pmc/login                            150 B          87.5 kB
 ├ ○ /pmc/master                           602 B          94.8 kB
-├ ○ /pmc/master/products                  1.14 kB         157 kB
+├ ○ /pmc/master/products                  2.71 kB         159 kB
 ├ ƒ /pmc/master/products/[id]             1.91 kB         158 kB
-├ ○ /pmc/master/raw-materials             1.11 kB         157 kB
-├ ○ /pmc/products                         1.05 kB         157 kB
+├ ○ /pmc/master/raw-materials             3.27 kB         159 kB
+├ ○ /pmc/products                         2.66 kB         159 kB
 ├ ƒ /pmc/products/[id]                    5.3 kB          161 kB
-├ ○ /pmc/references                       3.32 kB         152 kB
+├ ○ /pmc/references                       4.11 kB         160 kB
 └ ○ /sitemap.xml                          0 B                0 B
 + First Load JS shared by all             87.4 kB
   ├ chunks/1dd3208c-f920ffce4ce1ebb4.js   53.7 kB

@@ -2,9 +2,12 @@ import { getPmcCache } from '../lib/cache'
 import { calculateProductPricing } from '../lib/pricing'
 import {
   createReferenceDb,
+  deactivateProductDb,
   deactivateRawMaterialDb,
+  deleteReferenceDb,
   reloadPmcCache,
   setProductMaterialsDb,
+  updateReferenceDb,
   upsertProductDb,
   upsertProductParamsDb,
   upsertRawMaterialDb,
@@ -68,6 +71,11 @@ export const pmcApi = {
     const id = await upsertProductDb(input)
     await reloadPmcCache()
     return read().products.find((p) => p.id === id)!
+  },
+
+  async deactivateProduct(id: string): Promise<void> {
+    await deactivateProductDb(id)
+    await reloadPmcCache()
   },
 
   listProductMaterials(productId: string): PMCProductMaterial[] {
@@ -143,6 +151,21 @@ export const pmcApi = {
     const id = await createReferenceDb(prices, notes)
     await reloadPmcCache()
     return read().references.find((r) => r.id === id)!
+  },
+
+  async updateReference(
+    id: string,
+    prices: { raw_material_id: string; price: number }[],
+    notes?: string
+  ): Promise<PMCReference> {
+    await updateReferenceDb(id, prices, notes)
+    await reloadPmcCache()
+    return read().references.find((r) => r.id === id)!
+  },
+
+  async deleteReference(id: string): Promise<void> {
+    await deleteReferenceDb(id)
+    await reloadPmcCache()
   },
 
   // ─── Product params (per reference) ────────────────────────

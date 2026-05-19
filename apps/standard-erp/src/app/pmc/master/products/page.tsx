@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@madstoq/pmc-system/api'
+import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 
 export default function PMCMasterProductsPage() {
   const router = useRouter()
@@ -33,6 +34,16 @@ export default function PMCMasterProductsPage() {
       alert(err instanceof Error ? err.message : 'Could not save product.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete(productId: string, productName: string) {
+    if (!confirm(`Delete product "${productName}"? Pricing data for this product will be hidden.`)) return
+    try {
+      await pmcApi.deactivateProduct(productId)
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete product.')
     }
   }
 
@@ -72,13 +83,17 @@ export default function PMCMasterProductsPage() {
       <ul className="grid gap-2">
         {products.map((p) => (
           <li key={p.id}>
-            <Link
-              href={`/pmc/master/products/${p.id}`}
-              className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pmc-card hover:border-pmc-40"
-            >
-              <span className="font-medium">{p.name}</span>
-              <span className="text-xs text-pmc shrink-0">Edit recipe →</span>
-            </Link>
+            <div className="pmc-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-pmc-40">
+              <Link href={`/pmc/products/${p.id}`} className="min-w-0 flex-1">
+                <span className="font-medium">{p.name}</span>
+                {p.code && <span className="text-xs text-muted font-mono ml-2">{p.code}</span>}
+              </Link>
+              <PmcRowActions
+                viewHref={`/pmc/products/${p.id}`}
+                editHref={`/pmc/master/products/${p.id}`}
+                onDelete={() => handleDelete(p.id, p.name)}
+              />
+            </div>
           </li>
         ))}
       </ul>

@@ -5,9 +5,12 @@ import { useMemo } from 'react'
 import { usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@madstoq/pmc-system/api'
 import { formatINR } from '@madstoq/pmc-system/lib/pricing'
+import { usePMC } from '@/contexts/PMCContext'
+import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 
 export default function PMCProductsPage() {
   const { tick } = usePMCData()
+  const { refresh } = usePMC()
 
   const products = useMemo(() => {
     void tick
@@ -18,6 +21,16 @@ export default function PMCProductsPage() {
     void tick
     return pmcApi.getLatestReference()
   }, [tick])
+
+  async function handleDelete(productId: string, productName: string) {
+    if (!confirm(`Delete product "${productName}"? Pricing data for this product will be hidden.`)) return
+    try {
+      await pmcApi.deactivateProduct(productId)
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete product.')
+    }
+  }
 
   return (
     <div className="pmc-page max-w-4xl">
@@ -53,11 +66,8 @@ export default function PMCProductsPage() {
 
             return (
               <li key={p.id}>
-                <Link
-                  href={`/pmc/products/${p.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pmc-card hover:border-pmc-40 transition-colors min-h-[44px]"
-                >
-                  <div className="min-w-0">
+                <div className="pmc-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-pmc-40 transition-colors">
+                  <Link href={`/pmc/products/${p.id}`} className="min-w-0 flex-1 min-h-[44px] flex flex-col justify-center">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-primary">{p.name}</span>
                       {p.code && (
@@ -80,9 +90,13 @@ export default function PMCProductsPage() {
                         )}
                       </p>
                     )}
-                  </div>
-                  <span className="text-sm font-medium text-pmc shrink-0">Pricing sheet →</span>
-                </Link>
+                  </Link>
+                  <PmcRowActions
+                    viewHref={`/pmc/products/${p.id}`}
+                    editHref={`/pmc/master/products/${p.id}`}
+                    onDelete={() => handleDelete(p.id, p.name)}
+                  />
+                </div>
               </li>
             )
           })}

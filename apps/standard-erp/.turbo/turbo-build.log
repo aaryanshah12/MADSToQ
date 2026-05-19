@@ -204,13 +204,13 @@ Route (app)                               Size     First Load JS
 ├ ○ /personal/sales/quotations            276 B           157 kB
 ├ ƒ /personal/sales/quotations/[id]       324 B           295 kB
 ├ ○ /pmc                                  2.44 kB         152 kB
-├ ○ /pmc/dashboard                        3.22 kB         159 kB
+├ ○ /pmc/dashboard                        3.91 kB         160 kB
 ├ ○ /pmc/login                            150 B          87.5 kB
 ├ ○ /pmc/master                           602 B          94.8 kB
-├ ○ /pmc/master/products                  2.71 kB         159 kB
+├ ○ /pmc/master/products                  3.43 kB         159 kB
 ├ ƒ /pmc/master/products/[id]             1.91 kB         158 kB
-├ ○ /pmc/master/raw-materials             3.27 kB         159 kB
-├ ○ /pmc/products                         2.66 kB         159 kB
+├ ○ /pmc/master/raw-materials             3.29 kB         159 kB
+├ ○ /pmc/products                         3.36 kB         159 kB
 ├ ƒ /pmc/products/[id]                    5.3 kB          161 kB
 ├ ○ /pmc/references                       4.11 kB         160 kB
 └ ○ /sitemap.xml                          0 B                0 B

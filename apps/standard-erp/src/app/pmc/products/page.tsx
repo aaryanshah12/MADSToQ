@@ -1,16 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@madstoq/pmc-system/api'
+import type { PMCProduct } from '@madstoq/pmc-system/types'
 import { formatINR } from '@madstoq/pmc-system/lib/pricing'
 import { usePMC } from '@/contexts/PMCContext'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
+import { ProductMaterialsViewModal } from '@/components/pmc/ProductMaterialsViewModal'
 
 export default function PMCProductsPage() {
   const { tick } = usePMCData()
   const { refresh } = usePMC()
+  const [viewProduct, setViewProduct] = useState<PMCProduct | null>(null)
 
   const products = useMemo(() => {
     void tick
@@ -92,7 +95,7 @@ export default function PMCProductsPage() {
                     )}
                   </Link>
                   <PmcRowActions
-                    viewHref={`/pmc/products/${p.id}`}
+                    onView={() => setViewProduct(p)}
                     editHref={`/pmc/master/products/${p.id}`}
                     onDelete={() => handleDelete(p.id, p.name)}
                   />
@@ -102,6 +105,9 @@ export default function PMCProductsPage() {
           })}
         </ul>
       )}
+
+      <ProductMaterialsViewModal product={viewProduct} onClose={() => setViewProduct(null)} />
     </div>
   )
 }
+

@@ -84,6 +84,20 @@ export const pmcApi = {
       .sort((a, b) => a.sort_order - b.sort_order)
   },
 
+  /** Recipe lines with material name and unit for display. */
+  getProductRecipeLines(productId: string) {
+    const nameById = new Map(read().raw_materials.map((m) => [m.id, m]))
+    return pmcApi.listProductMaterials(productId).map((pm) => {
+      const rm = nameById.get(pm.raw_material_id)
+      return {
+        raw_material_name: rm?.name ?? '—',
+        unit: rm?.unit ?? 'Kg',
+        qty: pm.qty,
+        is_primary: pm.is_primary,
+      }
+    })
+  },
+
   async setProductMaterials(
     productId: string,
     rows: { raw_material_id: string; qty: number; is_primary: boolean }[]

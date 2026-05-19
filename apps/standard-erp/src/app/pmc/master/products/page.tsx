@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@madstoq/pmc-system/api'
+import type { PMCProduct } from '@madstoq/pmc-system/types'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
+import { ProductMaterialsViewModal } from '@/components/pmc/ProductMaterialsViewModal'
 
 export default function PMCMasterProductsPage() {
   const router = useRouter()
@@ -14,6 +16,7 @@ export default function PMCMasterProductsPage() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [saving, setSaving] = useState(false)
+  const [viewProduct, setViewProduct] = useState<PMCProduct | null>(null)
 
   const products = useMemo(() => {
     void tick
@@ -89,7 +92,7 @@ export default function PMCMasterProductsPage() {
                 {p.code && <span className="text-xs text-muted font-mono ml-2">{p.code}</span>}
               </Link>
               <PmcRowActions
-                viewHref={`/pmc/products/${p.id}`}
+                onView={() => setViewProduct(p)}
                 editHref={`/pmc/master/products/${p.id}`}
                 onDelete={() => handleDelete(p.id, p.name)}
               />
@@ -97,6 +100,8 @@ export default function PMCMasterProductsPage() {
           </li>
         ))}
       </ul>
+
+      <ProductMaterialsViewModal product={viewProduct} onClose={() => setViewProduct(null)} />
     </div>
   )
 }

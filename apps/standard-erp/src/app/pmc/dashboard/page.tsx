@@ -6,13 +6,16 @@ import { useState } from 'react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { pmcApi } from '@madstoq/pmc-system/api'
 import { seedPMCDemoIfEmpty } from '@madstoq/pmc-system/lib/seed'
+import type { PMCProduct } from '@madstoq/pmc-system/types'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
+import { ProductMaterialsViewModal } from '@/components/pmc/ProductMaterialsViewModal'
 
 export default function PMCDashboardPage() {
   const router = useRouter()
   const { refresh } = usePMC()
   const { tick } = usePMCData()
   const [seeding, setSeeding] = useState(false)
+  const [viewProduct, setViewProduct] = useState<PMCProduct | null>(null)
   void tick
 
   const stats = pmcApi.dashboardStats()
@@ -125,7 +128,7 @@ export default function PMCDashboardPage() {
                 >
                   <span className="text-sm font-medium text-primary truncate">{p.name}</span>
                   <PmcRowActions
-                    viewHref={`/pmc/products/${p.id}`}
+                    onView={() => setViewProduct(p)}
                     editHref={`/pmc/master/products/${p.id}`}
                     onDelete={() => deleteProduct(p.id, p.name)}
                   />
@@ -135,6 +138,8 @@ export default function PMCDashboardPage() {
           )}
         </section>
       </div>
+
+      <ProductMaterialsViewModal product={viewProduct} onClose={() => setViewProduct(null)} />
     </div>
   )
 }

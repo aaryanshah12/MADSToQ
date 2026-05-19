@@ -35,6 +35,8 @@ const nextConfig = {
       { source: '/website/script.js', destination: '/script.js', permanent: true },
       { source: '/website/MADSToQ.png', destination: '/MADSToQ.png', permanent: true },
       { source: '/website/favicon.png', destination: '/favicon.png', permanent: true },
+      { source: '/website/favicon-192.png', destination: '/favicon-192.png', permanent: true },
+      { source: '/website/apple-touch-icon.png', destination: '/apple-touch-icon.png', permanent: true },
       { source: '/website/Software/:path*', destination: '/Software/:path*', permanent: true },
     ]
   },

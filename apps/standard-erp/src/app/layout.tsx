@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
 
 const SITE_URL = "https://madstoq.com";
-const SITE_NAME = "MADSToQ";
+const SITE_NAME = "MADSToQ IT Solutions";
 /** Primary SEO title: includes brand + target query terms (keep ~60 chars for snippets). */
 const SITE_TITLE =
   "MADSToQ | IT Solutions, SaaS & Business Software";
@@ -48,9 +48,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.png", type: "image/png", sizes: "48x48" },
-      { url: "/MADSToQ.png", type: "image/png" },
+      { url: "/favicon-192.png", type: "image/png", sizes: "192x192" },
     ],
-    apple: [{ url: "/MADSToQ.png", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
   },
   openGraph: {
     title: SITE_TITLE,
@@ -92,10 +92,11 @@ const jsonLd = [
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: SITE_NAME,
-    alternateName: ["MADSTOQ", "madstoq.com"],
+    alternateName: ["MADSToQ", "MADSTOQ", "madstoq.com"],
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     inLanguage: "en-US",
+    publisher: { "@id": `${SITE_URL}/#organization` },
     keywords: SEO_KEYWORDS.join(", "),
   },
   {
@@ -103,7 +104,7 @@ const jsonLd = [
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
     name: SITE_NAME,
-    alternateName: ["MADSTOQ", "madstoq.com"],
+    alternateName: ["MADSToQ", "MADSTOQ", "madstoq.com"],
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     knowsAbout: [
@@ -118,8 +119,10 @@ const jsonLd = [
     logo: {
       "@type": "ImageObject",
       "@id": `${SITE_URL}/#logo`,
-      url: `${SITE_URL}/MADSToQ.png`,
-      contentUrl: `${SITE_URL}/MADSToQ.png`,
+      url: `${SITE_URL}/favicon-192.png`,
+      contentUrl: `${SITE_URL}/favicon-192.png`,
+      width: 192,
+      height: 192,
       caption: SITE_NAME,
     },
     image: {
@@ -162,8 +165,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" sizes="48x48" />
-        <link rel="icon" href="/MADSToQ.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/MADSToQ.png" />
+        <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+        <meta name="application-name" content={SITE_NAME} />
 
         <meta
           name="viewport"

@@ -1,0 +1,225 @@
+
+> @madstoq/standard-erp@1.0.0 build
+> next build
+
+  ▲ Next.js 14.2.3
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+./src/app/inventory/chemist/inward/page.tsx
+50:31  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+50:41  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+69:6  Warning: React Hook useEffect has a missing dependency: 'form.factory_id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+75:6  Warning: React Hook useEffect has a missing dependency: 'productOptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+75:24  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+
+./src/app/inventory/chemist/monthly-entry/page.tsx
+46:6  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+67:6  Warning: React Hook useEffect has a missing dependency: 'resetForm'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inventory/chemist/outward/page.tsx
+54:31  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+54:41  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+73:6  Warning: React Hook useEffect has a missing dependency: 'form.factory_id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+79:6  Warning: React Hook useEffect has a missing dependency: 'productOptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+79:24  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/inout-products/page.tsx
+42:31  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/inward/page.tsx
+50:31  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+50:41  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+69:6  Warning: React Hook useEffect has a missing dependency: 'form.factory_id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+75:6  Warning: React Hook useEffect has a missing dependency: 'productOptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+75:24  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/monthly-entry/page.tsx
+47:6  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+69:6  Warning: React Hook useEffect has a missing dependency: 'resetForm'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/outward/page.tsx
+54:31  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+54:41  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+73:6  Warning: React Hook useEffect has a missing dependency: 'form.factory_id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+79:6  Warning: React Hook useEffect has a missing dependency: 'productOptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+79:24  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/sales/page.tsx
+81:6  Warning: React Hook useEffect has a missing dependency: 'factoryId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+96:6  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/usage/page.tsx
+76:6  Warning: React Hook useEffect has missing dependencies: 'authLoading' and 'profile?.factories'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inventory/owner/users/page.tsx
+35:6  Warning: React Hook useEffect has a missing dependency: 'loadAll'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/dashboard/page.tsx
+27:6  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/domestic/page.tsx
+41:35  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/international/page.tsx
+41:35  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/inward/page.tsx
+44:35  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/master/page.tsx
+223:6  Warning: React Hook useEffect has missing dependencies: 'loadCompanies', 'loadNumbering', and 'loadProducts'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/outward/page.tsx
+40:35  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/inward-outward/quotation/page.tsx
+57:35  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/personal/sales/dashboard/page.tsx
+20:40  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/personal/sales/expenses/page.tsx
+22:40  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+71:6  Warning: React Hook useMemo has a missing dependency: 'membership'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/personal/sales/leads/[id]/page.tsx
+33:31  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/personal/sales/leads/page.tsx
+25:40  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/pmc/references/page.tsx
+38:6  Warning: React Hook useMemo has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/website.tsx
+480:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+552:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/io/IOLayout.tsx
+79:6  Warning: React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/io/ProductModal.tsx
+39:6  Warning: React Hook useEffect has a missing dependency: 'editing'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/sales/DocEditor.tsx
+74:6  Warning: React Hook useEffect has missing dependencies: 'isNew' and 'params'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/sales/DocList.tsx
+29:40  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/sales/NotificationBell.tsx
+39:6  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+72:6  Warning: React Hook useEffect has missing dependencies: 'load' and 'org'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/sales/RichTextEditor.tsx
+53:6  Warning: React Hook useEffect has a missing dependency: 'editor'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/contexts/IOFactoryContext.tsx
+48:6  Warning: React Hook useEffect has a missing dependency: 'factories'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/contexts/InventoryFactoryContext.tsx
+49:6  Warning: React Hook useEffect has a missing dependency: 'factories'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/hooks/useAuth.tsx
+84:6  Warning: React Hook useEffect has a missing dependency: 'loadProfile'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/69) ...
+   Generating static pages (17/69) 
+   Generating static pages (34/69) 
+   Generating static pages (51/69) 
+ ✓ Generating static pages (69/69)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                               Size     First Load JS
+┌ ○ /_not-found                           882 B          88.3 kB
+├ ƒ /api/auth/profile                     0 B                0 B
+├ ƒ /api/geo/cities                       0 B                0 B
+├ ƒ /api/geo/countries                    0 B                0 B
+├ ƒ /api/geo/states                       0 B                0 B
+├ ƒ /api/inventory/create-user            0 B                0 B
+├ ƒ /api/inventory/factories              0 B                0 B
+├ ƒ /api/inventory/inout-products         0 B                0 B
+├ ƒ /api/inventory/inward                 0 B                0 B
+├ ƒ /api/inventory/monthly-material       0 B                0 B
+├ ƒ /api/inventory/outward                0 B                0 B
+├ ƒ /api/inventory/sales                  0 B                0 B
+├ ƒ /api/inventory/stock                  0 B                0 B
+├ ƒ /api/inventory/usage                  0 B                0 B
+├ ƒ /api/inventory/usage/batch            0 B                0 B
+├ ƒ /api/inventory/users                  0 B                0 B
+├ ƒ /api/io/upload-pdf                    0 B                0 B
+├ ƒ /api/personal/sales/render-pdf        0 B                0 B
+├ ƒ /api/personal/sales/send-document     0 B                0 B
+├ ƒ /api/rpc/inventory                    0 B                0 B
+├ ƒ /api/rpc/io                           0 B                0 B
+├ ƒ /api/rpc/pmc                          0 B                0 B
+├ ƒ /api/rpc/sales                        0 B                0 B
+├ ƒ /api/send-inquiry                     0 B                0 B
+├ ○ /inventory/chemist                    2.79 kB         166 kB
+├ ○ /inventory/chemist/history            4.45 kB         162 kB
+├ ○ /inventory/chemist/inward             4.44 kB         158 kB
+├ ○ /inventory/chemist/monthly-entry      4.9 kB          159 kB
+├ ○ /inventory/chemist/outward            5.08 kB         159 kB
+├ ○ /inventory/chemist/use                7.34 kB         159 kB
+├ ○ /inventory/inputer                    2.13 kB         165 kB
+├ ○ /inventory/inputer/history            4.22 kB         162 kB
+├ ○ /inventory/inputer/new                5.15 kB         156 kB
+├ ○ /inventory/login                      3.76 kB         149 kB
+├ ○ /inventory/owner                      7.63 kB         255 kB
+├ ○ /inventory/owner/factories            7.05 kB         158 kB
+├ ○ /inventory/owner/inout-products       4.36 kB         156 kB
+├ ○ /inventory/owner/inward               4.41 kB         158 kB
+├ ○ /inventory/owner/management           8.66 kB         163 kB
+├ ○ /inventory/owner/monthly-entry        4.73 kB         159 kB
+├ ○ /inventory/owner/outward              5.06 kB         159 kB
+├ ○ /inventory/owner/permissions          4.1 kB          158 kB
+├ ○ /inventory/owner/reports              12.8 kB         265 kB
+├ ○ /inventory/owner/sales                8.72 kB         263 kB
+├ ○ /inventory/owner/stock                7.44 kB         159 kB
+├ ○ /inventory/owner/usage                7.48 kB         159 kB
+├ ○ /inventory/owner/users                4.08 kB         158 kB
+├ ○ /inward-outward                       150 B          87.5 kB
+├ ○ /inward-outward/dashboard             2.39 kB         159 kB
+├ ○ /inward-outward/domestic              7.45 kB         167 kB
+├ ○ /inward-outward/international         7.33 kB         166 kB
+├ ○ /inward-outward/inward                7.22 kB         166 kB
+├ ○ /inward-outward/login                 3.14 kB         148 kB
+├ ○ /inward-outward/master                9.38 kB         163 kB
+├ ○ /inward-outward/outward               6.9 kB          166 kB
+├ ○ /inward-outward/quotation             9.15 kB         168 kB
+├ ○ /personal/sales                       150 B          87.5 kB
+├ ○ /personal/sales/dashboard             5.25 kB         157 kB
+├ ○ /personal/sales/expenses              7.62 kB         153 kB
+├ ○ /personal/sales/leads                 2.95 kB         160 kB
+├ ƒ /personal/sales/leads/[id]            3.14 kB         160 kB
+├ ○ /personal/sales/login                 4.03 kB         149 kB
+├ ○ /personal/sales/purchase-orders       278 B           157 kB
+├ ƒ /personal/sales/purchase-orders/[id]  327 B           295 kB
+├ ○ /personal/sales/quotations            276 B           157 kB
+├ ƒ /personal/sales/quotations/[id]       324 B           295 kB
+├ ○ /pmc                                  2.44 kB         151 kB
+├ ○ /pmc/dashboard                        1.61 kB         157 kB
+├ ○ /pmc/login                            150 B          87.5 kB
+├ ○ /pmc/master                           602 B          94.8 kB
+├ ○ /pmc/master/products                  1.14 kB         157 kB
+├ ƒ /pmc/master/products/[id]             1.91 kB         158 kB
+├ ○ /pmc/master/raw-materials             1.11 kB         157 kB
+├ ○ /pmc/products                         1.05 kB         157 kB
+├ ƒ /pmc/products/[id]                    5.3 kB          161 kB
+├ ○ /pmc/references                       3.32 kB         152 kB
+└ ○ /sitemap.xml                          0 B                0 B
++ First Load JS shared by all             87.4 kB
+  ├ chunks/1dd3208c-f920ffce4ce1ebb4.js   53.7 kB
+  ├ chunks/286-cb71bc31aa7c8860.js        31.6 kB
+  └ other shared chunks (total)           2.09 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

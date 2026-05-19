@@ -5,12 +5,13 @@
   "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "database"
   ],
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo run build --filter=@madstoq/web && cp -r apps/web/.next .next",
-    "start": "npm run start --workspace=@madstoq/web",
+    "build": "turbo run build --filter=@madstoq/standard-erp",
+    "start": "npm run start --workspace=@madstoq/standard-erp",
     "lint": "turbo lint",
     "generate-favicon": "node scripts/generate-favicon.js",
     "pmc:register-user": "node scripts/register-pmc-user.js"

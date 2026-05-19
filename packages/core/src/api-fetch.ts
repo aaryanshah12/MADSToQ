@@ -1,8 +1,40 @@
 import { authClient } from '@madstoq/auth'
 
+let cachedAccessToken: string | null = null
+let inflightToken: Promise<string | null> | null = null
+let sessionListenerReady = false
+
+function ensureSessionListener() {
+  if (sessionListenerReady || typeof window === 'undefined') return
+  sessionListenerReady = true
+  authClient.auth.getSession().then(({ data }) => {
+    cachedAccessToken = data.session?.access_token ?? null
+  })
+  authClient.auth.onAuthStateChange((_event, session) => {
+    cachedAccessToken = session?.access_token ?? null
+  })
+}
+
+/** Call after sign-in so the next API request does not wait on getSession(). */
+export function setCachedAccessToken(token: string | null) {
+  cachedAccessToken = token
+}
+
+async function getAccessToken(): Promise<string | null> {
+  ensureSessionListener()
+  if (cachedAccessToken) return cachedAccessToken
+  if (!inflightToken) {
+    inflightToken = authClient.auth.getSession().then(({ data }) => {
+      cachedAccessToken = data.session?.access_token ?? null
+      inflightToken = null
+      return cachedAccessToken
+    })
+  }
+  return inflightToken
+}
+
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data } = await authClient.auth.getSession()
-  const token = data.session?.access_token
+  const token = await getAccessToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
   return headers

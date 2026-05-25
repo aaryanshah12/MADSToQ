@@ -128,8 +128,10 @@
 
 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
    Collecting page data ...
+⚠️  Node.js 18 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 20 or later. For more information, visit: https://github.com/orgs/supabase/discussions/37217
    Generating static pages (0/69) ...
    Generating static pages (17/69) 
+⚠️  Node.js 18 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 20 or later. For more information, visit: https://github.com/orgs/supabase/discussions/37217
    Generating static pages (34/69) 
    Generating static pages (51/69) 
  ✓ Generating static pages (69/69)
@@ -137,7 +139,7 @@ info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/d
    Collecting build traces ...
 
 Route (app)                               Size     First Load JS
-┌ ○ /_not-found                           882 B          88.3 kB
+┌ ○ /_not-found                           879 B          88.2 kB
 ├ ƒ /api/auth/profile                     0 B                0 B
 ├ ƒ /api/geo/cities                       0 B                0 B
 ├ ƒ /api/geo/countries                    0 B                0 B
@@ -162,61 +164,61 @@ Route (app)                               Size     First Load JS
 ├ ƒ /api/rpc/sales                        0 B                0 B
 ├ ƒ /api/send-inquiry                     0 B                0 B
 ├ ○ /inventory/chemist                    2.79 kB         166 kB
-├ ○ /inventory/chemist/history            4.45 kB         162 kB
-├ ○ /inventory/chemist/inward             4.44 kB         158 kB
-├ ○ /inventory/chemist/monthly-entry      4.9 kB          159 kB
-├ ○ /inventory/chemist/outward            5.08 kB         159 kB
-├ ○ /inventory/chemist/use                7.34 kB         159 kB
-├ ○ /inventory/inputer                    2.13 kB         165 kB
-├ ○ /inventory/inputer/history            4.22 kB         162 kB
-├ ○ /inventory/inputer/new                5.15 kB         156 kB
+├ ○ /inventory/chemist/history            4.54 kB         163 kB
+├ ○ /inventory/chemist/inward             4.46 kB         159 kB
+├ ○ /inventory/chemist/monthly-entry      4.89 kB         159 kB
+├ ○ /inventory/chemist/outward            5.09 kB         159 kB
+├ ○ /inventory/chemist/use                7.41 kB         159 kB
+├ ○ /inventory/inputer                    2.14 kB         165 kB
+├ ○ /inventory/inputer/history            4.31 kB         163 kB
+├ ○ /inventory/inputer/new                5.25 kB         157 kB
 ├ ○ /inventory/login                      3.76 kB         149 kB
-├ ○ /inventory/owner                      7.63 kB         255 kB
-├ ○ /inventory/owner/factories            7.05 kB         158 kB
-├ ○ /inventory/owner/inout-products       4.36 kB         156 kB
-├ ○ /inventory/owner/inward               4.41 kB         158 kB
-├ ○ /inventory/owner/management           8.66 kB         163 kB
-├ ○ /inventory/owner/monthly-entry        4.73 kB         159 kB
-├ ○ /inventory/owner/outward              5.06 kB         159 kB
-├ ○ /inventory/owner/permissions          4.1 kB          158 kB
-├ ○ /inventory/owner/reports              12.8 kB         265 kB
-├ ○ /inventory/owner/sales                8.72 kB         263 kB
-├ ○ /inventory/owner/stock                7.44 kB         159 kB
-├ ○ /inventory/owner/usage                7.48 kB         159 kB
-├ ○ /inventory/owner/users                4.08 kB         158 kB
-├ ○ /inward-outward                       150 B          87.5 kB
-├ ○ /inward-outward/dashboard             2.39 kB         159 kB
-├ ○ /inward-outward/domestic              7.45 kB         167 kB
-├ ○ /inward-outward/international         7.33 kB         166 kB
-├ ○ /inward-outward/inward                7.22 kB         166 kB
-├ ○ /inward-outward/login                 3.14 kB         148 kB
-├ ○ /inward-outward/master                9.38 kB         163 kB
-├ ○ /inward-outward/outward               6.9 kB          166 kB
-├ ○ /inward-outward/quotation             9.15 kB         168 kB
-├ ○ /personal/sales                       150 B          87.5 kB
-├ ○ /personal/sales/dashboard             5.25 kB         157 kB
-├ ○ /personal/sales/expenses              7.62 kB         153 kB
-├ ○ /personal/sales/leads                 2.95 kB         160 kB
-├ ƒ /personal/sales/leads/[id]            3.14 kB         160 kB
+├ ○ /inventory/owner                      7.7 kB          256 kB
+├ ○ /inventory/owner/factories            4.68 kB         159 kB
+├ ○ /inventory/owner/inout-products       1.9 kB          156 kB
+├ ○ /inventory/owner/inward               4.42 kB         159 kB
+├ ○ /inventory/owner/management           8.69 kB         163 kB
+├ ○ /inventory/owner/monthly-entry        4.74 kB         159 kB
+├ ○ /inventory/owner/outward              5.07 kB         159 kB
+├ ○ /inventory/owner/permissions          4.18 kB         158 kB
+├ ○ /inventory/owner/reports              12.9 kB         265 kB
+├ ○ /inventory/owner/sales                8.74 kB         264 kB
+├ ○ /inventory/owner/stock                7.54 kB         159 kB
+├ ○ /inventory/owner/usage                7.58 kB         159 kB
+├ ○ /inventory/owner/users                6.62 kB         158 kB
+├ ○ /inward-outward                       151 B          87.5 kB
+├ ○ /inward-outward/dashboard             2.4 kB          159 kB
+├ ○ /inward-outward/domestic              7.47 kB         167 kB
+├ ○ /inward-outward/international         7.35 kB         166 kB
+├ ○ /inward-outward/inward                7.24 kB         166 kB
+├ ○ /inward-outward/login                 3.15 kB         148 kB
+├ ○ /inward-outward/master                9.4 kB          163 kB
+├ ○ /inward-outward/outward               6.92 kB         166 kB
+├ ○ /inward-outward/quotation             9.17 kB         168 kB
+├ ○ /personal/sales                       151 B          87.5 kB
+├ ○ /personal/sales/dashboard             5.26 kB         157 kB
+├ ○ /personal/sales/expenses              7.65 kB         153 kB
+├ ○ /personal/sales/leads                 2.96 kB         160 kB
+├ ƒ /personal/sales/leads/[id]            3.16 kB         160 kB
 ├ ○ /personal/sales/login                 4.03 kB         149 kB
-├ ○ /personal/sales/purchase-orders       278 B           157 kB
-├ ƒ /personal/sales/purchase-orders/[id]  327 B           295 kB
-├ ○ /personal/sales/quotations            276 B           157 kB
-├ ƒ /personal/sales/quotations/[id]       324 B           295 kB
+├ ○ /personal/sales/purchase-orders       281 B           157 kB
+├ ƒ /personal/sales/purchase-orders/[id]  331 B           295 kB
+├ ○ /personal/sales/quotations            277 B           157 kB
+├ ƒ /personal/sales/quotations/[id]       327 B           295 kB
 ├ ○ /pmc                                  2.44 kB         152 kB
-├ ○ /pmc/dashboard                        3.91 kB         160 kB
-├ ○ /pmc/login                            150 B          87.5 kB
-├ ○ /pmc/master                           602 B          94.8 kB
-├ ○ /pmc/master/products                  3.43 kB         159 kB
-├ ƒ /pmc/master/products/[id]             1.91 kB         158 kB
-├ ○ /pmc/master/raw-materials             3.29 kB         159 kB
-├ ○ /pmc/products                         3.36 kB         159 kB
-├ ƒ /pmc/products/[id]                    5.3 kB          161 kB
-├ ○ /pmc/references                       4.11 kB         160 kB
+├ ○ /pmc/dashboard                        3.94 kB         160 kB
+├ ○ /pmc/login                            151 B          87.5 kB
+├ ○ /pmc/master                           4.83 kB         161 kB
+├ ○ /pmc/master/products                  388 B          87.7 kB
+├ ƒ /pmc/master/products/[id]             1.92 kB         158 kB
+├ ○ /pmc/master/raw-materials             391 B          87.7 kB
+├ ○ /pmc/products                         3.39 kB         159 kB
+├ ƒ /pmc/products/[id]                    5.31 kB         161 kB
+├ ○ /pmc/references                       4.13 kB         160 kB
 └ ○ /sitemap.xml                          0 B                0 B
 + First Load JS shared by all             87.4 kB
-  ├ chunks/1dd3208c-f920ffce4ce1ebb4.js   53.7 kB
-  ├ chunks/286-cb71bc31aa7c8860.js        31.6 kB
+  ├ chunks/1dd3208c-1f32ceeb8f93098c.js   53.6 kB
+  ├ chunks/286-906b11f888c1511b.js        31.6 kB
   └ other shared chunks (total)           2.09 kB
 
 

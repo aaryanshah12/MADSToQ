@@ -9,7 +9,7 @@ import clsx from 'clsx'
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpToLine,
   Home, Globe, FileText, BookOpen,
-  LogOut, Menu, X, Sun, Moon, ChevronRight, ChevronDown, Building2, Check, BookOpen,
+  LogOut, Menu, X, Sun, Moon, ChevronRight, ChevronDown, Building2, Check,
 } from 'lucide-react'
 
 const BASE          = '/inward-outward'

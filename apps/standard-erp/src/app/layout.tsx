@@ -3,7 +3,9 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
 
 const SITE_URL = "https://madstoq.com";
-const SITE_NAME = "MADSToQ IT Solutions";
+/** Brand label shown in Google site name (keep short; see WebSite schema). */
+const SITE_NAME = "MADSToQ";
+const SITE_NAME_LONG = "MADSToQ IT Solutions";
 /** Primary SEO title: includes brand + target query terms (keep ~60 chars for snippets). */
 const SITE_TITLE =
   "MADSToQ | IT Solutions, SaaS & Business Software";
@@ -92,7 +94,7 @@ const jsonLd = [
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: SITE_NAME,
-    alternateName: ["MADSToQ", "MADSTOQ", "madstoq.com"],
+    alternateName: [SITE_NAME_LONG, "MADSTOQ"],
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     inLanguage: "en-US",
@@ -104,7 +106,7 @@ const jsonLd = [
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
     name: SITE_NAME,
-    alternateName: ["MADSToQ", "MADSTOQ", "madstoq.com"],
+    alternateName: [SITE_NAME_LONG, "MADSTOQ"],
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     knowsAbout: [
@@ -140,7 +142,7 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
     "@id": `${SITE_URL}/#professional-service`,
-    name: `${SITE_NAME} — IT solutions & SaaS`,
+    name: `${SITE_NAME_LONG} — IT solutions & SaaS`,
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     serviceType: [

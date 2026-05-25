@@ -1,9 +1,37 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "INQUIRY_TO",
+    "SALES_SMTP_HOST",
+    "SALES_SMTP_PORT",
+    "SALES_SMTP_USER",
+    "SALES_SMTP_PASS"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASS",
+        "INQUIRY_TO",
+        "SALES_SMTP_HOST",
+        "SALES_SMTP_PORT",
+        "SALES_SMTP_USER",
+        "SALES_SMTP_PASS"
+      ]
     },
     "dev": {
       "cache": false,

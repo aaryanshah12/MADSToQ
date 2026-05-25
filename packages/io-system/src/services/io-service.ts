@@ -564,7 +564,7 @@ export async function fetchPdfConfig(factory_id: string) {
     Object.assign(selected, fs.selected)
   }
 
-  const manifest = await sanitizePdfManifest({ files: [...files], selected })
+  const manifest = await sanitizePdfManifest({ files: Array.from(files), selected })
   return {
     files: manifest.files,
     selected: manifest.selected,

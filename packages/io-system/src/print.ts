@@ -1,9 +1,16 @@
+import { getAuthHeaders } from '@madstoq/core'
 import type { IODomestic, IOInternational, IOInward, IOOutward, IOProduct, IOQuotation, IOQuotationItem, IOLineItem } from './types/index'
 import { fmtDate } from './api/client'
 type InvoiceLike = (IODomestic | IOInternational) & { items?: IOLineItem[] }
 type TemplateSlot = 'label' | 'letter-head' | 'customer-print'
 
-let templateCache: Record<string, string> | null = null
+/** Per-factory PDF slot → web path (from Master → PDFs for that factory). */
+const templateCache: Record<string, Record<string, string>> = {}
+
+export function invalidatePdfTemplateCache(factoryId?: string | null) {
+  if (factoryId) delete templateCache[factoryId]
+  else Object.keys(templateCache).forEach((k) => delete templateCache[k])
+}
 
 async function getPdfLib() {
   const { PDFDocument, StandardFonts, rgb, degrees } = await import('pdf-lib')
@@ -16,18 +23,21 @@ async function fetchArrayBuffer(url: string) {
   return res.arrayBuffer()
 }
 
-async function getTemplateUrl(slot: TemplateSlot): Promise<string> {
-  if (!templateCache) {
+async function getTemplateUrl(slot: TemplateSlot, factoryId?: string | null): Promise<string> {
+  const cacheKey = factoryId || ''
+  if (!templateCache[cacheKey]) {
     try {
-      const res = await fetch('/api/io/upload-pdf', { cache: 'no-store' })
+      const headers = await getAuthHeaders()
+      const qs = factoryId ? `?factoryId=${encodeURIComponent(factoryId)}` : ''
+      const res = await fetch(`/api/io/upload-pdf${qs}`, { cache: 'no-store', headers })
       if (res.ok) {
         const data = await res.json()
-        templateCache = data?.selected ?? {}
+        templateCache[cacheKey] = data?.selected ?? {}
       } else {
-        templateCache = {}
+        templateCache[cacheKey] = {}
       }
     } catch {
-      templateCache = {}
+      templateCache[cacheKey] = {}
     }
   }
   const fallbacks: Record<TemplateSlot, string> = {
@@ -35,7 +45,11 @@ async function getTemplateUrl(slot: TemplateSlot): Promise<string> {
     'letter-head': '/letter-head.pdf',
     'customer-print': '',
   }
-  return templateCache?.[slot] || fallbacks[slot]
+  const path = templateCache[cacheKey]?.[slot] || fallbacks[slot]
+  if (!path) return ''
+  const params = new URLSearchParams({ path })
+  if (factoryId) params.set('factoryId', factoryId)
+  return `/api/io/pdf?${params.toString()}`
 }
 
 function openPrintBlob(blob: Blob, _filename: string, format: 'label' | 'a4' = 'a4') {
@@ -172,7 +186,7 @@ function u8ToArrayBuffer(bytes: Uint8Array) {
 // --- REWRITTEN QUOTATION FUNCTION ---
 export async function printLetterHeadQuotation(row: IOQuotation, products: IOProduct[]) {
   const { PDFDocument, StandardFonts } = await getPdfLib()
-  const ab = await fetchArrayBuffer(await getTemplateUrl('letter-head'))
+  const ab = await fetchArrayBuffer(await getTemplateUrl('letter-head', row.factory_id))
   const pdf = await PDFDocument.load(ab)
   const page = pdf.getPages()[0]
   const font = await pdf.embedFont(StandardFonts.Helvetica)
@@ -250,7 +264,7 @@ export async function printLetterHeadQuotation(row: IOQuotation, products: IOPro
 // --- REWRITTEN INVOICE FUNCTION ---
 export async function printLetterHeadInvoice(_kind: 'Domestic' | 'International', row: InvoiceLike, products: IOProduct[]) {
   const { PDFDocument, StandardFonts } = await getPdfLib()
-  const ab = await fetchArrayBuffer(await getTemplateUrl('letter-head'))
+  const ab = await fetchArrayBuffer(await getTemplateUrl('letter-head', row.factory_id))
   const pdf = await PDFDocument.load(ab)
   const page = pdf.getPages()[0]
   const font = await pdf.embedFont(StandardFonts.Helvetica)
@@ -312,21 +326,21 @@ export async function printLetterHeadInvoice(_kind: 'Domestic' | 'International'
 }
 
 export async function printLabelForInward(row: IOInward, products: IOProduct[]) {
-  await printLabelPages('Inward', safeText(row.inward_number), row.inward_date, safeText(row.remarks ?? ''), row.items ?? [], products)
+  await printLabelPages('Inward', safeText(row.inward_number), row.inward_date, safeText(row.remarks ?? ''), row.items ?? [], products, row.factory_id)
 }
 
 export async function printLabelForOutward(row: IOOutward, products: IOProduct[]) {
-  await printLabelPages('Outward', safeText(row.outward_number), row.outward_date, safeText(row.remarks ?? ''), row.items ?? [], products)
+  await printLabelPages('Outward', safeText(row.outward_number), row.outward_date, safeText(row.remarks ?? ''), row.items ?? [], products, row.factory_id)
 }
 
 export async function printLabelForDomestic(row: IODomestic, products: IOProduct[]) {
   const id = safeText(row.tax_invoice_number || (row as any).invoice_number)
-  await printLabelPages('Domestic', id, (row as any).invoice_date, safeText(row.remarks ?? ''), (row.items ?? []) as any[], products)
+  await printLabelPages('Domestic', id, (row as any).invoice_date, safeText(row.remarks ?? ''), (row.items ?? []) as any[], products, row.factory_id)
 }
 
 export async function printLabelForInternational(row: IOInternational, products: IOProduct[]) {
   const id = safeText(row.tax_invoice_number || (row as any).invoice_number)
-  await printLabelPages('International', id, (row as any).invoice_date, safeText(row.remarks ?? ''), (row.items ?? []) as any[], products)
+  await printLabelPages('International', id, (row as any).invoice_date, safeText(row.remarks ?? ''), (row.items ?? []) as any[], products, row.factory_id)
 }
 
 function fmtLabelDate(d?: string | null) {
@@ -346,9 +360,10 @@ async function printLabelPages(
   remarks: string,
   items: IOLineItem[],
   products: IOProduct[],
+  factoryId?: string | null,
 ) {
   const { PDFDocument, StandardFonts, rgb, degrees } = await getPdfLib()
-  const ab = await fetchArrayBuffer(await getTemplateUrl('label'))
+  const ab = await fetchArrayBuffer(await getTemplateUrl('label', factoryId))
   const src = await PDFDocument.load(ab)
 
   const pdf = await PDFDocument.create()
@@ -386,7 +401,7 @@ async function printLabelPages(
     const product = safeText(it.product?.product_name || productNameById(products, it.product_id))
 
     const xLeft = width * 0.10
-    const yProduct = height * 0.66
+    const yProduct = height * 0.72
     const yMeta1 = height * 0.45
     const yMeta2 = height * 0.32
 

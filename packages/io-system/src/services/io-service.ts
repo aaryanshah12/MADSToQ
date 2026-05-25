@@ -1,4 +1,7 @@
-import { getServerDb } from '@madstoq/database'
+import { existsSync } from 'fs'
+import { access, mkdir, readFile, writeFile } from 'fs/promises'
+import path from 'path'
+import { getAuthenticatedUser, getServerDb } from '@madstoq/database'
 import type {
   IOUnit, IOCountry, IOState, IOCity,
   IOCompany, IOProduct,
@@ -32,8 +35,30 @@ function clearCachedPrefix(prefix: string) {
 
 // ── Auth helpers ───────────────────────────────────────────────
 async function userId() {
-  const { data } = await getServerDb().auth.getUser()
-  return data.user?.id ?? null
+  try {
+    return getAuthenticatedUser().id
+  } catch {
+    const { data } = await getServerDb().auth.getUser()
+    return data.user?.id ?? null
+  }
+}
+
+export async function assertFactoryAccess(factory_id: string) {
+  const uid = await userId()
+  if (!uid) throw new Error('Unauthorized')
+  const { data, error } = await getServerDb()
+    .from('profile_factories')
+    .select('factory_id')
+    .eq('profile_id', uid)
+    .eq('factory_id', factory_id)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('You do not have access to this factory')
+}
+
+function isMissingTableError(error: { code?: string; message?: string } | null) {
+  if (!error) return false
+  return error.code === '42P01' || (error.message ?? '').includes('io_pdf_')
 }
 
 // ── Next Document Number ───────────────────────────────────────
@@ -50,12 +75,6 @@ function pad2(n: number) {
 }
 
 const NO_VH_TYPES: DocType[] = ['domestic', 'international']
-
-function makeVHNumber(seq: number, date: Date) {
-  const mm = pad2(date.getMonth() + 1)
-  const yy = pad2(date.getFullYear() % 100)
-  return `VH ${seq}/${mm}/${yy}`
-}
 
 function makePlainNumber(seq: number, date: Date) {
   const mm = pad2(date.getMonth() + 1)
@@ -91,13 +110,14 @@ function applyOuterAffixes(core: string, prefix: string, suffix: string): string
   return `${prefix ?? ''}${core}${suffix ?? ''}`
 }
 
+/** Legacy numbers embed "VH" in the core; affixes are configured separately in Master. */
+function stripLegacyVHPrefix(s: string): string {
+  return String(s ?? '').trim().replace(/^VH\s*/i, '').trim()
+}
+
 function parseSeqForType(type: DocType, raw: unknown, prefix: string, suffix: string): { seq: number; yy: string } | null {
-  const stripped = stripOuterAffixes(String(raw ?? ''), prefix, suffix)
-  const noVH = NO_VH_TYPES.includes(type)
-  if (noVH) {
-    return parsePlainNumber(stripped) ?? parseVHNumber(stripped)
-  }
-  return parseVHNumber(stripped)
+  const stripped = stripLegacyVHPrefix(stripOuterAffixes(String(raw ?? ''), prefix, suffix))
+  return parsePlainNumber(stripped) ?? parseVHNumber(stripped)
 }
 
 async function computeNextNumber(
@@ -109,7 +129,6 @@ async function computeNextNumber(
 ): Promise<string> {
   const { table, column } = DOC_TABLE[type]
   const yy = pad2(date.getFullYear() % 100)
-  const noVH = NO_VH_TYPES.includes(type)
 
   // Pull a small slice of recent numbers and compute max for this year.
   // This keeps the logic in-app, even if the Supabase RPC isn't updated.
@@ -130,7 +149,7 @@ async function computeNextNumber(
     if (parsed.seq > max) max = parsed.seq
   }
 
-  return noVH ? makePlainNumber(max + 1, date) : makeVHNumber(max + 1, date)
+  return makePlainNumber(max + 1, date)
 }
 
 export async function getNextNumber(type: DocType, date?: string, factoryId?: string | null): Promise<string> {
@@ -156,8 +175,10 @@ export async function getNextNumber(type: DocType, date?: string, factoryId?: st
       })
       if (!error && typeof data === 'string' && data.trim()) {
         const trimmed = data.trim()
-        const core = stripOuterAffixes(trimmed, prefix, suffix)
-        return applyOuterAffixes(core, prefix, suffix)
+        const core = stripLegacyVHPrefix(stripOuterAffixes(trimmed, prefix, suffix))
+        if (parsePlainNumber(core) || parseVHNumber(trimmed)) {
+          return applyOuterAffixes(core, prefix, suffix)
+        }
       }
     } catch {
       // ignore and fallback
@@ -167,7 +188,13 @@ export async function getNextNumber(type: DocType, date?: string, factoryId?: st
   if (!NO_VH_TYPES.includes(type) && !factoryId) {
     try {
       const { data, error } = await getServerDb().rpc('io_next_number', { p_doc_type: type })
-      if (!error && typeof data === 'string' && parseVHNumber(data)) return data
+      if (!error && typeof data === 'string' && data.trim()) {
+        const trimmed = data.trim()
+        const core = stripLegacyVHPrefix(stripOuterAffixes(trimmed, prefix, suffix))
+        if (parsePlainNumber(core) || parseVHNumber(trimmed)) {
+          return applyOuterAffixes(core, prefix, suffix)
+        }
+      }
     } catch {
       // ignore and fallback
     }
@@ -369,12 +396,13 @@ export const deleteCompany = async (id: string) => {
 
 // ── Numbering Config (Factory-wise) ───────────────────────────
 export const fetchNumberingConfig = async (factory_id: string): Promise<Record<DocType, { prefix: string; suffix: string }>> => {
+  await assertFactoryAccess(factory_id)
   const defaults: Record<DocType, { prefix: string; suffix: string }> = {
-    inward: { prefix: '', suffix: '' },
-    outward: { prefix: '', suffix: '' },
+    inward: { prefix: 'VH ', suffix: '' },
+    outward: { prefix: 'VH ', suffix: '' },
     domestic: { prefix: '', suffix: '' },
     international: { prefix: '', suffix: '' },
-    quotation: { prefix: '', suffix: '' },
+    quotation: { prefix: 'VH ', suffix: '' },
   }
   const { data, error } = await getServerDb()
     .from('io_numbering_config')
@@ -392,6 +420,7 @@ export const saveNumberingConfig = async (
   factory_id: string,
   values: Record<DocType, { prefix: string; suffix: string }>
 ) => {
+  await assertFactoryAccess(factory_id)
   const docTypes: DocType[] = ['inward', 'outward', 'domestic', 'international', 'quotation']
   const rows = (['inward', 'outward', 'domestic', 'international', 'quotation'] as DocType[]).map((doc_type) => ({
     factory_id,
@@ -412,6 +441,188 @@ export const saveNumberingConfig = async (
     .from('io_numbering_config')
     .insert(rows)
   if (insError) throw insError
+}
+
+// ── PDF templates (Factory-wise) ──────────────────────────────
+export type IOPdfSlot = 'label' | 'letter-head' | 'customer-print'
+
+const PDF_DEFAULTS: Record<IOPdfSlot, string> = {
+  label: '/Label.pdf',
+  'letter-head': '/letter-head.pdf',
+  'customer-print': '',
+}
+
+const PDF_SLOTS: IOPdfSlot[] = ['label', 'letter-head', 'customer-print']
+
+function resolvePdfPublicRoot(): string {
+  const candidates = [
+    path.join(process.cwd(), 'public'),
+    path.join(process.cwd(), 'apps/standard-erp/public'),
+  ]
+  for (const dir of candidates) {
+    try {
+      if (existsSync(path.join(dir, 'Label.pdf')) || existsSync(path.join(dir, 'letter-head.pdf'))) {
+        return dir
+      }
+    } catch {
+      /* continue */
+    }
+  }
+  return candidates[0]
+}
+
+function pdfDirForFactory(factory_id: string) {
+  return path.join(resolvePdfPublicRoot(), 'io-pdfs', factory_id)
+}
+
+function pdfManifestPath(factory_id: string) {
+  return path.join(pdfDirForFactory(factory_id), 'templates.json')
+}
+
+async function pdfExistsOnDisk(webPath: string): Promise<boolean> {
+  if (!webPath.startsWith('/') || webPath.includes('..')) return false
+  try {
+    await access(path.join(resolvePdfPublicRoot(), webPath.replace(/^\//, '')))
+    return true
+  } catch {
+    return false
+  }
+}
+
+type PdfManifest = { files: string[]; selected: Record<IOPdfSlot, string> }
+
+async function readFsPdfManifest(factory_id: string): Promise<PdfManifest> {
+  try {
+    const raw = await readFile(pdfManifestPath(factory_id), 'utf8')
+    const parsed = JSON.parse(raw) as PdfManifest
+    return {
+      files: Array.isArray(parsed.files) ? parsed.files : [],
+      selected: {
+        label: parsed?.selected?.label || PDF_DEFAULTS.label,
+        'letter-head': parsed?.selected?.['letter-head'] || PDF_DEFAULTS['letter-head'],
+        'customer-print': parsed?.selected?.['customer-print'] || PDF_DEFAULTS['customer-print'],
+      },
+    }
+  } catch {
+    return { files: [], selected: { ...PDF_DEFAULTS } }
+  }
+}
+
+async function writeFsPdfManifest(factory_id: string, m: PdfManifest) {
+  const dir = pdfDirForFactory(factory_id)
+  await mkdir(dir, { recursive: true })
+  await writeFile(pdfManifestPath(factory_id), JSON.stringify(m, null, 2), 'utf8')
+}
+
+async function sanitizePdfManifest(m: PdfManifest): Promise<PdfManifest> {
+  const files: string[] = []
+  for (const f of m.files) {
+    if (await pdfExistsOnDisk(f)) files.push(f)
+  }
+  const selected = { ...m.selected }
+  for (const slot of PDF_SLOTS) {
+    const p = selected[slot]
+    if (!p) {
+      selected[slot] = PDF_DEFAULTS[slot]
+      continue
+    }
+    if (!(await pdfExistsOnDisk(p))) selected[slot] = PDF_DEFAULTS[slot]
+  }
+  return { files, selected }
+}
+
+export async function fetchPdfConfig(factory_id: string) {
+  await assertFactoryAccess(factory_id)
+  const selected: Record<IOPdfSlot, string> = { ...PDF_DEFAULTS }
+  const files = new Set<string>()
+
+  const { data: slotRows, error: slotErr } = await getServerDb()
+    .from('io_pdf_config')
+    .select('slot,file_path')
+    .eq('factory_id', factory_id)
+
+  if (!isMissingTableError(slotErr)) {
+    if (slotErr) throw slotErr
+    for (const row of slotRows ?? []) {
+      const slot = row.slot as IOPdfSlot
+      if (PDF_SLOTS.includes(slot) && row.file_path) selected[slot] = row.file_path
+    }
+    const { data: fileRows, error: fileErr } = await getServerDb()
+      .from('io_pdf_files')
+      .select('file_path')
+      .eq('factory_id', factory_id)
+      .order('uploaded_at', { ascending: false })
+    if (!isMissingTableError(fileErr)) {
+      if (fileErr) throw fileErr
+      for (const row of fileRows ?? []) {
+        if (row.file_path) files.add(row.file_path)
+      }
+    }
+  } else {
+    const fs = await readFsPdfManifest(factory_id)
+    for (const f of fs.files) files.add(f)
+    Object.assign(selected, fs.selected)
+  }
+
+  const manifest = await sanitizePdfManifest({ files: [...files], selected })
+  return {
+    files: manifest.files,
+    selected: manifest.selected,
+  }
+}
+
+export async function assignPdfConfig(factory_id: string, slot: IOPdfSlot, file_path: string) {
+  await assertFactoryAccess(factory_id)
+  if (!PDF_SLOTS.includes(slot)) throw new Error('Invalid PDF slot')
+  const pathToUse = file_path || PDF_DEFAULTS[slot]
+  if (pathToUse && !(await pdfExistsOnDisk(pathToUse))) {
+    throw new Error(`PDF not found: ${pathToUse}`)
+  }
+
+  const { error } = await getServerDb()
+    .from('io_pdf_config')
+    .upsert({
+      factory_id,
+      slot,
+      file_path: pathToUse,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'factory_id,slot' })
+
+  if (isMissingTableError(error)) {
+    const manifest = await readFsPdfManifest(factory_id)
+    manifest.selected[slot] = pathToUse
+    await writeFsPdfManifest(factory_id, manifest)
+    return
+  }
+  if (error) throw error
+}
+
+export async function registerPdfFile(factory_id: string, file_path: string) {
+  await assertFactoryAccess(factory_id)
+  const { error } = await getServerDb()
+    .from('io_pdf_files')
+    .upsert({ factory_id, file_path }, { onConflict: 'factory_id,file_path' })
+  if (isMissingTableError(error)) {
+    const manifest = await readFsPdfManifest(factory_id)
+    manifest.files = Array.from(new Set([file_path, ...manifest.files]))
+    await writeFsPdfManifest(factory_id, manifest)
+    return
+  }
+  if (error) throw error
+}
+
+export async function saveUploadedPdf(factory_id: string, bytes: ArrayBuffer, originalName: string) {
+  await assertFactoryAccess(factory_id)
+  const dir = pdfDirForFactory(factory_id)
+  await mkdir(dir, { recursive: true })
+  const sanitized = originalName.toLowerCase().replace(/[^a-z0-9._-]/g, '-')
+  const stampedName = `${Date.now()}-${sanitized.endsWith('.pdf') ? sanitized : `${sanitized}.pdf`}`
+  const dest = path.join(dir, stampedName)
+  await writeFile(dest, Buffer.from(bytes))
+  const webPath = `/io-pdfs/${factory_id}/${stampedName}`
+  await registerPdfFile(factory_id, webPath)
+  const cfg = await fetchPdfConfig(factory_id)
+  return { filePath: webPath, files: cfg.files, selected: cfg.selected }
 }
 
 // ── Products ──────────────────────────────────────────────────

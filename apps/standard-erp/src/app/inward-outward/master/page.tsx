@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
+import { getAuthHeaders } from '@madstoq/core'
+import { invalidatePdfTemplateCache } from '@madstoq/io-system/print'
 import {
   fetchProducts, saveProduct, deleteProduct,
   fetchCompanies, saveCompany, deleteCompany,
@@ -53,7 +55,8 @@ function parseCSV(text: string): Record<string, string>[] {
 }
 
 export default function MasterPage() {
-  const { factoryId } = useIOFactory()
+  const { factoryId, factories } = useIOFactory()
+  const factoryName = factories.find(f => f.id === factoryId)?.name
   const [tab, setTab] = useState<Tab>('products')
 
   // ── Products ──────────────────────────────────────────────────────────────
@@ -105,29 +108,48 @@ export default function MasterPage() {
   const [pdfUseFor, setPdfUseFor] = useState<'label' | 'letter-head' | 'customer-print'>('label')
   const pdfUploadRef = useRef<HTMLInputElement>(null)
 
-  async function loadPdfConfig() {
+  async function parsePdfApiError(res: Response): Promise<string> {
     try {
-      const res = await fetch('/api/io/upload-pdf', { cache: 'no-store' })
-      if (!res.ok) throw new Error('Failed to load PDF configuration')
+      const data = await res.json()
+      return data?.error || res.statusText || 'Request failed'
+    } catch {
+      return (await res.text()) || res.statusText || 'Request failed'
+    }
+  }
+
+  async function loadPdfConfig() {
+    if (!factoryId) {
+      setPdfStatus('Select a factory in the header to load PDF settings for that factory.')
+      return
+    }
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/io/upload-pdf?factoryId=${encodeURIComponent(factoryId)}`, { cache: 'no-store', headers })
+      if (!res.ok) throw new Error(await parsePdfApiError(res))
       const data = await res.json()
       setPdfFiles(data.files ?? [])
       setPdfSelected(prev => ({ ...prev, ...(data.selected ?? {}) }))
+      setPdfStatus('')
     } catch (e: any) {
       setPdfStatus(`Error: ${e.message}`)
     }
   }
 
   async function handlePdfUpload(file: File) {
+    if (!factoryId) { alert('Select a factory first'); return }
     setPdfUploading(true)
     setPdfStatus('')
     try {
       const fd = new FormData()
       fd.append('action', 'upload')
+      fd.append('factoryId', factoryId)
       fd.append('file', file)
-      const res = await fetch('/api/io/upload-pdf', { method: 'POST', body: fd })
-      if (!res.ok) throw new Error(await res.text())
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/io/upload-pdf', { method: 'POST', headers, body: fd })
+      if (!res.ok) throw new Error(await parsePdfApiError(res))
       const data = await res.json()
       setPdfFiles(data.files ?? [])
+      invalidatePdfTemplateCache(factoryId)
       setPdfStatus('Uploaded successfully')
     } catch (e: any) {
       setPdfStatus(`Error: ${e.message}`)
@@ -137,17 +159,21 @@ export default function MasterPage() {
   }
 
   async function assignPdf(slot: 'label' | 'letter-head' | 'customer-print', filePath: string) {
+    if (!factoryId) { alert('Select a factory first'); return }
     setPdfStatus('')
     try {
       const fd = new FormData()
       fd.append('action', 'assign')
+      fd.append('factoryId', factoryId)
       fd.append('slot', slot)
       fd.append('filePath', filePath)
-      const res = await fetch('/api/io/upload-pdf', { method: 'POST', body: fd })
-      if (!res.ok) throw new Error(await res.text())
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/io/upload-pdf', { method: 'POST', headers, body: fd })
+      if (!res.ok) throw new Error(await parsePdfApiError(res))
       const data = await res.json()
       setPdfSelected(prev => ({ ...prev, ...(data.selected ?? {}) }))
-      setPdfStatus('Template mapping saved')
+      invalidatePdfTemplateCache(factoryId)
+      setPdfStatus('Template mapping saved for this factory')
     } catch (e: any) {
       setPdfStatus(`Error: ${e.message}`)
     }
@@ -632,9 +658,17 @@ export default function MasterPage() {
       {/* ── PDFs TAB ──────────────────────────────────────────────────────── */}
       {tab === 'pdfs' && (
         <div className="space-y-4">
+          {!factoryId && (
+            <p className="text-sm text-amber-500 flex items-center gap-2"><AlertCircle size={14}/> Select a factory in the header — PDF templates are saved per factory for your account.</p>
+          )}
+          {factoryId && (
+            <p className="text-sm text-muted">
+              Settings for <span className="font-medium text-primary">{factoryName ?? 'selected factory'}</span>.
+              Upload PDFs and map slots; printing uses this factory&apos;s templates only.
+            </p>
+          )}
           <p className="text-sm text-muted">
-            Upload PDF files, then map each usage slot to any uploaded file.
-            Printing will use the selected file for each slot.
+            Built-in templates: <span className="font-mono">Label.pdf</span>, <span className="font-mono">letter-head.pdf</span>, and <span className="font-mono">address print.pdf</span> in public. Upload here only if this factory needs different layouts.
           </p>
 
           <div className="card p-4 space-y-3">
@@ -655,7 +689,7 @@ export default function MasterPage() {
                   e.target.value = ''
                 }}
               />
-              <button onClick={() => pdfUploadRef.current?.click()} disabled={pdfUploading} className="btn btn-inputer">
+              <button onClick={() => pdfUploadRef.current?.click()} disabled={pdfUploading || !factoryId} className="btn btn-inputer">
                 {pdfUploading ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> : <Upload size={14}/>}
                 Upload PDF
               </button>
@@ -690,13 +724,25 @@ export default function MasterPage() {
                             Default ({row.slot === 'label' ? '/Label.pdf' : '/letter-head.pdf'})
                           </option>
                         )}
-                        {row.slot === 'customer-print' && <option value="">Built-in simple print</option>}
+                        {row.slot === 'customer-print' && (
+                          <>
+                            <option value="">Built-in simple print</option>
+                            <option value="/address print.pdf">Default (/address print.pdf)</option>
+                          </>
+                        )}
                         {pdfFiles.map(f => <option key={`${row.slot}-${f}`} value={f}>{f}</option>)}
                       </select>
                     </td>
                     <td className="text-right">
                       {pdfSelected[row.slot] ? (
-                        <a href={pdfSelected[row.slot]} target="_blank" rel="noreferrer" className="text-xs text-inputer hover:underline">Preview</a>
+                        <a
+                          href={`/api/io/pdf?path=${encodeURIComponent(pdfSelected[row.slot])}${factoryId ? `&factoryId=${encodeURIComponent(factoryId)}` : ''}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-inputer hover:underline"
+                        >
+                          Preview
+                        </a>
                       ) : <span className="text-xs text-muted">—</span>}
                     </td>
                   </tr>
@@ -710,13 +756,26 @@ export default function MasterPage() {
       {/* ── NUMBERING TAB ─────────────────────────────────────────────────── */}
       {tab === 'numbering' && (
         <div className="space-y-4">
-          <p className="text-sm text-muted">Configure prefix/suffix for auto-generated numbers. Settings are saved per selected factory in database.</p>
+          {!factoryId && (
+            <p className="text-sm text-amber-500 flex items-center gap-2"><AlertCircle size={14}/> Select a factory in the header — numbering is saved per factory for your account.</p>
+          )}
+          {factoryId && (
+            <p className="text-sm text-muted mb-1">
+              Numbering for <span className="font-medium text-primary">{factoryName ?? 'selected factory'}</span>.
+            </p>
+          )}
+          <p className="text-sm text-muted">
+            Prefix and suffix wrap the numeric core only (e.g. <span className="font-mono">1/05/26</span>), not a second copy of VH.
+            Inward, Outward, and Quotation default to prefix <span className="font-mono">VH </span>; Domestic and International use no prefix.
+            Example with prefix <span className="font-mono">AB</span>: <span className="font-mono">AB1/05/26</span> — not <span className="font-mono">ABVH1/05/26</span>.
+            Settings are saved per selected factory.
+          </p>
           <div className="card overflow-hidden">
             <table className="data-table">
-              <thead><tr><th>Document Type</th><th>Prefix</th><th>Suffix</th></tr></thead>
+              <thead><tr><th>Document Type</th><th>Prefix</th><th>Suffix</th><th>Preview</th></tr></thead>
               <tbody>
                 {numberingLoading ? (
-                  <tr><td colSpan={3}><Spinner/></td></tr>
+                  <tr><td colSpan={4}><Spinner/></td></tr>
                 ) : ([
                   { key: 'inward',        label: 'Inward Number'         },
                   { key: 'outward',       label: 'Outward Number'        },
@@ -728,6 +787,9 @@ export default function MasterPage() {
                     <td className="font-medium text-primary text-sm">{label}</td>
                     <td className="w-40"><input value={getNum(key).prefix} onChange={e => setNum(key, 'prefix', e.target.value)} placeholder="e.g. IN/" className="input w-full py-1.5 text-sm font-mono"/></td>
                     <td className="w-40"><input value={getNum(key).suffix} onChange={e => setNum(key, 'suffix', e.target.value)} placeholder="e.g. /24-25" className="input w-full py-1.5 text-sm font-mono"/></td>
+                    <td className="text-xs font-mono text-muted whitespace-nowrap">
+                      {(getNum(key).prefix || '') + '1/05/26' + (getNum(key).suffix || '')}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -736,7 +798,7 @@ export default function MasterPage() {
           {numberingError && <p className="text-xs text-red-400">{numberingError}</p>}
           <div className="flex items-center justify-end gap-3">
             {numberingSaved && <span className="text-xs text-green-500 flex items-center gap-1"><CheckCircle size={13}/> Saved</span>}
-            <button onClick={saveNumbering} className="btn btn-inputer"><Save size={14}/> Save Settings</button>
+            <button onClick={saveNumbering} disabled={!factoryId} className="btn btn-inputer"><Save size={14}/> Save Settings</button>
           </div>
         </div>
       )}

@@ -171,9 +171,7 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
 
       <div className="px-4 py-4 border-t border-border shrink-0 space-y-1">
         <a
-          href="/docs/pmc-manual.html"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="/pmc/manual"
           className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all min-h-[44px]"
         >
           <BookOpen size={16} /> User manual

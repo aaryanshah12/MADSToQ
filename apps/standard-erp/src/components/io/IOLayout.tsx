@@ -212,9 +212,7 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
 
       <div className="px-4 py-4 border-t border-border space-y-1">
         <a
-          href="/docs/io-manual.html"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="/inward-outward/manual"
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
         >
           <BookOpen size={16} /> User manual

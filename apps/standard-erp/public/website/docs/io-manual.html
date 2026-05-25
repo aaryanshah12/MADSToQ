@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inward-Outward user manual | MADSToQ</title>
+    <link rel="stylesheet" href="manual.css" />
+  </head>
+  <body>
+    <div class="manual-wrap">
+      <a href="index.html" class="back">← All manuals</a>
+      <header class="manual-header">
+        <h1>Inward-Outward Portal — User manual</h1>
+        <p>Material movement, quotations, and master data for chemical operations.</p>
+      </header>
+      <nav class="manual-nav">
+        <a href="inventory-manual.html">Inventory</a>
+        <a href="io-manual.html" class="active">Inward-Outward</a>
+        <a href="pmc-manual.html">PMC</a>
+        <a href="sales-manual.html">Personal Sales</a>
+      </nav>
+
+      <h2>1. Sign in</h2>
+      <ol>
+        <li>Open <a href="/inward-outward/login">/inward-outward/login</a> (or your deployed I/O URL).</li>
+        <li>Pick the factory from the sidebar switcher when you have access to more than one site.</li>
+      </ol>
+
+      <h2>2. Daily operations</h2>
+      <ul>
+        <li><strong>Dashboard</strong> — Summary of recent inward/outward activity.</li>
+        <li><strong>Inward</strong> — Record material received; link products, quantities, and documents.</li>
+        <li><strong>Outward</strong> — Dispatch and outward listings.</li>
+        <li><strong>Domestic / International</strong> — Region-specific customer and shipment flows.</li>
+        <li><strong>Quotation</strong> — Create and track quotations before outward confirmation.</li>
+      </ul>
+
+      <h2>3. Master (tabbed menu)</h2>
+      <p>All setup data lives on one page with tabs (same pattern as PMC Master):</p>
+      <ul>
+        <li><strong>Products</strong> — SKU catalog; supports CSV import.</li>
+        <li><strong>Companies</strong> — Suppliers and customers.</li>
+        <li><strong>Units</strong> — Measurement units for line items.</li>
+        <li><strong>Locations</strong> — Countries, states, and cities.</li>
+        <li><strong>PDFs</strong> — Label, letterhead, and customer print templates.</li>
+        <li><strong>Numbering</strong> — Document number sequences.</li>
+      </ul>
+
+      <h2>4. Typical workflow</h2>
+      <ol>
+        <li>Configure Master data (products, companies, units) before transactional entry.</li>
+        <li>Create inward entries when material arrives.</li>
+        <li>Use quotations for customer pricing, then outward when goods leave.</li>
+        <li>Print address or label PDFs from configured templates where enabled.</li>
+      </ol>
+
+      <h2>5. Tips</h2>
+      <div class="tip">
+        <ul>
+          <li>Keep company records accurate — domestic and international screens reuse master addresses.</li>
+          <li>Review numbering settings before go-live to avoid duplicate document IDs.</li>
+          <li>Use sidebar <strong>User manual</strong> to reopen this guide.</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

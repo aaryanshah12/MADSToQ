@@ -10,6 +10,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/services.html",
     "/inventory.html",
     "/io.html",
+    "/pmc.html",
+    "/docs/index.html",
+    "/docs/inventory-manual.html",
+    "/docs/io-manual.html",
+    "/docs/pmc-manual.html",
+    "/docs/sales-manual.html",
     "/contact.html",
     "/demo.html",
   ];

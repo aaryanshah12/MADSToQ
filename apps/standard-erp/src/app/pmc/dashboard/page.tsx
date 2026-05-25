@@ -57,7 +57,7 @@ export default function PMCDashboardPage() {
     <div className="pmc-page">
       <div>
         <h1 className="pmc-page-title">Dashboard</h1>
-        <p className="text-sm text-muted mt-1">Reference counts, products, and recent activity</p>
+        <p className="text-sm text-muted mt-1">Reference counts, RMC sheets, and recent activity</p>
         {stats.referenceCount === 0 && (
           <button
             type="button"
@@ -72,8 +72,8 @@ export default function PMCDashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <StatCard label="References" value={stats.referenceCount} href="/pmc/references" />
-        <StatCard label="Products" value={stats.productCount} href="/pmc/products" />
-        <StatCard label="Raw materials" value={stats.rawMaterialCount} href="/pmc/master/raw-materials" />
+        <StatCard label="RMC" value={stats.productCount} href="/pmc/products" />
+        <StatCard label="Raw materials" value={stats.rawMaterialCount} href="/pmc/master?tab=raw-materials" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -112,7 +112,7 @@ export default function PMCDashboardPage() {
 
         <section className="pmc-card">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 className="font-semibold text-primary">Products</h2>
+            <h2 className="font-semibold text-primary">RMC</h2>
             <Link href="/pmc/products" className="text-xs font-medium text-pmc hover:underline">
               View all
             </Link>

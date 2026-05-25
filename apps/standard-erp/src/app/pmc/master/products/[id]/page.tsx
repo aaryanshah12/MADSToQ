@@ -101,7 +101,7 @@ export default function PMCMasterProductRecipePage() {
   return (
     <div className="pmc-page max-w-3xl">
       <div>
-        <Link href="/pmc/master/products" className="text-xs text-muted hover:text-primary">
+        <Link href="/pmc/master?tab=products" className="text-xs text-muted hover:text-primary">
           ← Products
         </Link>
         <h1 className="pmc-page-title mt-2">{product.name}</h1>
@@ -113,7 +113,7 @@ export default function PMCMasterProductRecipePage() {
       {materials.length === 0 ? (
         <p className="text-sm text-muted">
           Add raw materials first in{' '}
-          <Link href="/pmc/master/raw-materials" className="text-pmc hover:underline">
+          <Link href="/pmc/master?tab=raw-materials" className="text-pmc hover:underline">
             Raw materials
           </Link>
           .

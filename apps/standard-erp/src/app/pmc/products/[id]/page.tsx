@@ -86,7 +86,7 @@ export default function PMCProductDetailPage() {
       <div className="pmc-page">
         <p className="text-muted">Product not found.</p>
         <Link href="/pmc/products" className="text-sm mt-4 inline-block text-pmc hover:underline">
-          ← Back to products
+          ← Back to RMC
         </Link>
       </div>
     )
@@ -145,7 +145,7 @@ export default function PMCProductDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
           <Link href="/pmc/products" className="text-xs text-muted hover:text-primary">
-            ← Products
+            ← RMC
           </Link>
           <h1 className="pmc-page-title mt-2 break-words">{product.name}</h1>
           <p className="text-sm text-muted">

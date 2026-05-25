@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory Portal user manual | MADSToQ</title>
+    <link rel="stylesheet" href="manual.css" />
+  </head>
+  <body>
+    <div class="manual-wrap">
+      <a href="index.html" class="back">← All manuals</a>
+      <header class="manual-header">
+        <h1>Inventory Portal — User manual</h1>
+        <p>Chemical factory stock, usage, and reporting by role.</p>
+      </header>
+      <nav class="manual-nav">
+        <a href="inventory-manual.html" class="active">Inventory</a>
+        <a href="io-manual.html">Inward-Outward</a>
+        <a href="pmc-manual.html">PMC</a>
+        <a href="sales-manual.html">Personal Sales</a>
+      </nav>
+
+      <h2>1. Sign in</h2>
+      <ol>
+        <li>Go to <a href="/inventory/login">/inventory/login</a>.</li>
+        <li>Your account role (Owner, Inputer, or Chemist) determines which menu items you see.</li>
+        <li>Owners with multiple factories use the factory switcher at the bottom of the sidebar.</li>
+      </ol>
+
+      <h2>2. Owner role</h2>
+      <ul>
+        <li><strong>Dashboard</strong> — Overview metrics and quick links.</li>
+        <li><strong>Stock Ledger</strong> — Incoming stock with rates and invoice details.</li>
+        <li><strong>Usage Log</strong> — Consumption linked to invoices.</li>
+        <li><strong>Monthly Material</strong> — Period-based material entries.</li>
+        <li><strong>In/Out Products</strong> — Product master for movement screens.</li>
+        <li><strong>Inward / Outward</strong> — Factory-level movement records.</li>
+        <li><strong>Sales</strong> — Sales-related stock views.</li>
+        <li><strong>Reports</strong> — Analytics and exports.</li>
+        <li><strong>Management</strong> — Tabbed admin: factories, users, suppliers, permissions (similar to a master screen).</li>
+      </ul>
+
+      <h2>3. Inputer role</h2>
+      <ul>
+        <li><strong>Dashboard</strong> — Personal summary.</li>
+        <li><strong>New Entry</strong> — Log incoming stock (invoice, supplier, tons, rate, vehicle).</li>
+        <li><strong>My Entries</strong> — History and corrections of your submissions.</li>
+      </ul>
+
+      <h2>4. Chemist role</h2>
+      <ul>
+        <li><strong>Dashboard</strong> — Available stock without sensitive rate totals where restricted.</li>
+        <li><strong>Log Usage</strong> — Record usage by invoice and quantity.</li>
+        <li><strong>Monthly / Inward / Outward / My Usage</strong> — Operational views for daily lab work.</li>
+      </ul>
+      <p>Chemists see stock through safe views — rates and values may be hidden per policy.</p>
+
+      <h2>5. User management (Owner)</h2>
+      <ol>
+        <li>Open <strong>Management → Users</strong> to create Inputer or Chemist accounts.</li>
+        <li>Assign factories and permissions so each user only sees allowed data.</li>
+      </ol>
+
+      <h2>6. Tips</h2>
+      <div class="tip">
+        <ul>
+          <li>Always select the correct factory before entering stock or usage.</li>
+          <li>Use reports weekly to reconcile physical stock with system balances.</li>
+          <li>Open <strong>User manual</strong> from the sidebar footer for this guide inside the app.</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

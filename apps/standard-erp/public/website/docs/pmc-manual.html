@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PMC Portal user manual | MADSToQ</title>
+    <link rel="stylesheet" href="manual.css" />
+    <style>:root { --accent: var(--accent-pmc); }</style>
+  </head>
+  <body>
+    <div class="manual-wrap">
+      <a href="index.html" class="back">← All manuals</a>
+      <header class="manual-header">
+        <h1>PMC Portal — User manual</h1>
+        <p>Product pricing with reference-controlled raw material cost (RMC).</p>
+      </header>
+      <nav class="manual-nav">
+        <a href="inventory-manual.html">Inventory</a>
+        <a href="io-manual.html">Inward-Outward</a>
+        <a href="pmc-manual.html" class="active">PMC</a>
+        <a href="sales-manual.html">Personal Sales</a>
+      </nav>
+
+      <h2>1. Sign in</h2>
+      <ol>
+        <li>Open <a href="/pmc">/pmc</a> and sign in with the email and password provided by your administrator.</li>
+        <li>After login, the app loads master data (raw materials, products, references) into memory for fast editing.</li>
+      </ol>
+
+      <h2>2. Recommended setup order</h2>
+      <ol>
+        <li><strong>Master → Raw materials</strong> — Add every material used in recipes (name + unit, e.g. Kg).</li>
+        <li><strong>Master → Products</strong> — Create each finished product, then open <strong>Edit recipe</strong> to set BOM lines (quantity per material, mark one as primary).</li>
+        <li><strong>Reference Number</strong> — Save a new reference when raw-material prices change; the system assigns a reference ID.</li>
+        <li><strong>RMC</strong> — For each product, enter overhead, batch multiplier, and yield per reference to calculate final RMC.</li>
+      </ol>
+
+      <h2>3. Dashboard</h2>
+      <p>Summary counts and shortcuts to raw materials, references, and recent products. Use it for a quick health check before updating prices.</p>
+
+      <h2>4. Reference Number</h2>
+      <ul>
+        <li>Create a reference when you need a new price list for raw materials.</li>
+        <li>Enter each material rate; saving creates a durable reference you can reuse on product pricing sheets.</li>
+        <li>Past references remain in history for audit and comparison.</li>
+      </ul>
+
+      <h2>5. RMC (operational pricing)</h2>
+      <ul>
+        <li>This section is for <strong>RMC calculation</strong>, not for defining BOM (that is under Master → Products).</li>
+        <li>Select a product, pick a reference, and fill overhead / yield / tons per kg.</li>
+        <li>The sheet shows calculated RMC based on recipe quantities and reference prices.</li>
+      </ul>
+
+      <h2>6. Master (tabbed menu)</h2>
+      <p>Like other MADSToQ portals, Master uses a horizontal menu:</p>
+      <ul>
+        <li><strong>Raw materials</strong> — Add, view, edit, or deactivate materials. Inactive materials stay in history but drop from pick lists.</li>
+        <li><strong>Products</strong> — Add products and open the recipe editor to link materials and quantities. New products open the recipe screen automatically.</li>
+      </ul>
+
+      <h2>7. Recipe editor</h2>
+      <ol>
+        <li>From Master → Products, use the edit action on a product.</li>
+        <li>Add rows for each raw material and quantity; mark exactly one row as <strong>primary</strong> where required.</li>
+        <li>Save the recipe before pricing the product under a new reference.</li>
+      </ol>
+
+      <h2>8. Tips</h2>
+      <div class="tip">
+        <ul>
+          <li>Deactivate instead of deleting when a material or product is retired — pricing history stays intact.</li>
+          <li>If RMC looks wrong, confirm the active reference, recipe quantities, and primary material flag.</li>
+          <li>Use <strong>User manual</strong> in the sidebar anytime to reopen this guide.</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

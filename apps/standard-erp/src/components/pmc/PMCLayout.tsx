@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react'
 import { usePMC } from '@/contexts/PMCContext'
 
@@ -24,7 +25,7 @@ const THEME_KEY = 'theme'
 const NAV = [
   { href: `${BASE}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
   { href: `${BASE}/references`, label: 'Reference Number', icon: Hash },
-  { href: `${BASE}/products`, label: 'Products', icon: Package },
+  { href: `${BASE}/products`, label: 'RMC', icon: Package },
   { href: `${BASE}/master`, label: 'Master', icon: Database },
 ]
 
@@ -90,8 +91,12 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== `${BASE}/master` && pathname.startsWith(href + '/'))
+  const isActive = (href: string) => {
+    if (href === `${BASE}/master`) {
+      return pathname === href || pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}?`)
+    }
+    return pathname === href || pathname.startsWith(href + '/')
+  }
 
   const SidebarInner = () => (
     <div className="flex flex-col h-full min-h-0">
@@ -164,7 +169,15 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-border shrink-0">
+      <div className="px-4 py-4 border-t border-border shrink-0 space-y-1">
+        <a
+          href="/docs/pmc-manual.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all min-h-[44px]"
+        >
+          <BookOpen size={16} /> User manual
+        </a>
         <button
           type="button"
           onClick={() => signOut()}

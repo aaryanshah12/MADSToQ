@@ -6,7 +6,7 @@
     <title>PMC Portal | MADSToQ</title>
     <meta
       name="description"
-      content="PMC Portal — product pricing with reference numbers, raw material price lists, and RMC calculation per product."
+      content="PMC Portal — product pricing with reference numbers, raw material price lists, recipes, and RMC calculation per product."
     />
     <meta name="application-name" content="MADSToQ IT Solutions" />
     <meta property="og:site_name" content="MADSToQ IT Solutions" />
@@ -58,32 +58,19 @@
           </p>
           <p class="hero-actions" style="margin-top: 1.5rem">
             <a href="/pmc" class="btn btn-primary">Sign in to PMC Portal</a>
+            <a href="docs/pmc-manual.html" class="btn btn-ghost">Read user manual</a>
           </p>
         </div>
         <div class="hero-visual">
-          <div
+          <img
+            src="Software/PMC/Dashboard.png"
+            alt="PMC Portal dashboard"
             class="hero-stock-image"
-            style="
-              min-height: 280px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: linear-gradient(145deg, #1a2030, #121722);
-              color: #e2e8f0;
-              border-radius: 1rem;
-              padding: 2rem;
-              text-align: center;
-            "
-          >
-            <div>
-              <p style="font-size: 0.75rem; letter-spacing: 0.12em; opacity: 0.7">FLOW</p>
-              <p style="font-size: 1.1rem; margin-top: 0.5rem">Reference → Recipe → RMC</p>
-            </div>
-          </div>
+          />
         </div>
       </section>
 
-      <section class="container reveal" style="padding-bottom: 4rem">
+      <section class="container reveal" style="padding-bottom: 2rem">
         <h2>Modules</h2>
         <div class="metrics" style="margin-top: 1.5rem">
           <article class="metric-card">
@@ -95,12 +82,53 @@
             <p>Auto-generated ID when raw-material prices are saved, with full history.</p>
           </article>
           <article class="metric-card">
-            <h3>Products</h3>
-            <p>Overhead, tons/kg, and yield per reference — final RMC on the pricing sheet.</p>
+            <h3>RMC</h3>
+            <p>Overhead, batch multiplier, and yield per reference — final RMC on the pricing sheet.</p>
           </article>
           <article class="metric-card">
             <h3>Master</h3>
-            <p>Raw materials list and product recipes (BOM quantities).</p>
+            <p>Tabbed menu for raw materials and product recipes (BOM quantities).</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="showcase container reveal">
+        <h2>PMC Portal screens</h2>
+        <p class="section-copy">
+          Reference-driven pricing, operational RMC sheets, and master data setup
+          in one focused workspace.
+        </p>
+        <div class="workflow-showcase">
+          <article class="workflow-step">
+            <div class="workflow-head">
+              <span>Step 01</span>
+              <h3>Overview &amp; references</h3>
+            </div>
+            <div class="workflow-gallery">
+              <img src="Software/PMC/Dashboard.png" alt="PMC dashboard" loading="lazy" />
+              <img src="Software/PMC/Reference Number.png" alt="PMC reference number screen" loading="lazy" />
+            </div>
+          </article>
+
+          <article class="workflow-step">
+            <div class="workflow-head">
+              <span>Step 02</span>
+              <h3>RMC pricing sheets</h3>
+            </div>
+            <div class="workflow-gallery">
+              <img src="Software/PMC/RMC.png" alt="PMC RMC pricing sheet" loading="lazy" />
+            </div>
+          </article>
+
+          <article class="workflow-step">
+            <div class="workflow-head">
+              <span>Step 03</span>
+              <h3>Master — raw materials &amp; products</h3>
+            </div>
+            <div class="workflow-gallery">
+              <img src="Software/PMC/Master - Raw materials.svg" alt="PMC master raw materials tab" loading="lazy" />
+              <img src="Software/PMC/Master - Products.svg" alt="PMC master products tab" loading="lazy" />
+            </div>
           </article>
         </div>
       </section>
@@ -117,6 +145,11 @@
           <a class="footer-link" href="inventory.html">Inventory</a>
           <a class="footer-link" href="io.html">Inward-Outward</a>
           <a class="footer-link" href="pmc.html">PMC Portal</a>
+        </div>
+        <div>
+          <h4>Documentation</h4>
+          <a class="footer-link" href="docs/index.html">User manuals</a>
+          <a class="footer-link" href="docs/pmc-manual.html">PMC manual</a>
         </div>
         <div>
           <h4>Company</h4>

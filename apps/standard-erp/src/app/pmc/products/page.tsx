@@ -38,9 +38,9 @@ export default function PMCProductsPage() {
   return (
     <div className="pmc-page max-w-4xl">
       <div>
-        <h1 className="pmc-page-title">Products</h1>
+        <h1 className="pmc-page-title">RMC</h1>
         <p className="text-sm text-muted mt-1">
-          Open a product for pricing per reference. Latest reference:{' '}
+          Open a product RMC sheet per reference. Latest reference:{' '}
           {latestRef ? (
             <span className="font-mono text-pmc font-medium">{latestRef.ref_number}</span>
           ) : (
@@ -51,7 +51,7 @@ export default function PMCProductsPage() {
 
       {products.length === 0 ? (
         <p className="text-sm text-muted pmc-card">
-          No products yet. Add products and raw materials in{' '}
+          No RMC sheets yet. Add products and raw materials in{' '}
           <Link href="/pmc/master" className="text-pmc hover:underline">
             Master
           </Link>

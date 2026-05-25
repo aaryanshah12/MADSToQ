@@ -9,7 +9,7 @@ import clsx from 'clsx'
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpToLine,
   Home, Globe, FileText, BookOpen,
-  LogOut, Menu, X, Sun, Moon, ChevronRight, ChevronDown, Building2, Check,
+  LogOut, Menu, X, Sun, Moon, ChevronRight, ChevronDown, Building2, Check, BookOpen,
 } from 'lucide-react'
 
 const BASE          = '/inward-outward'
@@ -210,8 +210,15 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      {/* Sign out */}
-      <div className="px-4 py-4 border-t border-border">
+      <div className="px-4 py-4 border-t border-border space-y-1">
+        <a
+          href="/docs/io-manual.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
+        >
+          <BookOpen size={16} /> User manual
+        </a>
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-red-400 hover:bg-red-500/10 transition-all"

@@ -38,6 +38,7 @@ const nextConfig = {
       { source: '/website/favicon-192.png', destination: '/favicon-192.png', permanent: true },
       { source: '/website/apple-touch-icon.png', destination: '/apple-touch-icon.png', permanent: true },
       { source: '/website/Software/:path*', destination: '/Software/:path*', permanent: true },
+      { source: '/website/docs/:path*', destination: '/docs/:path*', permanent: true },
     ]
   },
   async rewrites() {
@@ -58,6 +59,7 @@ const nextConfig = {
         { source: '/script.js', destination: '/website/script.js' },
         { source: '/MADSToQ.png', destination: '/website/MADSToQ.png' },
         { source: '/Software/:path*', destination: '/website/Software/:path*' },
+        { source: '/docs/:path*', destination: '/website/docs/:path*' },
       ],
     }
   },

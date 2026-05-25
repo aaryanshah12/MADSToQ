@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Package, FlaskConical,
   BarChart3, LogOut, ChevronRight,
   Menu, X, Sun, Moon, CalendarRange, ArrowDownToLine, ArrowUpToLine, Settings, TrendingUp,
-  Building2, ChevronDown, Check,
+  Building2, ChevronDown, Check, BookOpen,
 } from 'lucide-react'
 import { useInventoryFactory, clearInventoryFactory } from '@/contexts/InventoryFactoryContext'
 
@@ -212,8 +212,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Sign out */}
-      <div className="px-4 py-4 border-t border-border">
+      <div className="px-4 py-4 border-t border-border space-y-1">
+        <a
+          href="/docs/inventory-manual.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
+        >
+          <BookOpen size={16} />
+          User manual
+        </a>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-red-400 hover:bg-red-500/10 transition-all"

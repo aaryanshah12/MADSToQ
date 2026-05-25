@@ -27,7 +27,7 @@ export function ProductMaterialsViewModal({ product, onClose }: ProductMaterials
             Close
           </button>
           <Link href={`/pmc/products/${product.id}`} className="btn btn-pmc">
-            Pricing sheet
+            RMC sheet
           </Link>
         </>
       }

@@ -203,8 +203,31 @@ h1 {
 .hero-actions {
   margin-top: 2.2rem;
   display: flex;
-  gap: 0.9rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
+}
+
+.hero-actions .btn {
+  padding: 0.48rem 0.72rem;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .hero-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .hero-actions .btn {
+    font-size: 0.78rem;
+    padding: 0.44rem 0.65rem;
+  }
 }
 
 .btn {

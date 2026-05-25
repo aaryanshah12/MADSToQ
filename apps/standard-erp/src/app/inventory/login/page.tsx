@@ -39,6 +39,7 @@ export default function LoginPage() {
       setSigningIn(false)
     } else {
       localStorage.setItem(EMAIL_KEY, email)
+      setSigningIn(false)
     }
   }
 

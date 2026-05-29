@@ -212,7 +212,6 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="px-4 py-4 border-t border-border space-y-1">
-        <PortalWhatsAppHelp portalName="Inward-Outward Portal" />
         <a
           href="/inward-outward/manual"
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
@@ -313,6 +312,8 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      <PortalWhatsAppHelp portalName="Inward-Outward Portal" />
     </div>
   )
 }

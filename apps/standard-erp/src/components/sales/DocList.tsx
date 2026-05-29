@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Trash2, Send, FileText } from 'lucide-react'
+import { Plus, Trash2, Send, FileText } from 'lucide-react'
+import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import { fetchDocuments, deleteDocument, fmtDate } from '@madstoq/sales-system/api'
 import type { SalesDocument, SalesDocType } from '@madstoq/sales-system/types'
@@ -70,15 +71,19 @@ export default function DocList({ docType }: { docType: SalesDocType }) {
           <h1 className="text-xl font-bold text-primary">{TITLE[docType]}</h1>
           <p className="text-sm text-muted mt-0.5">{filtered.length} of {rows.length}</p>
         </div>
-        <Link href={`${base}/new`} className="btn btn-owner"><Plus size={15}/> New {docType === 'quotation' ? 'Quotation' : 'PO'}</Link>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="input flex items-center gap-2 w-full md:w-[320px]">
-          <Search size={14} className="text-muted flex-shrink-0"/>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search number, company, subject…" className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
-        </div>
-      </div>
+      <ListSearchToolbar className="mb-4">
+        <ListSearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search number, company, subject…"
+          inputClassName="owner-focus"
+        />
+        <Link href={`${base}/new`} className={listSearchBtnClass('btn-owner')}>
+          <Plus size={15} /> New {docType === 'quotation' ? 'Quotation' : 'PO'}
+        </Link>
+      </ListSearchToolbar>
 
       <div className="card overflow-hidden">
         {/* Mobile cards */}

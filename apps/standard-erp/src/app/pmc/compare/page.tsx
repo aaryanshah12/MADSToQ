@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePMCData } from '@/contexts/PMCContext'
 import { PmcListSearch } from '@/components/pmc/PmcListSearch'
+import { ListSearchToolbar } from '@/components/layout/ListSearchToolbar'
 import { matchesPmcSearch } from '@/lib/pmc-search'
 
 export default function PMCComparePage() {
@@ -107,12 +108,13 @@ export default function PMCComparePage() {
             </div>
           </div>
 
-          <PmcListSearch
-            value={rowSearch}
-            onChange={setRowSearch}
-            placeholder="Search line items…"
-            className="mb-0"
-          />
+          <ListSearchToolbar>
+            <PmcListSearch
+              value={rowSearch}
+              onChange={setRowSearch}
+              placeholder="Search line items…"
+            />
+          </ListSearchToolbar>
 
           <div className="pmc-card overflow-x-auto p-0">
             <table className="data-table w-full text-sm">

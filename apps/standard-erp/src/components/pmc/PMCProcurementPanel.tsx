@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import type { PMCRawMaterial, PMCItemType } from '@madstoq/pmc-system/types'
 import { PmcListSearch } from '@/components/pmc/PmcListSearch'
+import { ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
 import { matchesPmcSearch } from '@/lib/pmc-search'
@@ -217,16 +218,16 @@ export default function PMCProcurementPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <ListSearchToolbar>
         <PmcListSearch
           value={search}
           onChange={setSearch}
           placeholder="Search code, name, vendor, type…"
         />
-        <button type="button" onClick={() => setShowAdd(true)} className="btn btn-pmc shrink-0 self-end sm:self-auto">
+        <button type="button" onClick={() => setShowAdd(true)} className={listSearchBtnClass('btn-pmc')}>
           <Plus size={14} /> Add
         </button>
-      </div>
+      </ListSearchToolbar>
 
       <div className="pmc-card overflow-x-auto p-0">
         <table className="data-table w-full">

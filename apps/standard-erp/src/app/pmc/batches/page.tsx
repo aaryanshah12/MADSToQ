@@ -9,6 +9,7 @@ import type { PmcApi } from '@madstoq/pmc-system/api'
 import { batchTotalCost, batchUnitPrice } from '@madstoq/pmc-system/lib/bom-pricing'
 import type { PMCBatchStatus } from '@madstoq/pmc-system/types'
 import { PmcListSearch } from '@/components/pmc/PmcListSearch'
+import { ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
 import { matchesPmcSearch } from '@/lib/pmc-search'
 
@@ -100,35 +101,42 @@ function BatchesContent() {
 
   return (
     <div className="pmc-page space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          {filterProduct && (
-            <Link
-              href={`/pmc/products/${filterProduct.id}`}
-              className="text-sm text-pmc hover:underline inline-block mb-1"
-            >
-              ← {filterProduct.name}
-            </Link>
-          )}
-          <h1 className="pmc-page-title">
-            {filterProduct ? `Batches · ${filterProduct.name}` : 'Batches'}
-          </h1>
-          <p className="text-sm text-muted mt-1">
-            {filterProduct
-              ? `All batches for this product (${batches.length}).`
-              : 'BOM per batch size with frozen unit prices.'}
-          </p>
-        </div>
-        <button type="button" onClick={() => { setShowAdd(true); if (preProduct) loadBomFromProduct(preProduct, batchSize) }} className="btn btn-pmc shrink-0">
-          <Plus size={14} /> Add batch
-        </button>
+      <div>
+        {filterProduct && (
+          <Link
+            href={`/pmc/products/${filterProduct.id}`}
+            className="text-sm text-pmc hover:underline inline-block mb-1"
+          >
+            ← {filterProduct.name}
+          </Link>
+        )}
+        <h1 className="pmc-page-title">
+          {filterProduct ? `Batches · ${filterProduct.name}` : 'Batches'}
+        </h1>
+        <p className="text-sm text-muted mt-1">
+          {filterProduct
+            ? `All batches for this product (${batches.length}).`
+            : 'BOM per batch size with frozen unit prices.'}
+        </p>
       </div>
 
-      <PmcListSearch
-        value={search}
-        onChange={setSearch}
-        placeholder="Search batch ID, product, status, size, price…"
-      />
+      <ListSearchToolbar>
+        <PmcListSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search batch ID, product, status, size, price…"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdd(true)
+            if (preProduct) loadBomFromProduct(preProduct, batchSize)
+          }}
+          className={listSearchBtnClass('btn-pmc')}
+        >
+          <Plus size={14} /> Add
+        </button>
+      </ListSearchToolbar>
 
       <div className="pmc-card overflow-x-auto p-0">
         <table className="data-table w-full">

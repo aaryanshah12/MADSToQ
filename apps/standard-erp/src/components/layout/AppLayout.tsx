@@ -214,7 +214,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="px-4 py-4 border-t border-border space-y-1">
-        <PortalWhatsAppHelp portalName="Inventory Portal" />
         <a
           href="/inventory/manual"
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
@@ -316,6 +315,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
 
       </div>
+
+      <PortalWhatsAppHelp portalName="Inventory Portal" />
     </div>
   )
 }

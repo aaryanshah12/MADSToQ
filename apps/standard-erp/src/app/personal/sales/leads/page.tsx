@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, Trash2, Search, Eye } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye } from 'lucide-react'
+import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import { fetchLeads, deleteLead, fmtDate } from '@madstoq/sales-system/api'
 import type { SalesLead, LeadStatus } from '@madstoq/sales-system/types'
@@ -78,21 +79,33 @@ export default function LeadsPage() {
           <h1 className="text-xl font-bold text-primary">Leads</h1>
           <p className="text-sm text-muted mt-0.5">{filtered.length} of {rows.length} leads</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn btn-owner"><Plus size={15}/> New Lead</button>
-        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="input flex items-center gap-2 w-full md:w-[320px]">
-          <Search size={14} className="text-muted flex-shrink-0"/>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, contact, email…" className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
-        </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="input w-full md:w-[200px] text-sm">
+      <ListSearchToolbar className="mb-4 flex-wrap">
+        <ListSearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search company, contact, email…"
+          inputClassName="owner-focus"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as LeadStatus | 'all')}
+          className="input list-search-side w-full sm:w-[200px] text-sm owner-focus"
+        >
           <option value="all">All statuses</option>
-          {ALL_STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+          {ALL_STATUSES.map((s) => (
+            <option key={s} value={s}>{s.replace('_', ' ')}</option>
+          ))}
         </select>
-      </div>
+        <button
+          type="button"
+          onClick={() => { setEditing(null); setShowForm(true) }}
+          className={listSearchBtnClass('btn-owner')}
+        >
+          <Plus size={15} /> New Lead
+        </button>
+      </ListSearchToolbar>
 
       <div className="card overflow-hidden">
         {/* Mobile cards */}

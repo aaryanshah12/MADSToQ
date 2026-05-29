@@ -6,7 +6,8 @@ import { getCurrentFiscalYear, getFiscalYears, monthOptions } from '@/lib/monthl
 import type { IOInternational, IOLineItem, IOCompany, IOProduct } from '@madstoq/io-system/types'
 import ProductModal from '@/components/io/ProductModal'
 import CompanyModal from '@/components/io/CompanyModal'
-import { Plus, Pencil, Trash2, X, Save, Download, Search, Upload, Printer, Eye } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Save, Download, Upload, Printer, Eye } from 'lucide-react'
+import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { printLetterHeadInvoice, printLabelForInternational } from '@madstoq/io-system/print'
 import ProductComboSearch from '@/components/io/ProductComboSearch'
 
@@ -191,37 +192,55 @@ export default function InternationalPage() {
           <input ref={importRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImportFile}/>
           <button onClick={() => importRef.current?.click()} className="btn btn-ghost"><Upload size={14}/> Import</button>
           <button onClick={handleExport} className="btn btn-ghost"><Download size={14}/> Export</button>
-          <button onClick={openNew} className="btn btn-inputer"><Plus size={15}/> New Invoice</button>
         </div>
       </div>
-      <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 mb-4">
-        <div className="input flex items-center gap-2 w-full md:w-[320px]">
-          <Search size={14} className="text-muted flex-shrink-0"/>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice or customer..." className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
-        </div>
-        <select value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} className="input w-full md:w-[220px] text-sm">
+      <ListSearchToolbar className="mb-4 flex-wrap">
+        <ListSearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search invoice or customer..."
+        />
+        <select
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+          className="input list-search-side w-full sm:w-[220px] text-sm"
+        >
           <option value="all">All Customers</option>
-          {companies.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+          {companies.map((c) => (
+            <option key={c.id} value={c.id}>{c.company_name}</option>
+          ))}
         </select>
-        <select value={fiscalYear} onChange={e => setFiscalYear(e.target.value)} className="input w-full md:w-[170px] text-sm">
-          {fiscalYears.map(fy => <option key={fy} value={fy}>{fy}</option>)}
+        <select
+          value={fiscalYear}
+          onChange={(e) => setFiscalYear(e.target.value)}
+          className="input list-search-side w-full sm:w-[170px] text-sm"
+        >
+          {fiscalYears.map((fy) => (
+            <option key={fy} value={fy}>{fy}</option>
+          ))}
         </select>
-        <div className="w-full md:w-auto md:flex-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-            <label className="flex flex-col gap-1">
-              <span className="px-1 text-xs font-medium text-muted">Month</span>
-              <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="input w-full text-sm">
-                <option value="">All Months</option>
-                {monthOptions.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="px-1 text-xs font-medium text-muted">Date</span>
-              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="input w-full text-sm" aria-label="Filter by date"/>
-            </label>
-          </div>
-        </div>
-      </div>
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="input list-search-side w-full sm:w-[160px] text-sm"
+          aria-label="Filter by month"
+        >
+          <option value="">All Months</option>
+          {monthOptions.map((m) => (
+            <option key={m.value} value={String(m.value)}>{m.label}</option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="input list-search-side w-full sm:w-[160px] text-sm"
+          aria-label="Filter by date"
+        />
+        <button type="button" onClick={openNew} className={listSearchBtnClass('btn-inputer')}>
+          <Plus size={15} /> New Invoice
+        </button>
+      </ListSearchToolbar>
       <div className="card overflow-visible">
         <div className="sm:hidden divide-y" style={{ borderColor: 'var(--color-border)' }}>
           {loading ? <div className="py-12 text-center"><div className="inline-block w-6 h-6 border-2 border-inputer border-t-transparent rounded-full animate-spin"/></div>

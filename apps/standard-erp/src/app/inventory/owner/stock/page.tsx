@@ -5,6 +5,7 @@ import PageHeader from '@madstoq/ui/page-header'
 import { inventoryApi } from '@madstoq/inventory-system/api'
 import { StockEntry } from '@/types'
 import { Download } from 'lucide-react'
+import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { useAuth } from '@/hooks/useAuth'
 import { useInventoryFactory } from '@/contexts/InventoryFactoryContext'
 import { getCurrentFiscalYear, getFiscalYears, monthOptions } from '@/lib/monthlyMaterial'
@@ -113,23 +114,29 @@ export default function OwnerStockPage() {
           title="Stock Ledger"
           subtitle="Owner · All Loading Records"
           accent="owner"
-          actions={
-            <button className="btn btn-owner gap-2" onClick={handleExport} disabled={loading || filtered.length === 0}>
-              <Download size={15}/> Export CSV
-            </button>
-          }
         />
 
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <input className="input-field owner-focus w-full md:w-[320px]" placeholder="Search invoice or supplier..." value={search} onChange={e => setSearch(e.target.value)} />
-          <select className="input-field owner-focus w-full md:w-[170px]" value={fiscalYear} onChange={e => setFiscalYear(e.target.value)}>
-              {fiscalYears.map(fy => <option key={fy} value={fy}>{fy}</option>)}
+        <ListSearchToolbar className="mb-6 flex-wrap">
+          <ListSearchField
+            value={search}
+            onChange={setSearch}
+            placeholder="Search invoice or supplier..."
+            inputClassName="owner-focus"
+          />
+          <select
+            className="input list-search-side owner-focus w-full sm:w-[170px] text-sm"
+            value={fiscalYear}
+            onChange={(e) => setFiscalYear(e.target.value)}
+          >
+            {fiscalYears.map((fy) => (
+              <option key={fy} value={fy}>{fy}</option>
+            ))}
           </select>
-          <div className="relative w-full md:w-[170px] flex-shrink-0">
+          <div className="relative w-full sm:w-[170px] flex-shrink-0">
             <button
               type="button"
-              onClick={() => setRateOpen(v => !v)}
-              className={`input-field owner-focus w-full flex items-center justify-between gap-2 whitespace-nowrap cursor-pointer ${rateMin || rateMax ? 'border-owner' : ''}`}
+              onClick={() => setRateOpen((v) => !v)}
+              className={`input list-search-side owner-focus w-full flex items-center justify-between gap-2 whitespace-nowrap cursor-pointer ${rateMin || rateMax ? 'border-owner' : ''}`}
             >
               <span className="text-xs font-mono text-muted">₹ Rate</span>
               {(rateMin || rateMax) && (
@@ -190,32 +197,37 @@ export default function OwnerStockPage() {
               </>
             )}
           </div>
-          <div className="w-full md:w-auto md:flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-              <label className="flex flex-col gap-1">
-                <span className="px-1 text-xs font-medium text-muted">Month</span>
-                <select className="input-field owner-focus w-full" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-                  <option value="">All Months</option>
-                  {monthOptions.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="px-1 text-xs font-medium text-muted">Date</span>
-                <input
-                  type="date"
-                  className="input-field owner-focus w-full"
-                  value={selectedDate}
-                  onChange={e => setSelectedDate(e.target.value)}
-                  aria-label="Filter by date"
-                />
-              </label>
-            </div>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+          <select
+            className="input list-search-side owner-focus w-full sm:w-[160px] text-sm"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            aria-label="Filter by month"
+          >
+            <option value="">All Months</option>
+            {monthOptions.map((m) => (
+              <option key={m.value} value={String(m.value)}>{m.label}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            className="input list-search-side owner-focus w-full sm:w-[160px] text-sm"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            aria-label="Filter by date"
+          />
+          <div className="flex items-center gap-2 shrink-0 self-center sm:ml-auto">
             <span className="font-mono text-xs text-muted">Total Value:</span>
-            <span className="font-display text-lg font-bold text-owner">₹{(totalValue/100000).toFixed(2)}L</span>
+            <span className="font-display text-lg font-bold text-owner">₹{(totalValue / 100000).toFixed(2)}L</span>
           </div>
-        </div>
+          <button
+            type="button"
+            className={listSearchBtnClass('btn-owner')}
+            onClick={handleExport}
+            disabled={loading || filtered.length === 0}
+          >
+            <Download size={15} /> Export CSV
+          </button>
+        </ListSearchToolbar>
 
         <div className="card overflow-hidden">
           {loading ? (

@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, X } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { batchTotalCost } from '@madstoq/pmc-system/lib/bom-pricing'
+import type { PMCRawMaterial } from '@madstoq/pmc-system/types'
 import type { PMCBatchStatus } from '@madstoq/pmc-system/types'
 
 export default function PMCBatchDetailPage() {
@@ -18,17 +19,22 @@ export default function PMCBatchDetailPage() {
   const batch = useMemo(() => {
     void tick
     return pmcApi.getBatch(id)
-  }, [id, tick])
+  }, [id, tick, pmcApi])
 
   const lines = useMemo(() => {
     void tick
     return pmcApi.listBatchLines(id)
-  }, [id, tick])
+  }, [id, tick, pmcApi])
 
   const product = useMemo(() => {
     void tick
     return batch ? pmcApi.getProduct(batch.product_id) : undefined
-  }, [batch, tick])
+  }, [batch, tick, pmcApi])
+
+  const procurement = useMemo(() => {
+    void tick
+    return pmcApi.listRawMaterials().filter((m) => m.is_active)
+  }, [tick, pmcApi])
 
   const [editLines, setEditLines] = useState<typeof lines | null>(null)
   const [batchSize, setBatchSize] = useState('')
@@ -50,6 +56,13 @@ export default function PMCBatchDetailPage() {
       setEditLines(null)
       return
     }
+
+    const invalid = editLines.some((l) => !l.raw_material_id || !Number.isFinite(l.qty) || l.qty <= 0)
+    if (invalid) {
+      alert('Please select an item and enter a valid Qty for every BOM line.')
+      return
+    }
+
     setSaving(true)
     try {
       await pmcApi.updateBatch(id, {
@@ -109,7 +122,7 @@ export default function PMCBatchDetailPage() {
             <span className="text-muted"> · Batch size {sizeForTotals}</span>
           </p>
           <p className="text-sm mt-1">
-            Unit price (per product):{' '}
+            Unit Price (RMC):{' '}
             <strong>
               ₹
               {(editLines
@@ -170,6 +183,27 @@ export default function PMCBatchDetailPage() {
             )
           ) : (
             <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setEditLines((rows) => [
+                    ...(rows ?? []),
+                    {
+                      id: `temp-${Date.now()}`,
+                      raw_material_id: '',
+                      item_code: '',
+                      item_name: '',
+                      item_type: 'material',
+                      qty: 1,
+                      unit_price: 0,
+                      is_primary: false,
+                    },
+                  ])
+                }}
+              >
+                <Plus size={14} /> Add item
+              </button>
               <button type="button" className="btn btn-ghost" onClick={() => setEditLines(null)}>Cancel</button>
               <button type="button" className="btn btn-pmc" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
             </>
@@ -178,12 +212,54 @@ export default function PMCBatchDetailPage() {
 
         <table className="data-table w-full text-sm">
           <thead>
-            <tr><th>Code</th><th>Name</th><th>Type</th><th>Qty</th><th>Unit price</th><th>Line total</th></tr>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Qty</th>
+              <th>Unit price</th>
+              <th>Line total</th>
+              {editLines && <th />}
+            </tr>
           </thead>
           <tbody>
             {displayLines.map((l, idx) => (
               <tr key={l.id ?? idx}>
-                <td className="font-mono text-xs">{l.item_code}</td>
+                <td className="font-mono text-xs">
+                  {editLines ? (
+                    <select
+                      className="input pmc-focus py-1 text-sm w-48"
+                      value={l.raw_material_id ?? ''}
+                      onChange={(e) => {
+                        const id = e.target.value
+                        const picked = procurement.find((m: PMCRawMaterial) => m.id === id)
+                        setEditLines((rows) =>
+                          rows!.map((r, i) =>
+                            i === idx
+                              ? {
+                                  ...r,
+                                  raw_material_id: id || null,
+                                  item_code: picked?.code ?? '',
+                                  item_name: picked?.name ?? '',
+                                  item_type: picked?.item_type ?? 'material',
+                                  unit_price: picked?.price ?? 0,
+                                }
+                              : r
+                          )
+                        )
+                      }}
+                    >
+                      <option value="">Select item…</option>
+                      {procurement.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.code} — {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    l.item_code
+                  )}
+                </td>
                 <td>{l.item_name}</td>
                 <td className="capitalize">{l.item_type}</td>
                 <td>
@@ -217,6 +293,18 @@ export default function PMCBatchDetailPage() {
                 <td>
                   ₹{(l.qty * (Number(editLines ? batchSize : batch.batch_size) || 1) * l.unit_price).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                 </td>
+                {editLines && (
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      className="text-muted hover:text-red-400"
+                      onClick={() => setEditLines((rows) => rows!.filter((_, i) => i !== idx))}
+                      aria-label="Remove line"
+                    >
+                      <X size={14} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

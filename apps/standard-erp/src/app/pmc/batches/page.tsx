@@ -146,8 +146,8 @@ function BatchesContent() {
               <th>Status</th>
               <th>Product</th>
               <th>Batch size</th>
-              <th>Unit price</th>
               <th>Total cost</th>
+              <th>Unit Price (RMC)</th>
             </tr>
           </thead>
           <tbody>
@@ -164,13 +164,13 @@ function BatchesContent() {
                   <td className="capitalize text-sm">{b.status}</td>
                   <td className="text-sm">{productName(b.product_id)}</td>
                   <td>{b.batch_size}</td>
-                  <td>₹{b.unit_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                   <td className="text-muted">
                     ₹
                     {(b.unit_price * (b.batch_size > 0 ? b.batch_size : 1)).toLocaleString('en-IN', {
                       maximumFractionDigits: 2,
                     })}
                   </td>
+                  <td>₹{b.unit_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                 </tr>
               ))
             )}

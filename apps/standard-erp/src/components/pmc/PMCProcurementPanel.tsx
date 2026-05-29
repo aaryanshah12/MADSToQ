@@ -186,7 +186,7 @@ export default function PMCProcurementPanel() {
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-1">Code *</label>
+          <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-1">HSN Code *</label>
           <input value={f.code} onChange={(e) => set({ ...f, code: e.target.value })} className="input w-full pmc-focus" required />
         </div>
         <div>
@@ -233,7 +233,7 @@ export default function PMCProcurementPanel() {
         <table className="data-table w-full">
           <thead>
             <tr>
-              <th>Code</th>
+              <th>HSN Code</th>
               <th>Name</th>
               <th>Price</th>
               <th>Type</th>

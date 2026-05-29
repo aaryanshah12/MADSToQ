@@ -91,7 +91,7 @@ export default function PMCProductsPanel() {
         <PmcListSearch
           value={search}
           onChange={setSearch}
-          placeholder="Search code, name, unit price…"
+          placeholder="Search code, name, unit price (RMC)…"
         />
         <button type="button" onClick={() => setShowAdd(true)} className={listSearchBtnClass('btn-pmc')}>
           <Plus size={14} /> Add
@@ -104,8 +104,8 @@ export default function PMCProductsPanel() {
             <tr>
               <th>Code</th>
               <th>Product name</th>
-              <th>Unit price</th>
               <th>Raw materials</th>
+              <th>Unit Price (RMC)</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
@@ -125,8 +125,8 @@ export default function PMCProductsPanel() {
                     </Link>
                   </td>
                   <td className="font-medium">{p.name}</td>
-                  <td>₹{(p.unit_price ?? pmcApi.templateUnitPrice(p.id)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                   <td className="text-sm text-muted">{pmcApi.countProductMaterials(p.id)}</td>
+                  <td>₹{(p.unit_price ?? pmcApi.templateUnitPrice(p.id)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                   <td className="text-right">
                     <PmcRowActions
                       editHref={`/pmc/products/${p.id}`}

@@ -1,3 +1,3 @@
-export { pmcApi } from './api/browser'
+export { createPmcApi, type PmcApi } from './api/scoped-api'
 export * from './api/rpc'
 export * from './services/pmc-service'

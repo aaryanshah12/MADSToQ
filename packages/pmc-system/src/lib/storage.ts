@@ -1,4 +1,4 @@
-import type { PMCStore } from '../lib/types'
+import type { PMCStore, PMCRawMaterial } from './types'
 
 export const STORAGE_KEY = 'pmc-store-v1'
 
@@ -6,12 +6,31 @@ const emptyStore = (): PMCStore => ({
   raw_materials: [],
   products: [],
   product_materials: [],
+  batches: [],
+  batch_lines: [],
   references: [],
   reference_prices: [],
   product_params: [],
 })
 
 export function migrateStore(store: PMCStore): PMCStore {
+  if (!store.batches) store.batches = []
+  if (!store.batch_lines) store.batch_lines = []
+
+  store.raw_materials = (store.raw_materials ?? []).map((m) => ({
+    ...m,
+    code: m.code ?? m.name.slice(0, 12).toUpperCase().replace(/\s+/g, ''),
+    price: Number((m as PMCRawMaterial).price ?? 0),
+    item_type: (m as PMCRawMaterial).item_type === 'service' ? 'service' : 'material',
+    vendor: (m as PMCRawMaterial).vendor ?? null,
+    description: (m as PMCRawMaterial).description ?? null,
+  }))
+
+  store.products = (store.products ?? []).map((p) => ({
+    ...p,
+    unit_price: Number((p as { unit_price?: number }).unit_price ?? 0),
+  }))
+
   store.product_params = store.product_params.map((p) => {
     const legacy = (p as { tons_kg?: number }).tons_kg
     const batch_multiplier =

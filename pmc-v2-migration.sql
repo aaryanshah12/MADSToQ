@@ -1,0 +1,3 @@
+-- DEPRECATED: Use pmc-schema.sql instead (full drop + create v2).
+-- This file only applied incremental changes on top of the old schema.
+-- Keeping for reference; do not run if you already ran the new pmc-schema.sql.

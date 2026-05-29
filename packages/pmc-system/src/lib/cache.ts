@@ -5,6 +5,8 @@ const emptyStore = (): PMCStore => ({
   raw_materials: [],
   products: [],
   product_materials: [],
+  batches: [],
+  batch_lines: [],
   references: [],
   reference_prices: [],
   product_params: [],

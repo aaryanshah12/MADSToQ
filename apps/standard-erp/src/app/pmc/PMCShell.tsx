@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { PMCProvider } from '@/contexts/PMCContext'
+import { PMCFactoryProvider } from '@/contexts/PMCFactoryContext'
 import PMCLayout from '@/components/pmc/PMCLayout'
 
 export default function PMCShell({ children }: { children: React.ReactNode }) {
@@ -10,7 +11,13 @@ export default function PMCShell({ children }: { children: React.ReactNode }) {
 
   return (
     <PMCProvider>
-      {bare ? children : <PMCLayout>{children}</PMCLayout>}
+      {bare ? (
+        children
+      ) : (
+        <PMCFactoryProvider>
+          <PMCLayout>{children}</PMCLayout>
+        </PMCFactoryProvider>
+      )}
     </PMCProvider>
   )
 }

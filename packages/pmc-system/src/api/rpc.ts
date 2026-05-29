@@ -34,20 +34,71 @@ export async function nextRefNumber(): Promise<string> {
 }
 
 export async function upsertRawMaterialDb(input: {
+  factory_id: string
   id?: string
   name: string
+  code: string
+  price: number
+  item_type: 'service' | 'material'
+  vendor?: string | null
+  description?: string | null
   unit?: string
-  is_active?: boolean
 }): Promise<void> {
   await rpcPost(RPC, 'upsertRawMaterialDb', { input })
 }
 
-export async function deactivateRawMaterialDb(id: string): Promise<void> {
-  await rpcPost(RPC, 'deactivateRawMaterialDb', { id })
+export async function updateProcurementPriceDb(
+  factory_id: string,
+  id: string,
+  price: number
+): Promise<void> {
+  await rpcPost(RPC, 'updateProcurementPriceDb', { factory_id, id, price })
 }
 
-export async function deactivateProductDb(id: string): Promise<void> {
-  await rpcPost(RPC, 'deactivateProductDb', { id })
+export type CreateBatchInput = {
+  factory_id: string
+  product_id: string
+  batch_size: number
+  status?: 'draft' | 'active' | 'completed' | 'cancelled'
+  lines: {
+    raw_material_id?: string | null
+    item_code: string
+    item_name: string
+    item_type: 'service' | 'material'
+    qty: number
+    unit_price: number
+    is_primary: boolean
+  }[]
+}
+
+export type UpdateBatchInput = {
+  status?: 'draft' | 'active' | 'completed' | 'cancelled'
+  batch_size?: number
+  lines?: CreateBatchInput['lines']
+}
+
+export async function createBatchDb(input: CreateBatchInput): Promise<string> {
+  return rpcPost<string>(RPC, 'createBatchDb', { input })
+}
+
+export async function updateBatchDb(
+  factory_id: string,
+  batchId: string,
+  input: UpdateBatchInput
+): Promise<void> {
+  await rpcPost(RPC, 'updateBatchDb', { factory_id, batchId, input })
+}
+
+export async function deleteBatchDb(factory_id: string, id: string): Promise<void> {
+  await rpcPost(RPC, 'deleteBatchDb', { factory_id, id })
+}
+
+export async function deactivateRawMaterialDb(factory_id: string, id: string): Promise<void> {
+  await rpcPost(RPC, 'deactivateRawMaterialDb', { factory_id, id })
+}
+
+export async function deactivateProductDb(factory_id: string, id: string): Promise<void> {
+  await rpcPost(RPC, 'deactivateProductDb', { factory_id, id })
 }
 
 export async function updateReferenceDb(
@@ -63,6 +114,7 @@ export async function deleteReferenceDb(id: string): Promise<void> {
 }
 
 export async function upsertProductDb(input: {
+  factory_id: string
   id?: string
   name: string
   code?: string
@@ -71,10 +123,11 @@ export async function upsertProductDb(input: {
 }
 
 export async function setProductMaterialsDb(
+  factory_id: string,
   productId: string,
   rows: { raw_material_id: string; qty: number; is_primary: boolean }[]
 ): Promise<void> {
-  await rpcPost(RPC, 'setProductMaterialsDb', { productId, materials: rows })
+  await rpcPost(RPC, 'setProductMaterialsDb', { factory_id, productId, materials: rows })
 }
 
 export async function createReferenceDb(
@@ -118,7 +171,7 @@ export async function migrateLocalStorageToSupabaseIfNeeded(remoteEmpty = false)
         local.references.length
     )
     if (!hasLocal) return false
-    await rpcPost(RPC, 'importStore', { store: local })
+    await rpcPost(RPC, 'importStore', { store: local, factory_id: undefined })
     localStorage.removeItem(STORAGE_KEY)
     return true
   } catch {

@@ -11,62 +11,107 @@
     <div class="manual-wrap">
       <header class="manual-header">
         <h1>PMC Portal — User manual</h1>
-        <p>Product pricing with reference-controlled raw material cost (RMC).</p>
+        <p>Procurement, product BOMs, production batches, and batch comparison.</p>
       </header>
 
       <h2>1. Sign in</h2>
       <ol>
         <li>Open <a href="/pmc">/pmc</a> and sign in with the email and password provided by your administrator.</li>
-        <li>After login, the app loads master data (raw materials, products, references) into memory for fast editing.</li>
+        <li>Your account must be on the PMC allowlist (<code>pmc_users</code> in the database).</li>
+        <li>After login, the app loads your procurement items, products, and batches for fast editing.</li>
       </ol>
 
-      <h2>2. Recommended setup order</h2>
+      <h2>2. Sidebar modules</h2>
+      <ul>
+        <li><strong>Dashboard</strong> — Counts and recent batches / products.</li>
+        <li><strong>Procurement</strong> — Services and raw materials (codes, prices, vendors).</li>
+        <li><strong>Products</strong> — Finished products and their BOM (bill of materials).</li>
+        <li><strong>Batches</strong> — Production runs with batch-specific BOM and frozen prices.</li>
+        <li><strong>Compare</strong> — Side-by-side comparison of two batches for one product.</li>
+      </ul>
+
+      <h2>3. Recommended setup order</h2>
       <ol>
-        <li><strong>Master → Raw materials</strong> — Add every material used in recipes (name + unit, e.g. Kg).</li>
-        <li><strong>Master → Products</strong> — Create each finished product, then open <strong>Edit recipe</strong> to set BOM lines (quantity per material, mark one as primary).</li>
-        <li><strong>Reference Number</strong> — Save a new reference when raw-material prices change; the system assigns a reference ID.</li>
-        <li><strong>RMC</strong> — For each product, enter overhead, batch multiplier, and yield per reference to calculate final RMC (see the <strong>RMC</strong> menu in the sidebar).</li>
+        <li><strong>Procurement</strong> — Add every service and material you buy (Code, Name, Price, Type). Vendor and Description are optional.</li>
+        <li><strong>Products</strong> — Add each product (Code, Name) and select procurement lines with quantities. Mark exactly one line as <strong>Primary</strong>. The product <strong>unit price</strong> is calculated from current procurement rates.</li>
+        <li><strong>Batches</strong> — For each production run, pick a product and batch size. The app copies the product BOM; adjust lines if needed, then save. Batch prices are <strong>frozen</strong> at save time.</li>
+        <li><strong>Compare</strong> — When you need to see cost drift between runs, select the product and two batches.</li>
       </ol>
 
-      <h2>3. Dashboard</h2>
-      <p>Summary counts and shortcuts to raw materials, references, and recent products. Use it for a quick health check before updating prices.</p>
+      <h2>4. Dashboard</h2>
+      <p>Shows how many procurement items, products, and batches you have, plus shortcuts to recent activity. Use it for a quick overview before updating prices or creating batches.</p>
 
-      <h2>4. Reference Number</h2>
+      <h2>5. Procurement</h2>
+      <h3>Listing</h3>
       <ul>
-        <li>Create a reference when you need a new price list for raw materials.</li>
-        <li>Enter each material rate; saving creates a durable reference you can reuse on product pricing sheets.</li>
-        <li>Past references remain in history for audit and comparison.</li>
+        <li>Columns: <strong>Code</strong>, <strong>Name</strong>, <strong>Price</strong>, <strong>Type</strong> (Service or Material), <strong>Vendor</strong>, and actions.</li>
+        <li><strong>Double-click the Price cell</strong> to edit the rate inline (press Enter to save, Escape to cancel).</li>
+        <li>Use <strong>Edit</strong> or <strong>Delete</strong> on each row for full changes or removal.</li>
+      </ul>
+      <h3>Add item</h3>
+      <ul>
+        <li>Click <strong>Add</strong> (top right). Required: Code, Name, Price, Type. Optional: Vendor, Description.</li>
+        <li>Changing procurement prices updates the <strong>product template</strong> unit price when you save a product BOM — it does <strong>not</strong> change prices on batches already saved.</li>
       </ul>
 
-      <h2>5. RMC (operational pricing)</h2>
+      <h2>6. Products</h2>
+      <h3>Listing</h3>
       <ul>
-        <li>This section is for <strong>RMC calculation</strong>, not for defining BOM (that is under Master → Products).</li>
-        <li>Select a product, pick a reference, and fill overhead / yield / tons per kg.</li>
-        <li>The sheet shows calculated RMC based on recipe quantities and reference prices.</li>
+        <li>Columns: Code (link), Product name, Unit price, number of raw materials, Edit / Delete.</li>
+        <li>Click the <strong>product code</strong> to open the detail view.</li>
+      </ul>
+      <h3>Add product</h3>
+      <ul>
+        <li>Click <strong>Add</strong>. Enter Code and Name, then add BOM lines by choosing procurement items and quantities.</li>
+        <li>Unit price on the list is the sum of (quantity × current procurement price) for all BOM lines.</li>
+      </ul>
+      <h3>Product detail (click code)</h3>
+      <ul>
+        <li><strong>BOM</strong> — View or edit recipe lines; save to recalculate template unit price.</li>
+        <li><strong>Unit price chart</strong> — Bar chart of template price vs each batch’s unit price.</li>
+        <li><strong>Recent batches</strong> — Links to batch records for this product.</li>
       </ul>
 
-      <h2>6. Master (tabbed menu)</h2>
-      <p>Like other MADSToQ portals, Master uses a horizontal menu:</p>
+      <h2>7. Batches</h2>
+      <h3>Listing</h3>
       <ul>
-        <li><strong>Raw materials</strong> — Add, view, edit, or deactivate materials. Inactive materials stay in history but drop from pick lists.</li>
-        <li><strong>Products</strong> — Add products and open the recipe editor to link materials and quantities. New products open the recipe screen automatically.</li>
+        <li>Columns: <strong>Batch ID</strong> (e.g. BATCH-001), <strong>Status</strong>, product name/code, <strong>Batch size</strong>, <strong>Unit price</strong>.</li>
+        <li>Click a row to open the batch editor.</li>
       </ul>
-
-      <h2>7. Recipe editor</h2>
+      <h3>Add batch</h3>
       <ol>
-        <li>From Master → Products, use the edit action on a product.</li>
-        <li>Add rows for each raw material and quantity; mark exactly one row as <strong>primary</strong> where required.</li>
-        <li>Save the recipe before pricing the product under a new reference.</li>
+        <li>Click <strong>Add batch</strong>.</li>
+        <li>Select the <strong>product</strong> and enter <strong>batch size</strong>.</li>
+        <li>The system loads BOM lines from the product with <strong>current procurement prices</strong> snapshotted on each line.</li>
+        <li>Edit quantities or unit prices for this batch only, then <strong>Create</strong>.</li>
+        <li>Status can be Draft, Active, Completed, or Cancelled.</li>
+      </ol>
+      <h3>Batch detail</h3>
+      <ul>
+        <li>Use <strong>Edit BOM</strong> to change lines, batch size, or status, then Save.</li>
+        <li>Delete removes the entire batch.</li>
+      </ul>
+
+      <h2>8. Compare</h2>
+      <ol>
+        <li>Select a <strong>product</strong>.</li>
+        <li>Choose <strong>Batch A</strong> and <strong>Batch B</strong> from the dropdowns (same product).</li>
+        <li>Review line-by-line quantities, rates, totals, and the difference column.</li>
+        <li>Summary cards show each batch’s overall unit price.</li>
       </ol>
 
-      <h2>8. Tips</h2>
+      <h2>9. Important rules</h2>
       <div class="tip">
         <ul>
-          <li>Deactivate instead of deleting when a material or product is retired — pricing history stays intact.</li>
-          <li>If RMC looks wrong, confirm the active reference, recipe quantities, and primary material flag.</li>
-          <li>Use <strong>User manual</strong> in the sidebar anytime to reopen this guide.</li>
+          <li><strong>Frozen batch pricing</strong> — Past batches keep the unit prices saved when the batch was created. Procurement price updates only affect new batches and product template pricing.</li>
+          <li><strong>Primary material</strong> — Each product BOM must have exactly one primary line when saving.</li>
+          <li><strong>Factory scope</strong> — Procurement, products, and batches belong to one factory. You only see and edit data for factories assigned to you in Inventory (same as Inward–Outward). Use the factory selector in the sidebar when you have more than one.</li>
+          <li>Open <strong>User manual</strong> from the sidebar anytime to return to this guide.</li>
         </ul>
       </div>
+
+      <h2>10. Database setup (administrators)</h2>
+      <p>After a schema reset, run <code>pmc-schema.sql</code> in Supabase, then add users to <code>pmc_users</code> so they can sign in. Re-register PMC users before expecting any historical data.</p>
     </div>
   </body>
 </html>

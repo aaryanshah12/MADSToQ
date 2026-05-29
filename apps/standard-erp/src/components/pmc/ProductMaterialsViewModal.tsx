@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import clsx from 'clsx'
-import { pmcApi } from '@madstoq/pmc-system/api'
+import { usePMCData } from '@/contexts/PMCContext'
 import type { PMCProduct } from '@madstoq/pmc-system/types'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
 
@@ -12,6 +12,7 @@ type ProductMaterialsViewModalProps = {
 }
 
 export function ProductMaterialsViewModal({ product, onClose }: ProductMaterialsViewModalProps) {
+  const { api: pmcApi } = usePMCData()
   if (!product) return null
 
   const lines = pmcApi.getProductRecipeLines(product.id)

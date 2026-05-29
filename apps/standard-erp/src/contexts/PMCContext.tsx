@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { setCachedAccessToken } from '@madstoq/core'
 import { clearPmcCache } from '@madstoq/pmc-system/lib/cache'
-import { pmcApi } from '@madstoq/pmc-system/api'
+import { createPmcApi } from '@madstoq/pmc-system/api'
+import { usePMCFactory } from '@/contexts/PMCFactoryContext'
 import { setPmcCache } from '@madstoq/pmc-system/lib/cache'
 import {
   bootstrapPmc,
@@ -157,5 +158,6 @@ export function usePMC() {
 
 export function usePMCData() {
   const { tick } = usePMC()
-  return useMemo(() => ({ api: pmcApi, tick }), [tick])
+  const { factoryId } = usePMCFactory()
+  return useMemo(() => ({ api: createPmcApi(factoryId), tick, factoryId }), [tick, factoryId])
 }

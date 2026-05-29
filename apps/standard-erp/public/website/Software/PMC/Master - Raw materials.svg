@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
   <rect width="1280" height="720" fill="#0f1419"/>
   <rect width="256" height="720" fill="#151b24"/>
-  <text x="24" y="220" fill="#a78bfa" font-family="Inter,sans-serif" font-size="13" font-weight="600">Master</text>
+  <text x="24" y="220" fill="#00c2ff" font-family="Inter,sans-serif" font-size="13" font-weight="600">Master</text>
   <text x="300" y="56" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="28" font-weight="700">Master</text>
-  <rect x="300" y="90" width="420" height="44" rx="10" fill="#a78bfa" fill-opacity="0.2" stroke="#a78bfa"/>
-  <text x="420" y="118" fill="#a78bfa" font-family="Inter,sans-serif" font-size="13" font-weight="600">Raw materials</text>
+  <rect x="300" y="90" width="420" height="44" rx="10" fill="#00c2ff" fill-opacity="0.2" stroke="#00c2ff"/>
+  <text x="420" y="118" fill="#00c2ff" font-family="Inter,sans-serif" font-size="13" font-weight="600">Raw materials</text>
   <rect x="740" y="90" width="200" height="44" rx="10" fill="#1e293b"/>
   <text x="800" y="118" fill="#64748b" font-family="Inter,sans-serif" font-size="13">Products</text>
   <rect x="300" y="160" width="600" height="80" rx="12" fill="#1e293b" stroke="#334155"/>

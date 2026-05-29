@@ -4,8 +4,8 @@
   <text x="300" y="56" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="28" font-weight="700">Master</text>
   <rect x="300" y="90" width="200" height="44" rx="10" fill="#1e293b"/>
   <text x="360" y="118" fill="#64748b" font-family="Inter,sans-serif" font-size="13">Raw materials</text>
-  <rect x="520" y="90" width="200" height="44" rx="10" fill="#a78bfa" fill-opacity="0.2" stroke="#a78bfa"/>
-  <text x="580" y="118" fill="#a78bfa" font-family="Inter,sans-serif" font-size="13" font-weight="600">Products</text>
+  <rect x="520" y="90" width="200" height="44" rx="10" fill="#00c2ff" fill-opacity="0.2" stroke="#00c2ff"/>
+  <text x="580" y="118" fill="#00c2ff" font-family="Inter,sans-serif" font-size="13" font-weight="600">Products</text>
   <rect x="300" y="160" width="700" height="420" rx="12" fill="#1e293b" stroke="#334155"/>
   <text x="340" y="220" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="15" font-weight="600">Product Alpha</text>
   <text x="340" y="280" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="15" font-weight="600">Product Beta — recipe editor</text>

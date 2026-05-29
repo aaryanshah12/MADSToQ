@@ -33,7 +33,7 @@
       <h2>3. Recommended setup order</h2>
       <ol>
         <li><strong>Procurement</strong> — Add every service and material you buy (Code, Name, Price, Type). Vendor and Description are optional.</li>
-        <li><strong>Products</strong> — Add each product (Code, Name) and select procurement lines with quantities. Mark exactly one line as <strong>Primary</strong>. The product <strong>unit price</strong> is calculated from current procurement rates.</li>
+        <li><strong>Products</strong> — Add each product (Code, Name) and select procurement lines with quantities. The product <strong>unit price</strong> is the sum of (qty × current procurement rate) for all BOM lines.</li>
         <li><strong>Batches</strong> — For each production run, pick a product and batch size. The app copies the product BOM; adjust lines if needed, then save. Batch prices are <strong>frozen</strong> at save time.</li>
         <li><strong>Compare</strong> — When you need to see cost drift between runs, select the product and two batches.</li>
       </ol>
@@ -104,7 +104,6 @@
       <div class="tip">
         <ul>
           <li><strong>Frozen batch pricing</strong> — Past batches keep the unit prices saved when the batch was created. Procurement price updates only affect new batches and product template pricing.</li>
-          <li><strong>Primary material</strong> — Each product BOM must have exactly one primary line when saving.</li>
           <li><strong>Factory scope</strong> — Procurement, products, and batches belong to one factory. You only see and edit data for factories assigned to you in Inventory (same as Inward–Outward). Use the factory selector in the sidebar when you have more than one.</li>
           <li>Open <strong>User manual</strong> from the sidebar anytime to return to this guide.</li>
         </ul>

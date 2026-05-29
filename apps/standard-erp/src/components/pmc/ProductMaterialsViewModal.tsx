@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import clsx from 'clsx'
 import { usePMCData } from '@/contexts/PMCContext'
 import type { PMCProduct } from '@madstoq/pmc-system/types'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
@@ -51,19 +50,14 @@ export function ProductMaterialsViewModal({ product, onClose }: ProductMaterials
                 <th>Raw material</th>
                 <th className="text-right">Quantity</th>
                 <th>Unit</th>
-                <th>Primary</th>
               </tr>
             </thead>
             <tbody>
               {lines.map((line, i) => (
-                <tr
-                  key={`${line.raw_material_name}-${i}`}
-                  className={clsx(line.is_primary && 'bg-pmc-10')}
-                >
+                <tr key={`${line.raw_material_name}-${i}`}>
                   <td className="font-medium">{line.raw_material_name}</td>
                   <td className="text-right font-mono tabular-nums">{line.qty}</td>
                   <td className="text-muted">{line.unit}</td>
-                  <td>{line.is_primary ? 'Yes' : '—'}</td>
                 </tr>
               ))}
             </tbody>

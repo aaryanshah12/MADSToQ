@@ -125,9 +125,21 @@ export async function upsertProductDb(input: {
 export async function setProductMaterialsDb(
   factory_id: string,
   productId: string,
-  rows: { raw_material_id: string; qty: number; is_primary: boolean }[]
+  rows: { raw_material_id: string; qty: number; is_primary?: boolean }[]
 ): Promise<void> {
   await rpcPost(RPC, 'setProductMaterialsDb', { factory_id, productId, materials: rows })
+}
+
+export async function saveProductWithMaterialsDb(
+  factory_id: string,
+  product: { id?: string; name: string; code?: string },
+  materials: { raw_material_id: string; qty: number }[]
+): Promise<string> {
+  return rpcPost<string>(RPC, 'saveProductWithMaterialsDb', {
+    factory_id,
+    product,
+    materials,
+  })
 }
 
 export async function createReferenceDb(

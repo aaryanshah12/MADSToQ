@@ -326,17 +326,34 @@ export async function updateProcurementPriceDb(
   if (error) throw new Error(error.message)
 }
 
-async function recalcProductUnitPrice(productId: string): Promise<void> {
-  const store = await fetchFullStore()
-  const materials = new Map(store.raw_materials.map((m) => [m.id, m]))
-  const lines = store.product_materials
-    .filter((pm) => pm.product_id === productId)
-    .map((pm) => {
-      const m = materials.get(pm.raw_material_id)
-      return { qty: pm.qty, unit_price: m?.price ?? 0 }
-    })
-  const unit_price = productUnitPriceFromRecipe(lines)
-  await getServerDb().from('pmc_products').update({ unit_price }).eq('id', productId)
+async function recalcProductUnitPrice(productId: string, factory_id: string): Promise<void> {
+  const db = getServerDb()
+  const { data: pms, error: pmErr } = await db
+    .from('pmc_product_materials')
+    .select('qty, raw_material_id')
+    .eq('product_id', productId)
+  if (pmErr) throw new Error(pmErr.message)
+  if (!pms?.length) {
+    const { error } = await db.from('pmc_products').update({ unit_price: 0 }).eq('id', productId)
+    if (error) throw new Error(error.message)
+    return
+  }
+  const rmIds = pms.map((p) => String(p.raw_material_id))
+  const { data: rms, error: rmErr } = await db
+    .from('pmc_raw_materials')
+    .select('id, price')
+    .eq('factory_id', factory_id)
+    .in('id', rmIds)
+  if (rmErr) throw new Error(rmErr.message)
+  const priceById = new Map((rms ?? []).map((m) => [String(m.id), num(m.price)]))
+  const unit_price = productUnitPriceFromRecipe(
+    pms.map((pm) => ({
+      qty: num(pm.qty),
+      unit_price: priceById.get(String(pm.raw_material_id)) ?? 0,
+    }))
+  )
+  const { error } = await db.from('pmc_products').update({ unit_price }).eq('id', productId)
+  if (error) throw new Error(error.message)
 }
 
 export async function deactivateRawMaterialDb(factory_id: string, id: string): Promise<void> {
@@ -431,7 +448,7 @@ export async function upsertProductDb(input: {
 export async function setProductMaterialsDb(
   factory_id: string,
   productId: string,
-  rows: { raw_material_id: string; qty: number; is_primary: boolean }[]
+  rows: { raw_material_id: string; qty: number; is_primary?: boolean }[]
 ): Promise<void> {
   await assertPmcFactoryAccess(factory_id)
   const { data: product, error: productErr } = await getServerDb()
@@ -457,11 +474,31 @@ export async function setProductMaterialsDb(
       raw_material_id: row.raw_material_id,
       qty: row.qty,
       sort_order: i,
-      is_primary: row.is_primary,
+      is_primary: row.is_primary ?? false,
     }))
   )
   if (insError) throw new Error(insError.message)
-  await recalcProductUnitPrice(productId)
+  await recalcProductUnitPrice(productId, factory_id)
+}
+
+/** Create/update product + BOM in one server round-trip (single cache reload on client). */
+export async function saveProductWithMaterialsDb(
+  factory_id: string,
+  product: { id?: string; name: string; code?: string },
+  materials: { raw_material_id: string; qty: number }[]
+): Promise<string> {
+  const productId = await upsertProductDb({
+    factory_id,
+    id: product.id,
+    name: product.name,
+    code: product.code,
+  })
+  await setProductMaterialsDb(
+    factory_id,
+    productId,
+    materials.map((m) => ({ ...m, is_primary: false }))
+  )
+  return productId
 }
 
 export async function nextBatchCode(factory_id: string): Promise<string> {
@@ -566,12 +603,20 @@ export async function updateBatchDb(
   const db = getServerDb()
   const { data: batchRow, error: batchLookupErr } = await db
     .from('pmc_batches')
-    .select('id')
+    .select('id, status')
     .eq('id', batchId)
     .eq('factory_id', factory_id)
     .maybeSingle()
   if (batchLookupErr) throw new Error(batchLookupErr.message)
   if (!batchRow) throw new Error('Batch not found for this factory')
+
+  const currentStatus = String(batchRow.status ?? 'draft')
+  if (input.lines && currentStatus === 'completed') {
+    throw new Error('Completed batches cannot be edited. BOM is frozen.')
+  }
+  if (input.batch_size !== undefined && currentStatus === 'completed') {
+    throw new Error('Completed batches cannot be edited. Batch size is frozen.')
+  }
 
   let batchSize: number | undefined
   if (input.batch_size !== undefined) batchSize = input.batch_size > 0 ? input.batch_size : 1

@@ -30,7 +30,7 @@ export async function seedPMCDemoIfEmpty(factoryId: string): Promise<boolean> {
     materials.map((m, i) => ({
       raw_material_id: m.id,
       qty: [2000, 200, 2050, 2250, 3500][i] / 1000,
-      is_primary: i === 0,
+      is_primary: false,
     }))
   )
 

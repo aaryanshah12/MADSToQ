@@ -6,6 +6,7 @@ import { useMemo, useState, Suspense } from 'react'
 import { Plus } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import type { PmcApi } from '@madstoq/pmc-system/api'
+import { batchTotalCost, batchUnitPrice } from '@madstoq/pmc-system/lib/bom-pricing'
 import type { PMCBatchStatus } from '@madstoq/pmc-system/types'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
 
@@ -22,15 +23,21 @@ function BatchesContent() {
   const [lines, setLines] = useState<ReturnType<PmcApi['buildBatchLinesFromProduct']>>([])
   const [saving, setSaving] = useState(false)
 
-  const batches = useMemo(() => {
-    void tick
-    return pmcApi.listBatches()
-  }, [tick])
-
   const products = useMemo(() => {
     void tick
     return pmcApi.listProducts()
-  }, [tick])
+  }, [tick, pmcApi])
+
+  const filterProduct = useMemo(
+    () => (preProduct ? products.find((p) => p.id === preProduct) : undefined),
+    [preProduct, products]
+  )
+
+  const batches = useMemo(() => {
+    void tick
+    const list = preProduct ? pmcApi.listBatches(preProduct) : pmcApi.listBatches()
+    return list
+  }, [tick, preProduct, pmcApi])
 
   const productName = (pid: string) => {
     const p = products.find((x) => x.id === pid)
@@ -75,8 +82,22 @@ function BatchesContent() {
     <div className="pmc-page space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="pmc-page-title">Batches</h1>
-          <p className="text-sm text-muted mt-1">BOM per batch size with frozen unit prices.</p>
+          {filterProduct && (
+            <Link
+              href={`/pmc/products/${filterProduct.id}`}
+              className="text-sm text-pmc hover:underline inline-block mb-1"
+            >
+              ← {filterProduct.name}
+            </Link>
+          )}
+          <h1 className="pmc-page-title">
+            {filterProduct ? `Batches · ${filterProduct.name}` : 'Batches'}
+          </h1>
+          <p className="text-sm text-muted mt-1">
+            {filterProduct
+              ? `All batches for this product (${batches.length}).`
+              : 'BOM per batch size with frozen unit prices.'}
+          </p>
         </div>
         <button type="button" onClick={() => { setShowAdd(true); if (preProduct) loadBomFromProduct(preProduct, batchSize) }} className="btn btn-pmc">
           <Plus size={14} /> Add batch
@@ -91,7 +112,7 @@ function BatchesContent() {
               <th>Status</th>
               <th>Product</th>
               <th>Batch size</th>
-              <th>Unit price</th>
+              <th>Unit price / product</th>
             </tr>
           </thead>
           <tbody>
@@ -169,6 +190,27 @@ function BatchesContent() {
               </div>
             </div>
             <p className="text-xs text-muted">Edit lines below — prices are snapshotted and won&apos;t change when procurement prices update.</p>
+            {lines.length > 0 && (
+              <p className="text-sm">
+                Total:{' '}
+                <strong>
+                  ₹
+                  {batchTotalCost(
+                    lines.map((l) => ({ qty: l.qty, unit_price: l.unit_price })),
+                    Number(batchSize) || 1
+                  ).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </strong>
+                {' · '}
+                Per product:{' '}
+                <strong>
+                  ₹
+                  {batchUnitPrice(
+                    lines.map((l) => ({ qty: l.qty, unit_price: l.unit_price })),
+                    Number(batchSize) || 1
+                  ).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </strong>
+              </p>
+            )}
             <div className="max-h-56 overflow-y-auto space-y-2">
               {lines.map((l, idx) => (
                 <div key={idx} className="grid grid-cols-12 gap-2 text-sm items-center border border-border rounded p-2">

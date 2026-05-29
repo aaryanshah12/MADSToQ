@@ -32,6 +32,12 @@ const handlers: Record<string, RpcHandler> = {
       p.productId as string,
       p.materials as Parameters<typeof pmc.setProductMaterialsDb>[2]
     ),
+  saveProductWithMaterialsDb: (p) =>
+    pmc.saveProductWithMaterialsDb(
+      p.factory_id as string,
+      p.product as Parameters<typeof pmc.saveProductWithMaterialsDb>[1],
+      p.materials as Parameters<typeof pmc.saveProductWithMaterialsDb>[2]
+    ),
   createReferenceDb: (p) => {
     const input = p.input as { prices: { raw_material_id: string; price: number }[]; notes?: string }
     return pmc.createReferenceDb(input.prices, input.notes)

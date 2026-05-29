@@ -12,11 +12,20 @@ export function productUnitPriceFromRecipe(
   return sumLineCosts(lines)
 }
 
-/** Batch unit price: recipe qty × batch_size × frozen unit prices. */
-export function batchUnitPrice(
+/** Total batch cost: Σ (recipe qty × batch size × frozen unit price). */
+export function batchTotalCost(
   lines: { qty: number; unit_price: number }[],
   batchSize: number
 ): number {
   const size = batchSize > 0 ? batchSize : 1
   return sumLineCosts(lines.map((l) => ({ qty: l.qty * size, unit_price: l.unit_price })))
+}
+
+/** Per-unit product price for the batch: total cost ÷ batch size. */
+export function batchUnitPrice(
+  lines: { qty: number; unit_price: number }[],
+  batchSize: number
+): number {
+  const size = batchSize > 0 ? batchSize : 1
+  return batchTotalCost(lines, size) / size
 }

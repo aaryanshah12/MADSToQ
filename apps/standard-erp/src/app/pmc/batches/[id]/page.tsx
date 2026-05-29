@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
+import { batchTotalCost } from '@madstoq/pmc-system/lib/bom-pricing'
 import type { PMCBatchStatus } from '@madstoq/pmc-system/types'
 
 export default function PMCBatchDetailPage() {
@@ -44,6 +45,11 @@ export default function PMCBatchDetailPage() {
 
   async function save() {
     if (!editLines || !batch) return
+    if (batch.status === 'completed') {
+      alert('Completed batches cannot be edited.')
+      setEditLines(null)
+      return
+    }
     setSaving(true)
     try {
       await pmcApi.updateBatch(id, {
@@ -80,6 +86,12 @@ export default function PMCBatchDetailPage() {
   }
 
   const displayLines = editLines ?? lines
+  const bomLocked = batch.status === 'completed'
+  const sizeForTotals = Number(editLines ? batchSize : batch.batch_size) || 1
+  const totalBatchCost = batchTotalCost(
+    displayLines.map((l) => ({ qty: l.qty, unit_price: l.unit_price })),
+    sizeForTotals
+  )
 
   return (
     <div className="pmc-page space-y-6">
@@ -91,7 +103,21 @@ export default function PMCBatchDetailPage() {
         <div>
           <h1 className="pmc-page-title font-mono">{batch.batch_code}</h1>
           <p className="text-sm text-muted">{product?.name} ({product?.code})</p>
-          <p className="text-sm mt-2">Unit price: <strong>₹{batch.unit_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong></p>
+          <p className="text-sm mt-1">
+            Total batch cost:{' '}
+            <strong>₹{totalBatchCost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+            <span className="text-muted"> · Batch size {sizeForTotals}</span>
+          </p>
+          <p className="text-sm mt-1">
+            Unit price (per product):{' '}
+            <strong>
+              ₹
+              {(editLines
+                ? totalBatchCost / sizeForTotals
+                : batch.unit_price
+              ).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+            </strong>
+          </p>
         </div>
         <button type="button" onClick={remove} className="btn btn-ghost text-red-400"><Trash2 size={14} /> Delete</button>
       </div>
@@ -123,18 +149,25 @@ export default function PMCBatchDetailPage() {
               className="input pmc-focus block mt-1 w-32"
             />
           </div>
+          {bomLocked && (
+            <p className="text-xs text-muted w-full sm:w-auto">
+              BOM is locked — this batch is completed.
+            </p>
+          )}
           {!editLines ? (
-            <button
-              type="button"
-              className="btn btn-pmc"
-              onClick={() => {
-                setEditLines([...lines])
-                setBatchSize(String(batch.batch_size))
-                setStatus(batch.status)
-              }}
-            >
-              Edit BOM
-            </button>
+            !bomLocked && (
+              <button
+                type="button"
+                className="btn btn-pmc"
+                onClick={() => {
+                  setEditLines([...lines])
+                  setBatchSize(String(batch.batch_size))
+                  setStatus(batch.status)
+                }}
+              >
+                Edit BOM
+              </button>
+            )
           ) : (
             <>
               <button type="button" className="btn btn-ghost" onClick={() => setEditLines(null)}>Cancel</button>

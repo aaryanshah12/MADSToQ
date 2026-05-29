@@ -50,17 +50,6 @@ export function migrateStore(store: PMCStore): PMCStore {
     is_primary: Boolean(m.is_primary),
   }))
 
-  const byProduct = new Map<string, typeof store.product_materials>()
-  for (const m of store.product_materials) {
-    const list = byProduct.get(m.product_id) ?? []
-    list.push(m)
-    byProduct.set(m.product_id, list)
-  }
-  byProduct.forEach((rows) => {
-    if (rows.some((r) => r.is_primary)) return
-    if (rows.length > 0) rows[0].is_primary = true
-  })
-
   const needsRefMigrate = store.references.some(
     (r) => !/^REF-\d{3}$/.test(r.ref_number)
   )

@@ -8,7 +8,7 @@ import type { PMCRawMaterial } from '@madstoq/pmc-system/types'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
 
-type BomRow = { raw_material_id: string; qty: string; is_primary: boolean }
+type BomRow = { raw_material_id: string; qty: string }
 
 export default function PMCProductsPanel() {
   const { refresh } = usePMC()
@@ -16,7 +16,7 @@ export default function PMCProductsPanel() {
   const [showAdd, setShowAdd] = useState(false)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [bomRows, setBomRows] = useState<BomRow[]>([{ raw_material_id: '', qty: '1', is_primary: true }])
+  const [bomRows, setBomRows] = useState<BomRow[]>([{ raw_material_id: '', qty: '1' }])
   const [saving, setSaving] = useState(false)
 
   const products = useMemo(() => {
@@ -37,26 +37,19 @@ export default function PMCProductsPanel() {
       alert('Add at least one procurement line to the BOM.')
       return
     }
-    const primaryCount = valid.filter((r) => r.is_primary).length
-    if (primaryCount !== 1) {
-      alert('Mark exactly one line as primary.')
-      return
-    }
     setSaving(true)
     try {
-      const p = await pmcApi.upsertProduct({ name, code })
-      await pmcApi.setProductMaterials(
-        p.id,
+      await pmcApi.saveProductWithMaterials(
+        { name, code },
         valid.map((r) => ({
           raw_material_id: r.raw_material_id,
           qty: Number(r.qty),
-          is_primary: r.is_primary,
         }))
       )
       setShowAdd(false)
       setCode('')
       setName('')
-      setBomRows([{ raw_material_id: '', qty: '1', is_primary: true }])
+      setBomRows([{ raw_material_id: '', qty: '1' }])
       refresh()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not save product.')
@@ -76,11 +69,7 @@ export default function PMCProductsPanel() {
   }
 
   function addBomRow() {
-    setBomRows((rows) => [...rows, { raw_material_id: '', qty: '1', is_primary: false }])
-  }
-
-  function setPrimary(idx: number) {
-    setBomRows((rows) => rows.map((r, i) => ({ ...r, is_primary: i === idx })))
+    setBomRows((rows) => [...rows, { raw_material_id: '', qty: '1' }])
   }
 
   return (
@@ -187,10 +176,6 @@ export default function PMCProductsPanel() {
                       className="input w-24 pmc-focus text-sm"
                       required
                     />
-                    <label className="flex items-center gap-1 text-xs whitespace-nowrap">
-                      <input type="radio" name="primary" checked={row.is_primary} onChange={() => setPrimary(idx)} />
-                      Primary
-                    </label>
                   </div>
                 ))}
               </div>

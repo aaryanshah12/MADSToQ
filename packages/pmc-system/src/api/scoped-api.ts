@@ -1,6 +1,6 @@
 import { getPmcCache } from '../lib/cache'
 import { calculateProductPricing } from '../lib/pricing'
-import { batchUnitPrice, productUnitPriceFromRecipe } from '../lib/bom-pricing'
+import { productUnitPriceFromRecipe } from '../lib/bom-pricing'
 import {
   createBatchDb,
   createReferenceDb,
@@ -9,6 +9,7 @@ import {
   deleteBatchDb,
   deleteReferenceDb,
   reloadPmcCache,
+  saveProductWithMaterialsDb,
   setProductMaterialsDb,
   updateBatchDb,
   updateProcurementPriceDb,
@@ -254,17 +255,28 @@ export function createPmcApi(factoryId: string) {
       return { batchA, batchB, rows }
     },
 
+    async saveProductWithMaterials(
+      product: { id?: string; name: string; code?: string },
+      materials: { raw_material_id: string; qty: number }[]
+    ): Promise<PMCProduct> {
+      assertFactory()
+      const valid = materials.filter((r) => r.raw_material_id && r.qty > 0)
+      const id = await saveProductWithMaterialsDb(factoryId, product, valid)
+      await reloadPmcCache()
+      return api.getProduct(id)!
+    },
+
     async setProductMaterials(
       productId: string,
-      rows: { raw_material_id: string; qty: number; is_primary: boolean }[]
+      rows: { raw_material_id: string; qty: number }[]
     ): Promise<void> {
       assertFactory()
       const valid = rows.filter((r) => r.raw_material_id && r.qty > 0)
-      const primaryCount = valid.filter((r) => r.is_primary).length
-      if (valid.length > 0 && primaryCount !== 1) {
-        throw new Error('Select exactly one primary raw material (Yes).')
-      }
-      await setProductMaterialsDb(factoryId, productId, valid)
+      await setProductMaterialsDb(
+        factoryId,
+        productId,
+        valid.map((r) => ({ ...r, is_primary: false }))
+      )
       await reloadPmcCache()
     },
 

@@ -251,5 +251,6 @@ grant execute on function public.can_access_pmc_factory(uuid) to authenticated;
 
 -- App pricing notes:
 -- Product template unit_price = SUM(recipe_qty × current procurement price)
--- Batch unit_price = SUM(recipe_qty × batch_size × frozen line unit_price)
+-- Batch unit_price = total batch cost ÷ batch_size
+--   (total = SUM(recipe_qty × batch_size × frozen line unit_price))
 -- Updating procurement price does NOT change existing batch lines.

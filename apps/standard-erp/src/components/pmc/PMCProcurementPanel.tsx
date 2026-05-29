@@ -90,15 +90,25 @@ export default function PMCProcurementPanel() {
     }
   }
 
-  async function saveInlinePrice(id: string) {
+  function startPriceEdit(m: PMCRawMaterial) {
+    setEditingPriceId(m.id)
+    setPriceDraft(String(m.price))
+  }
+
+  async function commitInlinePrice(id: string) {
     const price = Number(priceDraft)
-    if (Number.isNaN(price)) return
+    if (Number.isNaN(price) || price < 0) {
+      setEditingPriceId(null)
+      return
+    }
+    setEditingPriceId(null)
     try {
       await pmcApi.updateProcurementPrice(id, price)
-      setEditingPriceId(null)
       refresh()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not update price.')
+      setEditingPriceId(id)
+      setPriceDraft(String(price))
     }
   }
 
@@ -177,30 +187,36 @@ export default function PMCProcurementPanel() {
                 <tr key={m.id}>
                   <td className="font-mono text-xs">{m.code}</td>
                   <td className="font-medium">{m.name}</td>
-                  <td
-                    className="cursor-pointer"
-                    title="Double-click to edit price"
-                    onDoubleClick={() => {
-                      setEditingPriceId(m.id)
-                      setPriceDraft(String(m.price))
-                    }}
-                  >
+                  <td>
                     {editingPriceId === m.id ? (
                       <input
                         autoFocus
                         type="number"
                         step="0.01"
-                        className="input w-24 py-1 text-sm pmc-focus"
+                        min="0"
+                        className="input w-28 py-1 text-sm pmc-focus"
                         value={priceDraft}
                         onChange={(e) => setPriceDraft(e.target.value)}
-                        onBlur={() => saveInlinePrice(m.id)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveInlinePrice(m.id)
-                          if (e.key === 'Escape') setEditingPriceId(null)
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void commitInlinePrice(m.id)
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            setEditingPriceId(null)
+                          }
                         }}
                       />
                     ) : (
-                      <span>₹{m.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                      <button
+                        type="button"
+                        onClick={() => startPriceEdit(m)}
+                        className="text-left font-mono tabular-nums text-pmc hover:underline cursor-pointer"
+                        title="Click to edit price"
+                      >
+                        ₹{m.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </button>
                     )}
                   </td>
                   <td className="capitalize text-xs">{m.item_type}</td>

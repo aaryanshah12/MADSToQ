@@ -12,6 +12,7 @@
     "./rpc": "./src/api/rpc.ts",
     "./lib/cache": "./src/lib/cache.ts",
     "./lib/pricing": "./src/lib/pricing.ts",
+    "./lib/bom-pricing": "./src/lib/bom-pricing.ts",
     "./lib/seed": "./src/lib/seed.ts",
     "./lib/exportSheet": "./src/lib/exportSheet.ts"
   },

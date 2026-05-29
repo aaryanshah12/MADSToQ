@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
   <rect width="1280" height="720" fill="#0f1419"/>
   <rect width="256" height="720" fill="#151b24"/>
-  <text x="24" y="48" fill="#a78bfa" font-family="Inter,sans-serif" font-size="18" font-weight="700">PMC Portal</text>
-  <text x="24" y="180" fill="#a78bfa" font-family="Inter,sans-serif" font-size="13" font-weight="600">Products</text>
+  <text x="24" y="48" fill="#00c2ff" font-family="Inter,sans-serif" font-size="18" font-weight="700">PMC Portal</text>
+  <text x="24" y="180" fill="#00c2ff" font-family="Inter,sans-serif" font-size="13" font-weight="600">Products</text>
   <text x="300" y="56" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="28" font-weight="700">Products — RMC sheet</text>
   <rect x="300" y="90" width="880" height="520" rx="12" fill="#1e293b" stroke="#334155"/>
   <text x="320" y="130" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">Reference: REF-2026-0042</text>
   <text x="320" y="180" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="16" font-weight="600">Finished Product X</text>
   <text x="320" y="220" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">Overhead · Yield · Tons/Kg</text>
-  <text x="320" y="280" fill="#a78bfa" font-family="Inter,sans-serif" font-size="36" font-weight="700">Final RMC: ₹ 1,248.60</text>
+  <text x="320" y="280" fill="#00c2ff" font-family="Inter,sans-serif" font-size="36" font-weight="700">Final RMC: ₹ 1,248.60</text>
 </svg>

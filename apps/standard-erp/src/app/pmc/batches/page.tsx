@@ -14,8 +14,8 @@ import { matchesPmcSearch } from '@/lib/pmc-search'
 
 function BatchesContent() {
   const router = useRouter()
-  const search = useSearchParams()
-  const preProduct = search.get('product') ?? ''
+  const searchParams = useSearchParams()
+  const preProduct = searchParams.get('product') ?? ''
   const { refresh } = usePMC()
   const { api: pmcApi, tick } = usePMCData()
   const [showAdd, setShowAdd] = useState(false)

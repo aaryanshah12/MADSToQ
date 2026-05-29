@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import NotificationBell from '@/components/sales/NotificationBell'
+import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
 
 const BASE = '/personal/sales'
 
@@ -118,6 +119,7 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
       </nav>
 
       <div className="px-4 py-4 border-t border-border space-y-1">
+        <PortalWhatsAppHelp portalName="Personal Sales Portal" />
         <a
           href="/personal/sales/manual"
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"

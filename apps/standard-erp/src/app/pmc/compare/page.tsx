@@ -33,10 +33,14 @@ export default function PMCComparePage() {
     return comparison.rows.filter((row) =>
       matchesPmcSearch(rowSearch, [
         row.key,
-        row.a?.item_code,
         row.a?.item_name,
-        row.b?.item_code,
+        row.a?.item_type,
+        row.a?.qty,
+        row.a?.unit_price,
         row.b?.item_name,
+        row.b?.item_type,
+        row.b?.qty,
+        row.b?.unit_price,
       ])
     )
   }, [comparison, rowSearch])

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
+import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
 import clsx from 'clsx'
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpToLine,
@@ -211,6 +212,7 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="px-4 py-4 border-t border-border space-y-1">
+        <PortalWhatsAppHelp portalName="Inward-Outward Portal" />
         <a
           href="/inward-outward/manual"
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"

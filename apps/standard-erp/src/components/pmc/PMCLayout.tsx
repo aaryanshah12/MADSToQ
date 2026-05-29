@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { usePMC } from '@/contexts/PMCContext'
 import { usePMCFactory } from '@/contexts/PMCFactoryContext'
+import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
 
 const BASE = '/pmc'
 const THEME_KEY = 'theme'
@@ -222,6 +223,7 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="px-4 py-4 border-t border-border shrink-0 space-y-1">
+        <PortalWhatsAppHelp portalName="PMC Portal" />
         <a
           href="/pmc/manual"
           className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all min-h-[44px]"

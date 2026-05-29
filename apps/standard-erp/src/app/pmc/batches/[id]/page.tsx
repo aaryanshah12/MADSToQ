@@ -6,8 +6,22 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, Plus, Trash2, X } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import { batchTotalCost } from '@madstoq/pmc-system/lib/bom-pricing'
-import type { PMCRawMaterial } from '@madstoq/pmc-system/types'
-import type { PMCBatchStatus } from '@madstoq/pmc-system/types'
+import type { PMCBatchLine, PMCRawMaterial, PMCBatchStatus } from '@madstoq/pmc-system/types'
+
+function newEmptyBatchLine(batchId: string, sortOrder: number): PMCBatchLine {
+  return {
+    id: `temp-${Date.now()}-${sortOrder}`,
+    batch_id: batchId,
+    raw_material_id: null,
+    item_code: '',
+    item_name: '',
+    item_type: 'material',
+    qty: 1,
+    unit_price: 0,
+    is_primary: false,
+    sort_order: sortOrder,
+  }
+}
 
 export default function PMCBatchDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -36,7 +50,7 @@ export default function PMCBatchDetailPage() {
     return pmcApi.listRawMaterials().filter((m) => m.is_active)
   }, [tick, pmcApi])
 
-  const [editLines, setEditLines] = useState<typeof lines | null>(null)
+  const [editLines, setEditLines] = useState<PMCBatchLine[] | null>(null)
   const [batchSize, setBatchSize] = useState('')
   const [status, setStatus] = useState<PMCBatchStatus>('draft')
 
@@ -189,16 +203,7 @@ export default function PMCBatchDetailPage() {
                 onClick={() => {
                   setEditLines((rows) => [
                     ...(rows ?? []),
-                    {
-                      id: `temp-${Date.now()}`,
-                      raw_material_id: '',
-                      item_code: '',
-                      item_name: '',
-                      item_type: 'material',
-                      qty: 1,
-                      unit_price: 0,
-                      is_primary: false,
-                    },
+                    newEmptyBatchLine(id, (rows ?? []).length),
                   ])
                 }}
               >

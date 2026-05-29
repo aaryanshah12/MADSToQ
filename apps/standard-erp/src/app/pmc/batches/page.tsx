@@ -112,12 +112,13 @@ function BatchesContent() {
               <th>Status</th>
               <th>Product</th>
               <th>Batch size</th>
-              <th>Unit price / product</th>
+              <th>Unit price</th>
+              <th>Total cost</th>
             </tr>
           </thead>
           <tbody>
             {batches.length === 0 ? (
-              <tr><td colSpan={5} className="py-10 text-center text-muted text-sm">No batches yet.</td></tr>
+              <tr><td colSpan={6} className="py-10 text-center text-muted text-sm">No batches yet.</td></tr>
             ) : (
               batches.map((b) => (
                 <tr key={b.id} className="cursor-pointer hover:bg-layer-sm" onClick={() => router.push(`/pmc/batches/${b.id}`)}>
@@ -126,6 +127,12 @@ function BatchesContent() {
                   <td className="text-sm">{productName(b.product_id)}</td>
                   <td>{b.batch_size}</td>
                   <td>₹{b.unit_price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                  <td className="text-muted">
+                    ₹
+                    {(b.unit_price * (b.batch_size > 0 ? b.batch_size : 1)).toLocaleString('en-IN', {
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
                 </tr>
               ))
             )}

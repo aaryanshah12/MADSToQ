@@ -29,3 +29,25 @@ export function batchUnitPrice(
   const size = batchSize > 0 ? batchSize : 1
   return batchTotalCost(lines, size) / size
 }
+
+/** Recompute unit_price from frozen lines (fixes legacy rows that stored total cost). */
+export function normalizeBatchesUnitPrices<
+  B extends { id: string; batch_size: number; unit_price: number },
+  L extends { batch_id: string; qty: number; unit_price: number },
+>(batches: B[], batchLines: L[]): B[] {
+  const linesByBatch = new Map<string, L[]>()
+  for (const line of batchLines) {
+    const list = linesByBatch.get(line.batch_id) ?? []
+    list.push(line)
+    linesByBatch.set(line.batch_id, list)
+  }
+  return batches.map((batch) => {
+    const lines = linesByBatch.get(batch.id)
+    if (!lines?.length) return batch
+    const unit = batchUnitPrice(
+      lines.map((l) => ({ qty: l.qty, unit_price: l.unit_price })),
+      batch.batch_size
+    )
+    return { ...batch, unit_price: unit }
+  })
+}

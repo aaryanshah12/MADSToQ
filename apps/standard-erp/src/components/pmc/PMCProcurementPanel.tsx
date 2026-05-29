@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import type { PMCRawMaterial, PMCItemType } from '@madstoq/pmc-system/types'
@@ -26,6 +26,14 @@ export default function PMCProcurementPanel() {
   const [saving, setSaving] = useState(false)
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [priceDraft, setPriceDraft] = useState('')
+  const editingPriceIdRef = useRef<string | null>(null)
+  const priceEditOriginalRef = useRef(0)
+  const committingPriceRef = useRef(false)
+  const skipNextPriceBlurRef = useRef(false)
+
+  useEffect(() => {
+    editingPriceIdRef.current = editingPriceId
+  }, [editingPriceId])
 
   const items = useMemo(() => {
     void tick
@@ -91,24 +99,54 @@ export default function PMCProcurementPanel() {
   }
 
   function startPriceEdit(m: PMCRawMaterial) {
+    priceEditOriginalRef.current = m.price
     setEditingPriceId(m.id)
     setPriceDraft(String(m.price))
   }
 
-  async function commitInlinePrice(id: string) {
-    const price = Number(priceDraft)
-    if (Number.isNaN(price) || price < 0) {
-      setEditingPriceId(null)
-      return
-    }
+  function cancelPriceEdit() {
+    skipNextPriceBlurRef.current = true
     setEditingPriceId(null)
+    setPriceDraft('')
+  }
+
+  function handlePriceBlur(itemId: string, originalPrice: number, draft: string) {
+    window.setTimeout(() => {
+      if (skipNextPriceBlurRef.current) {
+        skipNextPriceBlurRef.current = false
+        return
+      }
+      void commitInlinePrice(itemId, originalPrice, draft)
+    }, 0)
+  }
+
+  async function commitInlinePrice(id: string, originalPrice: number, draftValue?: string) {
+    if (committingPriceRef.current) return
+
+    const draft = draftValue ?? priceDraft
+    const price = Number(draft)
+    const stillEditing = editingPriceIdRef.current === id
+
+    if (stillEditing) {
+      setEditingPriceId(null)
+      setPriceDraft('')
+    }
+
+    if (Number.isNaN(price) || price < 0) return
+    if (price === originalPrice) return
+
+    committingPriceRef.current = true
     try {
       await pmcApi.updateProcurementPrice(id, price)
       refresh()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not update price.')
-      setEditingPriceId(id)
-      setPriceDraft(String(price))
+      if (stillEditing) {
+        setEditingPriceId(id)
+        setPriceDraft(draft)
+      }
+    } finally {
+      committingPriceRef.current = false
     }
   }
 
@@ -197,20 +235,23 @@ export default function PMCProcurementPanel() {
                         className="input w-28 py-1 text-sm pmc-focus"
                         value={priceDraft}
                         onChange={(e) => setPriceDraft(e.target.value)}
+                        onBlur={(e) => handlePriceBlur(m.id, priceEditOriginalRef.current, e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            void commitInlinePrice(m.id)
+                            skipNextPriceBlurRef.current = true
+                            void commitInlinePrice(m.id, priceEditOriginalRef.current)
                           }
                           if (e.key === 'Escape') {
                             e.preventDefault()
-                            setEditingPriceId(null)
+                            cancelPriceEdit()
                           }
                         }}
                       />
                     ) : (
                       <button
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => startPriceEdit(m)}
                         className="text-left font-mono tabular-nums text-pmc hover:underline cursor-pointer"
                         title="Click to edit price"

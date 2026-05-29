@@ -2,7 +2,11 @@ import { existsSync } from 'fs'
 import { access, mkdir, readFile, writeFile } from 'fs/promises'
 import path from 'path'
 import { getServerDb } from '@madstoq/database'
-import { batchUnitPrice, productUnitPriceFromRecipe } from '../lib/bom-pricing'
+import {
+  batchUnitPrice,
+  normalizeBatchesUnitPrices,
+  productUnitPriceFromRecipe,
+} from '../lib/bom-pricing'
 import { setPmcCache } from '../lib/cache'
 import { migrateStore, STORAGE_KEY } from '../lib/storage'
 import type {
@@ -232,6 +236,7 @@ export async function fetchFullStore(): Promise<PMCStore> {
     if (!lineRes.error) {
       batchLines = (lineRes.data ?? []).map((r) => rowToBatchLine(r as Record<string, unknown>))
     }
+    batches = normalizeBatchesUnitPrices(batches, batchLines)
   }
 
   return migrateStore({

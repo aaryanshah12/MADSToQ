@@ -8,7 +8,9 @@ import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import type { PmcApi } from '@madstoq/pmc-system/api'
 import { batchTotalCost, batchUnitPrice } from '@madstoq/pmc-system/lib/bom-pricing'
 import type { PMCBatchStatus } from '@madstoq/pmc-system/types'
+import { PmcListSearch } from '@/components/pmc/PmcListSearch'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
+import { matchesPmcSearch } from '@/lib/pmc-search'
 
 function BatchesContent() {
   const router = useRouter()
@@ -22,6 +24,7 @@ function BatchesContent() {
   const [status, setStatus] = useState<PMCBatchStatus>('draft')
   const [lines, setLines] = useState<ReturnType<PmcApi['buildBatchLinesFromProduct']>>([])
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
 
   const products = useMemo(() => {
     void tick
@@ -43,6 +46,23 @@ function BatchesContent() {
     const p = products.find((x) => x.id === pid)
     return p ? `${p.code ? `${p.code} — ` : ''}${p.name}` : '—'
   }
+
+  const filteredBatches = useMemo(() => {
+    return batches.filter((b) => {
+      const p = products.find((x) => x.id === b.product_id)
+      const totalCost = b.unit_price * (b.batch_size > 0 ? b.batch_size : 1)
+      return matchesPmcSearch(search, [
+        b.batch_code,
+        b.status,
+        p?.code,
+        p?.name,
+        productName(b.product_id),
+        b.batch_size,
+        b.unit_price,
+        totalCost,
+      ])
+    })
+  }, [batches, products, search])
 
   function loadBomFromProduct(pid: string, size: string) {
     setLines(pmcApi.buildBatchLinesFromProduct(pid, Number(size) || 1))
@@ -99,10 +119,16 @@ function BatchesContent() {
               : 'BOM per batch size with frozen unit prices.'}
           </p>
         </div>
-        <button type="button" onClick={() => { setShowAdd(true); if (preProduct) loadBomFromProduct(preProduct, batchSize) }} className="btn btn-pmc">
+        <button type="button" onClick={() => { setShowAdd(true); if (preProduct) loadBomFromProduct(preProduct, batchSize) }} className="btn btn-pmc shrink-0">
           <Plus size={14} /> Add batch
         </button>
       </div>
+
+      <PmcListSearch
+        value={search}
+        onChange={setSearch}
+        placeholder="Search batch ID, product, status, size, price…"
+      />
 
       <div className="pmc-card overflow-x-auto p-0">
         <table className="data-table w-full">
@@ -117,10 +143,14 @@ function BatchesContent() {
             </tr>
           </thead>
           <tbody>
-            {batches.length === 0 ? (
-              <tr><td colSpan={6} className="py-10 text-center text-muted text-sm">No batches yet.</td></tr>
+            {filteredBatches.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-10 text-center text-muted text-sm">
+                  {batches.length === 0 ? 'No batches yet.' : 'No batches match your search.'}
+                </td>
+              </tr>
             ) : (
-              batches.map((b) => (
+              filteredBatches.map((b) => (
                 <tr key={b.id} className="cursor-pointer hover:bg-layer-sm" onClick={() => router.push(`/pmc/batches/${b.id}`)}>
                   <td className="font-mono text-pmc">{b.batch_code}</td>
                   <td className="capitalize text-sm">{b.status}</td>

@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePMCData } from '@/contexts/PMCContext'
+import { PmcListSearch } from '@/components/pmc/PmcListSearch'
+import { matchesPmcSearch } from '@/lib/pmc-search'
 
 export default function PMCComparePage() {
   const { api: pmcApi, tick } = usePMCData()
@@ -9,6 +11,7 @@ export default function PMCComparePage() {
   const [productId, setProductId] = useState('')
   const [batchA, setBatchA] = useState('')
   const [batchB, setBatchB] = useState('')
+  const [rowSearch, setRowSearch] = useState('')
 
   const products = useMemo(() => pmcApi.listProducts(), [tick])
   const batchesForProduct = useMemo(
@@ -19,7 +22,24 @@ export default function PMCComparePage() {
   const comparison = useMemo(() => {
     if (!batchA || !batchB || batchA === batchB) return null
     return pmcApi.compareBatches(batchA, batchB)
-  }, [batchA, batchB, tick])
+  }, [batchA, batchB, tick, pmcApi])
+
+  useEffect(() => {
+    setRowSearch('')
+  }, [batchA, batchB])
+
+  const filteredRows = useMemo(() => {
+    if (!comparison) return []
+    return comparison.rows.filter((row) =>
+      matchesPmcSearch(rowSearch, [
+        row.key,
+        row.a?.item_code,
+        row.a?.item_name,
+        row.b?.item_code,
+        row.b?.item_name,
+      ])
+    )
+  }, [comparison, rowSearch])
 
   return (
     <div className="pmc-page space-y-6">
@@ -83,6 +103,13 @@ export default function PMCComparePage() {
             </div>
           </div>
 
+          <PmcListSearch
+            value={rowSearch}
+            onChange={setRowSearch}
+            placeholder="Search line items…"
+            className="mb-0"
+          />
+
           <div className="pmc-card overflow-x-auto p-0">
             <table className="data-table w-full text-sm">
               <thead>
@@ -100,7 +127,16 @@ export default function PMCComparePage() {
                 </tr>
               </thead>
               <tbody>
-                {comparison.rows.map((row) => {
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-sm text-muted">
+                      {comparison.rows.length === 0
+                        ? 'No line items to compare.'
+                        : 'No line items match your search.'}
+                    </td>
+                  </tr>
+                ) : (
+                filteredRows.map((row) => {
                   const totalA = row.a?.line_total ?? 0
                   const totalB = row.b?.line_total ?? 0
                   const delta = totalB - totalA
@@ -118,7 +154,8 @@ export default function PMCComparePage() {
                       </td>
                     </tr>
                   )
-                })}
+                })
+                )}
               </tbody>
             </table>
           </div>

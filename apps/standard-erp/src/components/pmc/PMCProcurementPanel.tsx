@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import type { PMCRawMaterial, PMCItemType } from '@madstoq/pmc-system/types'
+import { PmcListSearch } from '@/components/pmc/PmcListSearch'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
+import { matchesPmcSearch } from '@/lib/pmc-search'
 
 const emptyForm = () => ({
   code: '',
@@ -26,6 +28,7 @@ export default function PMCProcurementPanel() {
   const [saving, setSaving] = useState(false)
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [priceDraft, setPriceDraft] = useState('')
+  const [search, setSearch] = useState('')
   const editingPriceIdRef = useRef<string | null>(null)
   const priceEditOriginalRef = useRef(0)
   const committingPriceRef = useRef(false)
@@ -38,7 +41,22 @@ export default function PMCProcurementPanel() {
   const items = useMemo(() => {
     void tick
     return pmcApi.listAllRawMaterials().filter((m) => m.is_active)
-  }, [tick])
+  }, [tick, pmcApi])
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter((m) =>
+        matchesPmcSearch(search, [
+          m.code,
+          m.name,
+          m.item_type,
+          m.vendor,
+          m.description,
+          m.price,
+        ])
+      ),
+    [items, search]
+  )
 
   async function saveNew(e: React.FormEvent) {
     e.preventDefault()
@@ -199,8 +217,13 @@ export default function PMCProcurementPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setShowAdd(true)} className="btn btn-pmc">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <PmcListSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search code, name, vendor, type…"
+        />
+        <button type="button" onClick={() => setShowAdd(true)} className="btn btn-pmc shrink-0 self-end sm:self-auto">
           <Plus size={14} /> Add
         </button>
       </div>
@@ -218,10 +241,14 @@ export default function PMCProcurementPanel() {
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
-              <tr><td colSpan={6} className="py-10 text-center text-sm text-muted">No procurement items yet.</td></tr>
+            {filteredItems.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-10 text-center text-sm text-muted">
+                  {items.length === 0 ? 'No procurement items yet.' : 'No items match your search.'}
+                </td>
+              </tr>
             ) : (
-              items.map((m) => (
+              filteredItems.map((m) => (
                 <tr key={m.id}>
                   <td className="font-mono text-xs">{m.code}</td>
                   <td className="font-medium">{m.name}</td>

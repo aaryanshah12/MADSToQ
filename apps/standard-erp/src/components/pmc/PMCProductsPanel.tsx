@@ -5,8 +5,10 @@ import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
 import type { PMCRawMaterial } from '@madstoq/pmc-system/types'
+import { PmcListSearch } from '@/components/pmc/PmcListSearch'
 import { PmcRowActions } from '@/components/pmc/PmcRowActions'
 import { PmcSimpleModal } from '@/components/pmc/PmcSimpleModal'
+import { matchesPmcSearch } from '@/lib/pmc-search'
 
 type BomRow = { raw_material_id: string; qty: string }
 
@@ -18,11 +20,21 @@ export default function PMCProductsPanel() {
   const [name, setName] = useState('')
   const [bomRows, setBomRows] = useState<BomRow[]>([{ raw_material_id: '', qty: '1' }])
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
 
   const products = useMemo(() => {
     void tick
     return pmcApi.listProducts()
-  }, [tick])
+  }, [tick, pmcApi])
+
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((p) => {
+        const unitPrice = p.unit_price ?? pmcApi.templateUnitPrice(p.id)
+        return matchesPmcSearch(search, [p.code, p.name, unitPrice, pmcApi.countProductMaterials(p.id)])
+      }),
+    [products, search, pmcApi]
+  )
 
   const procurement = useMemo(() => {
     void tick
@@ -74,8 +86,13 @@ export default function PMCProductsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setShowAdd(true)} className="btn btn-pmc">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <PmcListSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search code, name, unit price…"
+        />
+        <button type="button" onClick={() => setShowAdd(true)} className="btn btn-pmc shrink-0 self-end sm:self-auto">
           <Plus size={14} /> Add
         </button>
       </div>
@@ -92,10 +109,14 @@ export default function PMCProductsPanel() {
             </tr>
           </thead>
           <tbody>
-            {products.length === 0 ? (
-              <tr><td colSpan={5} className="py-10 text-center text-sm text-muted">No products yet.</td></tr>
+            {filteredProducts.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-10 text-center text-sm text-muted">
+                  {products.length === 0 ? 'No products yet.' : 'No products match your search.'}
+                </td>
+              </tr>
             ) : (
-              products.map((p) => (
+              filteredProducts.map((p) => (
                 <tr key={p.id}>
                   <td>
                     <Link href={`/pmc/products/${p.id}`} className="font-mono text-sm text-pmc hover:underline">

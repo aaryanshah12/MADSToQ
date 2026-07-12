@@ -1,6 +1,7 @@
 import { getAuthHeaders } from '@madstoq/core'
 import type { IODomestic, IOInternational, IOInward, IOOutward, IOProduct, IOQuotation, IOQuotationItem, IOLineItem } from './types/index'
 import { fmtDate } from './api/client'
+import { buildLetterHeadQuotationPdfBytes } from './pdf-quotation'
 type InvoiceLike = (IODomestic | IOInternational) & { items?: IOLineItem[] }
 type TemplateSlot = 'label' | 'letter-head' | 'customer-print'
 
@@ -184,80 +185,10 @@ function u8ToArrayBuffer(bytes: Uint8Array) {
 }
 
 // --- REWRITTEN QUOTATION FUNCTION ---
-export async function printLetterHeadQuotation(row: IOQuotation, products: IOProduct[]) {
-  const { PDFDocument, StandardFonts } = await getPdfLib()
+export async function printLetterHeadQuotation(row: IOQuotation, products: IOProduct[], options?: { documentTitle?: string }) {
   const ab = await fetchArrayBuffer(await getTemplateUrl('letter-head', row.factory_id))
-  const pdf = await PDFDocument.load(ab)
-  const page = pdf.getPages()[0]
-  const font = await pdf.embedFont(StandardFonts.Helvetica)
-  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold)
-  const { width, height } = page.getSize()
-
-  const marginX = 56
-  const contentW = width - marginX * 2
-  let y = height * 0.78 // Move start position to top
-
+  const bytes = await buildLetterHeadQuotationPdfBytes(row, products, ab, options)
   const qNo = safeText(row.quotation_number)
-  const qDate = fmtDate(row.quotation_date)
-  const customerName = safeText(row.customer?.company_name ?? '')
-  const rightX = marginX + contentW * 0.65
-
-  // 1. TOP RIGHT DATE
-  page.drawText(`Date: ${qDate || '—'}`, { x: rightX, y, size: 10.5, font })
-
-  // 2. GREETING (Respected Mr. [Customer Name])
-  const greeting = `Respected Mr. ${customerName},`
-  page.drawText(greeting, { x: marginX, y, size: 11, font: fontBold })
-  y -= 18
-
-  // 3. HEADER CONTENT (Greetings of the day, etc)
-  const headerText = safeText((row as any).header_content ?? '')
-  if (headerText) {
-    // Filter out redundant manual "Respected Mr" if it exists in data
-    const cleanHeader = headerText.replace(/^Respected Mr,?\s*/i, '').replace(/^Greetings of the Day\s*!!!\s*/i, 'Greetings of the Day !!!\n\n')
-    y = renderTextBlock({ text: cleanHeader, page, x: marginX, y, font, size: 10.5, maxWidth: contentW, lineHeight: 14 })
-  }
-
-  y -= 10
-
-  // 4. QUOTATION TITLE AND NO
-  page.drawText('QUOTATION', { x: marginX, y, size: 14, font: fontBold })
-  page.drawText(`Quotation No: ${qNo || '—'}`, { x: rightX, y, size: 10.5, font: fontBold })
-
-  y -= 25
-
-  // 6. TABLE
-  const tableW = Math.min(520, contentW)
-  const x0 = (width - tableW) / 2
-  const col1 = x0
-  const col2 = x0 + tableW * 0.22
-  const col3 = x0 + tableW * 0.80
-
-  page.drawText('Outward Ref', { x: col1, y, size: 10, font: fontBold })
-  page.drawText('Product', { x: col2, y, size: 10, font: fontBold })
-  page.drawText('Price', { x: col3, y, size: 10, font: fontBold })
-  y -= 16
-
-  const items: IOQuotationItem[] = row.items ?? []
-  for (const it of items) {
-    const ref = safeText(it.reference_no ?? '')
-    const name = safeText(it.product_name_override || productNameById(products, it.product_id || ''))
-    const price = formatINR(it.price)
-    page.drawText(ref || '—', { x: col1, y, size: 10, font })
-    page.drawText(name || '—', { x: col2, y, size: 10, font })
-    page.drawText(price || '—', { x: col3, y, size: 10, font })
-    y -= 14
-    if (y < height * 0.18) break
-  }
-
-  // 7. FOOTER
-  y -= 20
-  const footerText = safeText((row as any).footer_content ?? '')
-  if (footerText && y > height * 0.10) {
-    renderTextBlock({ text: footerText, page, x: marginX, y, font, size: 10, maxWidth: contentW, lineHeight: 13 })
-  }
-
-  const bytes = await pdf.save()
   openPrintBlob(new Blob([u8ToArrayBuffer(bytes)], { type: 'application/pdf' }), `${qNo || 'quotation'}.pdf`)
 }
 

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
 import { fetchQuotations, saveQuotation, deleteQuotation, fetchCompanies, fetchProducts, fetchOutwardByRefNo, searchOutwards, fmtDate, today } from '@madstoq/io-system/api'
 import { getCurrentFiscalYear, getFiscalYears, monthOptions } from '@/lib/monthlyMaterial'
@@ -24,6 +25,10 @@ const DEFAULT_FOOTER = `The above price is for
 * Any other type of packing will cost extra`
 
 export default function QuotationPage() {
+  const pathname = usePathname()
+  const isPurchaseOrder = pathname.includes('/purchase-order')
+  const docLabel = isPurchaseOrder ? 'Purchase Order' : 'Quotation'
+  const accentClass = isPurchaseOrder ? 'owner' : 'inputer'
   const { factoryId, factories } = useIOFactory()
   const [rows, setRows] = useState<IOQuotation[]>([])
   const [companies, setCompanies] = useState<IOCompany[]>([])
@@ -101,14 +106,38 @@ export default function QuotationPage() {
       setRows(next)
       if (doPrint) {
         const full = next.find(r => r.id === saved.id) ?? (editing ?? null)
-        if (full) await printLetterHeadQuotation(full, products)
+        if (full) await printLetterHeadQuotation(full, products, {
+          documentTitle: isPurchaseOrder ? 'PURCHASE ORDER' : 'QUOTATION',
+        })
       }
     } catch (e: any) { alert(e.message) } finally { setSaving(false) }
   }
 
   async function handlePrint(row: IOQuotation) {
     try {
-      await printLetterHeadQuotation(row, products)
+      await printLetterHeadQuotation(row, products, {
+        documentTitle: isPurchaseOrder ? 'PURCHASE ORDER' : 'QUOTATION',
+      })
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function handleSendMail(row: IOQuotation) {
+    if (!row.customer_id) {
+      alert('Select a customer with email and mobile on file.')
+      return
+    }
+    if (!confirm(`Send ${docLabel} ${row.quotation_number} to the customer via email and SMS?`)) return
+    try {
+      const res = await fetch('/api/io/send-purchase-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quotation_id: row.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Send failed')
+      alert(`${docLabel} sent successfully.`)
     } catch (e: any) {
       alert(e.message)
     }
@@ -286,7 +315,7 @@ export default function QuotationPage() {
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div><h1 className="text-xl font-bold text-primary">Quotations</h1><p className="text-sm text-muted mt-0.5">{filtered.length} records</p></div>
+        <div><h1 className="text-xl font-bold text-primary">{isPurchaseOrder ? 'Purchase Orders' : 'Quotations'}</h1><p className="text-sm text-muted mt-0.5">{filtered.length} records</p></div>
         <div className="flex items-center gap-2 flex-wrap">
           <input ref={importRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImportFile}/>
           <button onClick={() => importRef.current?.click()} className="btn btn-ghost"><Upload size={14}/> Import</button>
@@ -356,6 +385,9 @@ export default function QuotationPage() {
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button onClick={() => setViewRow(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="View"><Eye size={14}/></button>
                   <button onClick={() => handlePrint(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="Print"><Printer size={14}/></button>
+                  {isPurchaseOrder && (
+                    <button onClick={() => handleSendMail(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-owner transition-colors" title="Email & SMS to customer"><Mail size={14}/></button>
+                  )}
                   <button onClick={() => openEdit(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-inputer transition-colors"><Pencil size={14}/></button>
                   <button onClick={() => handleDelete(row.id)} className="p-2 rounded hover:bg-layer text-muted hover:text-red-400 transition-colors"><Trash2 size={14}/></button>
                 </div>
@@ -388,6 +420,9 @@ export default function QuotationPage() {
                   <td className="text-right"><div className="flex items-center justify-end gap-1">
                     <button onClick={() => setViewRow(row)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="View"><Eye size={13}/></button>
                     <button onClick={() => handlePrint(row)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="Print"><Printer size={13}/></button>
+                    {isPurchaseOrder && (
+                      <button onClick={() => handleSendMail(row)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-owner transition-colors" title="Email & SMS to customer"><Mail size={13}/></button>
+                    )}
                     <button onClick={() => openEdit(row)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors"><Pencil size={13}/></button>
                     <button onClick={() => handleDelete(row.id)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-red-400 transition-colors"><Trash2 size={13}/></button>
                   </div></td>

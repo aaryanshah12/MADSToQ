@@ -3,46 +3,31 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
 
 const SITE_URL = "https://madstoq.com";
-/** Brand label shown in Google site name (keep short; see WebSite schema). */
-const SITE_NAME = "MADSToQ";
-const SITE_NAME_LONG = "MADSToQ IT Solutions";
-/** Primary SEO title: includes brand + target query terms (keep ~60 chars for snippets). */
+const SITE_NAME = "MADSToQ IT Solutions";
 const SITE_TITLE =
-  "MADSToQ | IT Solutions, SaaS & Business Software";
+  "MADSToQ | IT SaaS & IT Services Provider in Ahmedabad";
 const SITE_DESCRIPTION =
-  "MADSToQ is an IT solutions and SaaS provider: Inventory and Inward-Outward software, custom business software, and cloud platforms for operations, compliance, and traceability.";
+  "MADSToQ IT Solutions — IT SaaS and IT services provider in Ahmedabad, Gujarat. Inventory, Inward-Outward, PMC costing, and custom business software for operations.";
 
 const SEO_KEYWORDS: string[] = [
   "MADSToQ",
   "MADSTOQ",
-  "madstoq",
-  "IT",
-  "information technology",
-  "IT solutions",
-  "Best IT firms",
-  "IT company",
-  "ERP",
-  "POC",
-  "proof of concept",
-  "software development",
-  "website development",
-  "business software",
-  "software",
-  "software solutions",
-  "SaaS",
-  "SaaS provider",
-  "cloud software",
-  "enterprise software",
-  "operations software",
-  "custom software",
+  "IT SaaS provider",
+  "best IT SaaS provider",
+  "IT services provider in Ahmedabad",
+  "SaaS company Ahmedabad",
+  "IT company Gujarat",
   "inventory software",
   "Inward-Outward",
-  "stock management",
-  "traceability",
+  "custom software Ahmedabad",
+  "business software India",
+  "PMC",
+  "RMC",
   "digital transformation",
 ];
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
     default: SITE_TITLE,
@@ -50,9 +35,6 @@ export const metadata: Metadata = {
   },
   description: SITE_DESCRIPTION,
   keywords: SEO_KEYWORDS,
-  alternates: {
-    canonical: SITE_URL,
-  },
   icons: {
     icon: [
       { url: "/favicon.png", type: "image/png", sizes: "48x48" },
@@ -65,14 +47,14 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     siteName: SITE_NAME,
-    locale: "en_US",
+    locale: "en_IN",
     type: "website",
     images: [
       {
         url: `${SITE_URL}/MADSToQ.png`,
-        width: 1200,
-        height: 630,
-        alt: `${SITE_NAME} — IT solutions, SaaS & business software`,
+        width: 680,
+        height: 373,
+        alt: `${SITE_NAME} — IT SaaS & IT services in Ahmedabad`,
       },
     ],
   },
@@ -81,6 +63,11 @@ export const metadata: Metadata = {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     images: [`${SITE_URL}/MADSToQ.png`],
+  },
+  other: {
+    "geo.region": "IN-GJ",
+    "geo.placename": "Ahmedabad",
+    ICBM: "23.0225, 72.5714",
   },
   robots: {
     index: true,
@@ -94,75 +81,71 @@ export const metadata: Metadata = {
   },
 };
 
-const jsonLd = [
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "@id": `${SITE_URL}/#website`,
-    name: SITE_NAME,
-    alternateName: [SITE_NAME_LONG, "MADSTOQ"],
-    description: SITE_DESCRIPTION,
-    url: SITE_URL,
-    inLanguage: "en-US",
-    publisher: { "@id": `${SITE_URL}/#organization` },
-    keywords: SEO_KEYWORDS.join(", "),
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "@id": `${SITE_URL}/#organization`,
-    name: SITE_NAME,
-    alternateName: [SITE_NAME_LONG, "MADSTOQ"],
-    description: SITE_DESCRIPTION,
-    url: SITE_URL,
-    knowsAbout: [
-      "Information technology",
-      "IT solutions",
-      "SaaS",
-      "Business software",
-      "Cloud software",
-      "Inventory management software",
-      "Operations management",
-    ],
-    logo: {
-      "@type": "ImageObject",
-      "@id": `${SITE_URL}/#logo`,
-      url: `${SITE_URL}/favicon-192.png`,
-      contentUrl: `${SITE_URL}/favicon-192.png`,
-      width: 192,
-      height: 192,
-      caption: SITE_NAME,
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: SITE_NAME,
+      alternateName: ["MADSToQ", "MADSTOQ", "madstoq.com"],
+      description: SITE_DESCRIPTION,
+      url: SITE_URL,
+      inLanguage: "en-IN",
+      publisher: { "@id": `${SITE_URL}/#organization` },
     },
-    image: {
-      "@id": `${SITE_URL}/#logo`,
-    },
-    contactPoint: {
-      "@type": "ContactPoint",
-      contactType: "customer service",
+    {
+      "@type": ["Organization", "LocalBusiness", "ProfessionalService"],
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      alternateName: ["MADSToQ", "MADSTOQ", "madstoq.com"],
+      description: SITE_DESCRIPTION,
+      url: SITE_URL,
       email: "inquires@madstoq.com",
-      availableLanguage: ["English"],
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Ahmedabad",
+        addressRegion: "Gujarat",
+        addressCountry: "IN",
+      },
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: 23.0225,
+        longitude: 72.5714,
+      },
+      areaServed: [
+        { "@type": "City", name: "Ahmedabad" },
+        { "@type": "State", name: "Gujarat" },
+        { "@type": "Country", name: "India" },
+      ],
+      knowsAbout: [
+        "IT SaaS",
+        "IT services",
+        "Inventory management software",
+        "Inward-Outward software",
+        "Product costing",
+        "Custom software development",
+      ],
+      logo: {
+        "@type": "ImageObject",
+        "@id": `${SITE_URL}/#logo`,
+        url: `${SITE_URL}/favicon-192.png`,
+        contentUrl: `${SITE_URL}/favicon-192.png`,
+        width: 192,
+        height: 192,
+        caption: SITE_NAME,
+      },
+      image: `${SITE_URL}/MADSToQ.png`,
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer service",
+        email: "inquires@madstoq.com",
+        areaServed: ["Ahmedabad", "Gujarat", "IN"],
+        availableLanguage: ["English", "Hindi", "Gujarati"],
+      },
     },
-    sameAs: [],
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "ProfessionalService",
-    "@id": `${SITE_URL}/#professional-service`,
-    name: `${SITE_NAME_LONG} — IT solutions & SaaS`,
-    description: SITE_DESCRIPTION,
-    url: SITE_URL,
-    serviceType: [
-      "Software as a Service (SaaS)",
-      "IT consulting and software development",
-      "Business process software",
-    ],
-    provider: { "@id": `${SITE_URL}/#organization` },
-    areaServed: {
-      "@type": "Place",
-      name: "Worldwide",
-    },
-  },
-];
+  ],
+};
 
 export default function RootLayout({
   children,
@@ -176,12 +159,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
         <meta name="application-name" content={SITE_NAME} />
-
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-        />
-
+        <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

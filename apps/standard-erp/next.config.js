@@ -54,6 +54,8 @@ const nextConfig = {
       { source: '/inward-outward/login', destination: '/portals/demo/inward-outward', permanent: false },
       { source: '/personal/sales/login', destination: '/portals/demo/sales', permanent: false },
       { source: '/crm/login', destination: '/portals/demo/crm', permanent: false },
+      { source: '/portal/demos/crm/login', destination: '/portals/demo/crm', permanent: false },
+      { source: '/portal/demos/crm', destination: '/portals/demo/crm', permanent: false },
       { source: '/website/portfolio.html', destination: '/portfolio.html', permanent: true },
       { source: '/website/ahmedabad-it-saas.html', destination: '/ahmedabad-it-saas.html', permanent: true },
       { source: '/website/styles.css', destination: '/styles.css', permanent: true },

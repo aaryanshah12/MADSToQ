@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Eye, EyeOff } from 'lucide-react'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
+import DemoCredentials from '@/components/auth/DemoCredentials'
+import { DEMO_PORTALS } from '@/lib/demo-portals'
 
 const EMAIL_KEY = 'inv-last-email'
 
@@ -16,6 +19,7 @@ export default function LoginPage() {
   const [signingIn, setSigningIn]       = useState(false)
 
   useEffect(() => {
+    persistTheme(readStoredTheme())
     const lastEmail = localStorage.getItem(EMAIL_KEY)
     if (lastEmail) setEmail(lastEmail)
   }, [])
@@ -44,11 +48,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid-bg flex items-center justify-center px-4">
-      {/* Background blobs */}
-      <div className="fixed top-0 left-1/4 w-96 h-96 bg-inputer/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-owner/5 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md animate-fade-up">
         {/* Logo */}
         <div className="text-center mb-10">
@@ -92,7 +92,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="input-field pr-10"
+                  className="input-field pr-14"
                   placeholder="••••••••"
                   required
                   disabled={signingIn}
@@ -128,11 +128,8 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-muted text-center">
-              Software is managed by MADSToQ
-            </p>
-          </div>
+          <DemoCredentials accounts={DEMO_PORTALS.inventory.accounts} />
+          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
         </div>
 
         {/* Role indicators */}

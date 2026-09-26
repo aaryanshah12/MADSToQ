@@ -1,13 +1,13 @@
 'use client'
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
-import { User } from '@supabase/supabase-js'
+import type { SessionUser } from '@madstoq/auth'
 import { setCachedAccessToken } from '@madstoq/core'
 import { authClient } from '@/lib/auth-client'
 import { getAuthHeaders } from '@/lib/client/api-fetch'
 import { Profile } from '@/types'
 
 interface AuthContextType {
-  user: User | null
+  user: SessionUser | null
   profile: Profile | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
@@ -17,7 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({} as AuthContextType)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]       = useState<User | null>(null)
+  const [user, setUser]       = useState<SessionUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const profileLoadRef = useRef<Promise<void> | null>(null)

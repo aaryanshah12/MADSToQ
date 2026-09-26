@@ -19,8 +19,6 @@
     "@madstoq/shared-utils": "*",
     "@madstoq/themes": "*",
     "@madstoq/ui": "*",
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "@supabase/supabase-js": "^2.43.1",
     "@tiptap/core": "3.22.5",
     "@tiptap/extension-link": "3.22.5",
     "@tiptap/extension-placeholder": "3.22.5",

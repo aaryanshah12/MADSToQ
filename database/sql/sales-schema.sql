@@ -2,7 +2,7 @@
 -- SALES MODULE — SUPABASE DATABASE SCHEMA
 -- Path: madstoq.com/personal/sales/...
 -- Run this entire file in Supabase SQL Editor.
--- This file is independent of supabase-schema.sql (Inventory/IO).
+-- This file is independent of database/sql/supabase-schema.sql (Inventory/IO).
 -- A user gets access to /personal/sales ONLY if a row exists for
 -- them in `sales_users`. Manually insert that row to grant access.
 -- ============================================================
@@ -171,7 +171,7 @@ create table if not exists sales_documents (
   status            text not null default 'draft'
                       check (status in ('draft','sent','accepted','declined','cancelled')),
 
-  pdf_path          text,                       -- supabase storage path
+  pdf_path          text,                       -- stored file path
   pdf_url           text,                       -- public/signed URL
 
   sent_at           timestamptz,
@@ -202,7 +202,7 @@ create table if not exists sales_expenses (
   split_method  text not null default 'equal'
                   check (split_method in ('equal','custom','percent')),
 
-  receipt_path  text,                           -- supabase storage path
+  receipt_path  text,                           -- stored file path
   receipt_url   text,
   notes         text,
 

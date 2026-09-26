@@ -503,7 +503,7 @@ export default function QuotationPage() {
                     <Plus size={12}/> Add Row
                   </button>
                 </div>
-                <div className="border border-border rounded-xl overflow-x-auto sm:overflow-visible -mx-1 px-1 sm:mx-0 sm:px-0">
+                <div className="border border-border rounded-xl overflow-visible -mx-1 px-1 sm:mx-0 sm:px-0">
                   <table className="w-full text-xs min-w-[560px] sm:min-w-0">
                     <thead style={{ background: 'var(--color-surface)' }}>
                       <tr className="border-b border-border">

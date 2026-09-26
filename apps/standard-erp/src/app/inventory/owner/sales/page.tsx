@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { getCurrentFiscalYear, getFiscalYears, monthOptions, fetchSalesEntries, saveSalesEntry, deleteSalesEntry, SalesEntry, SalesEntryLine } from '@/lib/sales'
 import { Download, Save, Trash2 } from 'lucide-react'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
+import { chartColors, chartTick, chartTooltip } from '@/lib/chart-theme'
 
 const num = (v: any) => (v === '' || v === null || v === undefined ? null : Number(v))
 
@@ -588,14 +589,14 @@ export default function OwnerSalesPage() {
                 <AreaChart data={fyData}>
                   <defs>
                     <linearGradient id="gTurnover" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00c2ff" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#00c2ff" stopOpacity={0} />
+                      <stop offset="5%" stopColor={chartColors[0]} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={chartColors[0]} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="turnover" name="Turnover" stroke="#00c2ff" fill="url(#gTurnover)" strokeWidth={2} />
+                  <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
+                  <YAxis tick={chartTick} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
+                  <Area type="monotone" dataKey="turnover" name="Turnover" stroke={chartColors[0]} fill="url(#gTurnover)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -612,14 +613,14 @@ export default function OwnerSalesPage() {
                 <AreaChart data={fyData}>
                   <defs>
                     <linearGradient id="gPntosa" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00e5a0" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#00e5a0" stopOpacity={0} />
+                      <stop offset="5%" stopColor={chartColors[0]} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={chartColors[0]} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="pntosa" name="PNTOSA" stroke="#00e5a0" fill="url(#gPntosa)" strokeWidth={2} />
+                  <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
+                  <YAxis tick={chartTick} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
+                  <Area type="monotone" dataKey="pntosa" name="PNTOSA" stroke={chartColors[0]} fill="url(#gPntosa)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -636,14 +637,14 @@ export default function OwnerSalesPage() {
                 <AreaChart data={fyData}>
                   <defs>
                     <linearGradient id="gHydrazone" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f0a500" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#f0a500" stopOpacity={0} />
+                      <stop offset="5%" stopColor={chartColors[0]} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={chartColors[0]} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="hydrazone" name="Hydrazone" stroke="#f0a500" fill="url(#gHydrazone)" strokeWidth={2} />
+                  <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
+                  <YAxis tick={chartTick} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
+                  <Area type="monotone" dataKey="hydrazone" name="Hydrazone" stroke={chartColors[0]} fill="url(#gHydrazone)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             )}

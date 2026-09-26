@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { withAuthenticatedDb } from './api-auth'
 import type { AuthUser } from './db-context'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { DbClient } from './client'
 
 export type RpcHandler = (params: Record<string, unknown>) => Promise<unknown>
 
@@ -17,7 +17,7 @@ export function createRpcRoute(handlers: Record<string, RpcHandler>) {
         return NextResponse.json({ error: `Unknown action: ${action ?? '(missing)'}` }, { status: 400 })
       }
 
-      const result = await withAuthenticatedDb(request, async (ctx: { user: AuthUser; db: SupabaseClient }) =>
+      const result = await withAuthenticatedDb(request, async (_ctx: { user: AuthUser; db: DbClient }) =>
         handlers[action](params)
       )
 

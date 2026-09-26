@@ -7,8 +7,7 @@ import { inventoryApi } from '@madstoq/inventory-system/api'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { BarChart3 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-
-const COLORS = ['#00c2ff', '#00e5a0', '#f0a500', '#ff6060', '#a78bfa']
+import { chartColors, chartTick, chartTooltip } from '@/lib/chart-theme'
 
 export default function OwnerReportsPage() {
   const { profile, loading: authLoading } = useAuth()
@@ -86,19 +85,19 @@ export default function OwnerReportsPage() {
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="gLoaded" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00c2ff" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#00c2ff" stopOpacity={0}/>
+                      <stop offset="5%" stopColor={chartColors[0]} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={chartColors[0]} stopOpacity={0}/>
                     </linearGradient>
                     <linearGradient id="gUsed" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00e5a0" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#00e5a0" stopOpacity={0}/>
+                      <stop offset="5%" stopColor={chartColors[1]} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={chartColors[1]} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="loaded" stroke="#00c2ff" fill="url(#gLoaded)" strokeWidth={2} name="Loaded" />
-                  <Area type="monotone" dataKey="used"   stroke="#00e5a0" fill="url(#gUsed)"   strokeWidth={2} name="Used"   />
+                  <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
+                  <YAxis tick={chartTick} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
+                  <Area type="monotone" dataKey="loaded" stroke={chartColors[0]} fill="url(#gLoaded)" strokeWidth={2} name="Loaded" />
+                  <Area type="monotone" dataKey="used"   stroke={chartColors[1]} fill="url(#gUsed)"   strokeWidth={2} name="Used"   />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -118,11 +117,11 @@ export default function OwnerReportsPage() {
                 <PieChart>
                   <Pie data={materialBreakdown} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name">
                     {materialBreakdown.map((_: any, i: number) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      <Cell key={i} fill={chartColors[i % chartColors.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#4a6080' }} />
+                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--color-muted)' }} />
                 </PieChart>
               </ResponsiveContainer>
             )}

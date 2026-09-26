@@ -2,9 +2,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { setCachedAccessToken } from '@madstoq/core'
-import { supabase } from '@/lib/supabase'
+import { authClient } from '@/lib/auth-client'
 import { clearSalesReadCache } from '@madstoq/sales-system/api'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
+import DemoCredentials from '@/components/auth/DemoCredentials'
+import { DEMO_PORTALS } from '@/lib/demo-portals'
 
 const EMAIL_KEY = 'sales-last-email'
 
@@ -17,8 +20,7 @@ export default function SalesLoginPage() {
   const [loading, setLoading]           = useState(false)
 
   useEffect(() => {
-    const saved = (localStorage.getItem('sales-theme') as 'dark' | 'light' | null) ?? 'light'
-    document.documentElement.dataset.theme = saved
+    persistTheme(readStoredTheme())
 
     const lastEmail = localStorage.getItem(EMAIL_KEY)
     if (lastEmail) setEmail(lastEmail)
@@ -33,7 +35,7 @@ export default function SalesLoginPage() {
 
     clearSalesReadCache()
 
-    const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error: signInErr } = await authClient.auth.signInWithPassword({ email, password })
     if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
     if (signInErr || !data.user) {
       setError(signInErr?.message ?? 'Sign-in failed')
@@ -86,7 +88,7 @@ export default function SalesLoginPage() {
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
-                  className="input w-full pr-10"
+                  className="input w-full pr-14"
                 />
                 <button
                   type="button"
@@ -114,11 +116,8 @@ export default function SalesLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-muted text-center">
-              Access is granted manually. If you can&apos;t sign in, contact your admin.
-            </p>
-          </div>
+          <DemoCredentials accounts={DEMO_PORTALS.sales.accounts} />
+          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { authClient } from '@/lib/auth-client'
 import { setCachedAccessToken } from '@madstoq/core'
 import { clearPmcCache } from '@madstoq/pmc-system/lib/cache'
 import { createPmcApi } from '@madstoq/pmc-system/api'
@@ -53,7 +53,7 @@ export function PMCProvider({ children }: { children: React.ReactNode }) {
     const run = async () => {
       setDataError(null)
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await authClient.auth.getSession()
         const user = session?.user
         if (session?.access_token) setCachedAccessToken(session.access_token)
         if (!user) {
@@ -82,7 +82,7 @@ export function PMCProvider({ children }: { children: React.ReactNode }) {
   }, [refresh])
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
+    authClient.auth.getSession().then(async ({ data }) => {
       const user = data.session?.user
       if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
       setEmail(user?.email ?? null)
@@ -93,7 +93,7 @@ export function PMCProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: sub } = authClient.auth.onAuthStateChange(async (event, session) => {
       if (event === 'INITIAL_SESSION') return
       if (session?.access_token) setCachedAccessToken(session.access_token)
       setEmail(session?.user?.email ?? null)
@@ -112,7 +112,7 @@ export function PMCProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await authClient.auth.signInWithPassword({ email, password })
       if (error) return { error: error.message }
       if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
       setEmail(email)
@@ -125,11 +125,11 @@ export function PMCProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    await authClient.auth.signOut()
     setEmail(null)
     clearPmcCache()
     setDataReady(false)
-    router.push('/pmc')
+    router.push('/portals/demo/pmc')
   }, [router])
 
   const value = useMemo(

@@ -1,20 +1,21 @@
 import { AsyncLocalStorage } from 'async_hooks'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { DbClient } from './client'
+import type { SessionUser } from './session'
 
-export type AuthUser = { id: string; email?: string | null }
+export type AuthUser = SessionUser
 
 type DbStore = {
-  db: SupabaseClient
+  db: DbClient
   user: AuthUser
 }
 
 const storage = new AsyncLocalStorage<DbStore>()
 
-export function runWithDb<T>(db: SupabaseClient, user: AuthUser, fn: () => Promise<T>): Promise<T> {
+export function runWithDb<T>(db: DbClient, user: AuthUser, fn: () => Promise<T>): Promise<T> {
   return storage.run({ db, user }, fn)
 }
 
-export function getServerDb(): SupabaseClient {
+export function getServerDb(): DbClient {
   const store = storage.getStore()
   if (!store) throw new Error('Database context not initialized')
   return store.db

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 // POST /api/usage — Create usage entry
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     // Validate stock availability
-    const { data: balance } = await supabaseAdmin
+    const { data: balance } = await db
       .from('stock_balance')
       .select('tons_remaining')
       .eq('invoice_number', invoice_number)
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('usage_entries')
       .insert({
         factory_id,
@@ -59,7 +59,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'Entry ID required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('usage_entries')
       .delete()
       .eq('id', id)

@@ -7,13 +7,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const ctx = await getSalesContext()
+  const ctx = await getSalesContext(req)
   if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
   const id = req.nextUrl.searchParams.get('document_id')
   if (!id) return NextResponse.json({ error: 'document_id required' }, { status: 400 })
 
-  const { data: doc, error } = await ctx.supabase
+  const { data: doc, error } = await ctx.db
     .from('sales_documents')
     .select('*')
     .eq('id', id)

@@ -1,7 +1,7 @@
 'use client'
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { authClient } from '@/lib/auth-client'
 import { setCachedAccessToken } from '@madstoq/core'
 import { clearSalesReadCache, getCurrentSalesUser } from '@madstoq/sales-system/api'
 import type { SalesOrg, SalesUser } from '@madstoq/sales-system/types'
@@ -56,13 +56,13 @@ export function SalesUserProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    authClient.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return
       if (session?.access_token) setCachedAccessToken(session.access_token)
       if (session?.user) void refresh()
       else setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = authClient.auth.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION') return
       if (session?.access_token) setCachedAccessToken(session.access_token)
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') void refresh()
@@ -76,16 +76,16 @@ export function SalesUserProvider({ children }: { children: ReactNode }) {
   // Redirect to login when not signed in or not provisioned.
   useEffect(() => {
     if (loading) return
-    if (pathname === '/personal/sales/login') return
+    if (pathname === '/portals/demo/sales' || pathname === '/personal/sales/login') return
     if (!authUserId || !membership) {
-      router.replace('/personal/sales/login')
+      router.replace('/portals/demo/sales')
     }
   }, [loading, authUserId, membership, pathname, router])
 
   const signOut = async () => {
     clearSalesReadCache()
-    await supabase.auth.signOut()
-    router.replace('/personal/sales/login')
+    await authClient.auth.signOut()
+    router.replace('/portals/demo/sales')
   }
 
   return (

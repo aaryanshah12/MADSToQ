@@ -280,7 +280,7 @@ const allowScrollFx = window.matchMedia(
 
 if (allowScrollFx) {
   const scroll3dItems = document.querySelectorAll(
-    ".hero-stock-image, .product-simple-card, .service-card, .about-stock-image"
+    ".hero-stock-image, .service-card, .about-stock-image"
   );
 
   scroll3dItems.forEach((item) => item.classList.add("scroll-3d"));
@@ -387,80 +387,193 @@ if (allowScrollFx) {
   }
 }
 
-const initImageCarousels = () => {
-  const galleries = document.querySelectorAll(".role-gallery, .workflow-gallery");
+const initScreenTours = () => {
+  document.querySelectorAll(".role-gallery, .workflow-gallery").forEach((gallery) => {
+    if (gallery.dataset.tourReady === "true") return;
+    const sources = Array.from(gallery.querySelectorAll("img"));
+    if (sources.length <= 1) return;
+    gallery.dataset.tourReady = "true";
 
-  galleries.forEach((gallery) => {
-    if (gallery.dataset.carouselReady === "true") return;
-    const slides = Array.from(gallery.querySelectorAll("img"));
-    if (slides.length <= 1) return;
+    const tour = document.createElement("div");
+    tour.className = "screen-tour";
 
-    gallery.dataset.carouselReady = "true";
-    gallery.classList.add("image-carousel-track");
-    slides.forEach((slide) => slide.classList.add("carousel-slide"));
+    const stage = document.createElement("div");
+    stage.className = "screen-stage";
+    const prev = document.createElement("img");
+    const next = document.createElement("img");
+    prev.className = "screen-peek screen-peek-prev";
+    next.className = "screen-peek screen-peek-next";
+    prev.alt = "";
+    next.alt = "";
+    prev.setAttribute("aria-hidden", "true");
+    next.setAttribute("aria-hidden", "true");
+    const figure = document.createElement("figure");
+    const main = document.createElement("img");
+    const caption = document.createElement("figcaption");
+    figure.append(main, caption);
+    stage.append(prev, figure, next);
 
-    const viewport = document.createElement("div");
-    viewport.className = "image-carousel-viewport";
-    gallery.parentNode.insertBefore(viewport, gallery);
-    viewport.appendChild(gallery);
-
-    const carousel = document.createElement("div");
-    carousel.className = "image-carousel";
-    viewport.parentNode.insertBefore(carousel, viewport);
-    carousel.appendChild(viewport);
-
-    const controls = document.createElement("div");
-    controls.className = "image-carousel-controls";
-    controls.innerHTML =
-      '<button type="button" class="carousel-btn" aria-label="Previous image">&#8249;</button><button type="button" class="carousel-btn" aria-label="Next image">&#8250;</button>';
-    carousel.appendChild(controls);
+    const rail = document.createElement("div");
+    rail.className = "screen-rail";
+    rail.setAttribute("role", "tablist");
+    rail.setAttribute("aria-label", "Product screens");
 
     let index = 0;
-    const [prevBtn, nextBtn] = controls.querySelectorAll(".carousel-btn");
-
-    const update = () => {
-      gallery.style.transform = `translateX(-${index * 100}%)`;
+    const show = (step) => {
+      index = (step + sources.length) % sources.length;
+      const source = sources[index];
+      const label = source.alt || `Screen ${index + 1}`;
+      const previous = sources[(index - 1 + sources.length) % sources.length];
+      const following = sources[(index + 1) % sources.length];
+      main.src = source.currentSrc || source.src;
+      main.alt = label;
+      prev.src = previous.currentSrc || previous.src;
+      next.src = following.currentSrc || following.src;
+      caption.textContent = label;
+      main.classList.remove("is-entering");
+      void main.offsetWidth;
+      main.classList.add("is-entering");
+      buttons.forEach((button, i) => {
+        const active = i === index;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
     };
 
-    prevBtn.addEventListener("click", () => {
-      index = index === 0 ? slides.length - 1 : index - 1;
-      update();
+    const buttons = sources.map((source, i) => {
+      const label = source.alt || `Screen ${i + 1}`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "screen-thumb";
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-label", label);
+      const thumb = document.createElement("img");
+      thumb.src = source.getAttribute("src");
+      thumb.alt = "";
+      const name = document.createElement("span");
+      name.textContent = label;
+      button.append(thumb, name);
+      button.addEventListener("click", () => show(i));
+      rail.append(button);
+      return button;
     });
 
-    nextBtn.addEventListener("click", () => {
-      index = index === slides.length - 1 ? 0 : index + 1;
-      update();
-    });
+    prev.addEventListener("click", () => show(index - 1));
+    next.addEventListener("click", () => show(index + 1));
 
     let touchStartX = 0;
-    let touchEndX = 0;
-
-    viewport.addEventListener(
+    stage.addEventListener(
       "touchstart",
       (event) => {
         touchStartX = event.changedTouches[0].clientX;
       },
       { passive: true }
     );
-
-    viewport.addEventListener(
+    stage.addEventListener(
       "touchend",
       (event) => {
-        touchEndX = event.changedTouches[0].clientX;
-        const delta = touchStartX - touchEndX;
-        if (Math.abs(delta) < 30) return;
-        if (delta > 0) {
-          index = index === slides.length - 1 ? 0 : index + 1;
-        } else {
-          index = index === 0 ? slides.length - 1 : index - 1;
-        }
-        update();
+        const delta = touchStartX - event.changedTouches[0].clientX;
+        if (Math.abs(delta) < 40) return;
+        show(index + (delta > 0 ? 1 : -1));
       },
       { passive: true }
     );
 
-    update();
+    tour.append(stage, rail);
+    gallery.replaceWith(tour);
+    show(0);
+
+    const motionOk = window.matchMedia(
+      "(prefers-reduced-motion: no-preference)"
+    ).matches;
+    if (!motionOk) return;
+
+    let timer = 0;
+    const arm = () => {
+      window.clearInterval(timer);
+      timer = window.setInterval(() => show(index + 1), 4200);
+    };
+    tour.addEventListener("mouseenter", () => window.clearInterval(timer));
+    tour.addEventListener("mouseleave", arm);
+    tour.addEventListener("focusin", () => window.clearInterval(timer));
+    tour.addEventListener("focusout", arm);
+    arm();
   });
 };
 
-initImageCarousels();
+initScreenTours();
+
+const initSiteMotion = () => {
+  const motionOk = window.matchMedia(
+    "(prefers-reduced-motion: no-preference)"
+  ).matches;
+
+  const title = document.querySelector(".hero h1");
+  if (title && motionOk && title.dataset.split !== "true") {
+    const text = title.textContent.replace(/\s+/g, " ").trim();
+    title.dataset.split = "true";
+    title.setAttribute("aria-label", text);
+    title.innerHTML = text
+      .split(" ")
+      .map(
+        (word, index) =>
+          `<span class="hero-word" style="--d:${index}"><span>${word}</span></span>`
+      )
+      .join(" ");
+  }
+
+  if (!motionOk) return;
+
+  if (!document.querySelector(".bg-glow-3")) {
+    const glow = document.createElement("div");
+    glow.className = "bg-glow bg-glow-3";
+    glow.setAttribute("aria-hidden", "true");
+    document.body.prepend(glow);
+  }
+
+  if (!document.querySelector(".scroll-progress")) {
+    const bar = document.createElement("div");
+    bar.className = "scroll-progress";
+    bar.setAttribute("aria-hidden", "true");
+    document.body.prepend(bar);
+
+    const updateProgress = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+      bar.style.transform = `scaleX(${progress})`;
+    };
+
+    window.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+    updateProgress();
+  }
+
+  document.querySelectorAll(".metric-value").forEach((el) => {
+    const match = el.textContent.trim().match(/^(\d+)(.*)$/);
+    if (!match) return;
+    const target = Number(match[1]);
+    const suffix = match[2];
+    if (!Number.isFinite(target) || target > 500) return;
+
+    el.textContent = `0${suffix}`;
+    const counter = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        counter.disconnect();
+        const start = performance.now();
+        const duration = 1100;
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          el.textContent = `${Math.round(target * eased)}${suffix}`;
+          if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      { threshold: 0.45 }
+    );
+    counter.observe(el);
+  });
+};
+
+initSiteMotion();

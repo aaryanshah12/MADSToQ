@@ -1,13 +1,14 @@
 -- ============================================================
 -- PMC PORTAL — Full reset (v2 + factory scoping)
--- Run entire script in Supabase SQL Editor.
+-- Run in the Neon SQL editor after database/sql/neon/00-auth.sql
+-- and database/sql/supabase-schema.sql.
 --
 -- ALREADY HAVE v2 tables with data? Do NOT run this file.
 -- Use: pmc-v2-to-factory-migration.sql (adds factory_id in place).
 --
 -- WARNING: Drops ALL existing PMC tables and data.
 -- Requires: public.factories, public.profiles, public.profile_factories
---           (from main supabase-schema.sql).
+--           (from database/sql/supabase-schema.sql).
 --
 -- Data is scoped per factory. Users see rows only for factories
 -- assigned in profile_factories (owners see all factories).
@@ -232,11 +233,7 @@ create policy "pmc_batch_lines_factory"
     )
   );
 
--- ─── GRANTS ─────────────────────────────────────────────────
-grant usage on schema public to authenticated;
-grant select, insert, update, delete on all tables in schema public to authenticated;
-grant execute on function public.is_pmc_user() to authenticated;
-grant execute on function public.can_access_pmc_factory(uuid) to authenticated;
+-- Grants for the signed-in role are in database/sql/neon/90-grants.sql.
 
 -- ─── GRANT PMC ACCESS ─────────────────────────────────────────
 -- insert into public.pmc_users (user_id, full_name, email, is_active)

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 interface UsageItem {
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     })
 
     const invoiceNumbers = Object.keys(invoiceTotals)
-    const { data: balances, error: balError } = await supabaseAdmin
+    const { data: balances, error: balError } = await db
       .from('stock_balance')
       .select('invoice_number, tons_remaining')
       .in('invoice_number', invoiceNumbers)
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       created_by,
     }))
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('usage_entries')
       .insert(rows)
       .select()

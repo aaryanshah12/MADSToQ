@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type EntryInput = {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'fiscal_year and month are required' }, { status: 400 })
   }
 
-  let query = supabaseAdmin
+  let query = db
     .from('monthly_material_entries')
     .select('*')
     .eq('fiscal_year', fiscalYear)
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     }
     const { actualReal, yieldPct, usedPnt } = compute(payload)
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('monthly_material_entries')
       .insert({
         factory_id: payload.factory_id,
@@ -93,7 +93,7 @@ export async function PATCH(request: Request) {
     if (!payload.id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
     const { actualReal, yieldPct, usedPnt } = compute(payload)
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('monthly_material_entries')
       .update({
         factory_id: payload.factory_id,
@@ -122,7 +122,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('monthly_material_entries')
       .delete()
       .eq('id', id)

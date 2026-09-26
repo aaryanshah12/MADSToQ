@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
 import { usePMC } from '@/contexts/PMCContext'
-
-const THEME_KEY = 'theme'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
+import DemoCredentials from '@/components/auth/DemoCredentials'
+import { DEMO_PORTALS } from '@/lib/demo-portals'
 
 export default function PMCLoginScreen() {
   const router = useRouter()
@@ -17,11 +18,7 @@ export default function PMCLoginScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const saved =
-      (localStorage.getItem(THEME_KEY) as 'dark' | 'light' | null) ??
-      (localStorage.getItem('pmc-theme') as 'dark' | 'light' | null) ??
-      'light'
-    document.documentElement.dataset.theme = saved
+    persistTheme(readStoredTheme())
     setPassword('')
   }, [])
 
@@ -89,7 +86,7 @@ export default function PMCLoginScreen() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="new-password"
-                  className="input w-full pr-10 pmc-focus"
+                  className="input w-full pr-14 pmc-focus"
                 />
                 <button
                   type="button"
@@ -128,9 +125,8 @@ export default function PMCLoginScreen() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-muted text-center">Software is managed by MADSToQ</p>
-          </div>
+          <DemoCredentials accounts={DEMO_PORTALS.pmc.accounts} />
+          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
         </div>
       </div>
     </div>

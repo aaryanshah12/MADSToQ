@@ -1,19 +1,19 @@
 /**
- * Grant PMC Portal access via pmc_users allowlist.
+ * Grant PMC Portal access via the pmc_users allowlist.
  *
- * For users who ALREADY exist in Supabase Auth (other portals), omit password:
- *   node scripts/register-pmc-user.js owner@factory.com '' 'Factory Owner'
+ * Existing account, allowlist only:
  *   node scripts/register-pmc-user.js owner@factory.com --allowlist-only 'Factory Owner'
  *
- * To also create Auth or reset password, pass a password:
+ * Create an account or reset the password:
  *   node scripts/register-pmc-user.js owner@factory.com 'NewPass123' 'Factory Owner'
  *
- * Requires .env.local: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * Requires DATABASE_URL in .env.local.
  */
 
 const fs = require('fs')
 const path = require('path')
-const { createClient } = require('@supabase/supabase-js')
+const bcrypt = require('bcryptjs')
+const { Pool } = require('pg')
 
 function loadEnvLocal() {
   const envPath = path.join(__dirname, '..', '.env.local')
@@ -36,18 +36,13 @@ function loadEnvLocal() {
   }
 }
 
-async function findUserIdByEmail(admin, email) {
-  let page = 1
-  const perPage = 200
-  while (true) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
-    if (error) throw error
-    const match = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
-    if (match) return match.id
-    if (data.users.length < perPage) break
-    page += 1
-  }
-  return null
+function databaseUrl() {
+  const raw = process.env.DATABASE_URL
+  if (!raw) return null
+  const url = new URL(raw)
+  url.hostname = url.hostname.replace('-pooler', '')
+  url.searchParams.delete('channel_binding')
+  return url.toString()
 }
 
 function parseArgs(argv) {
@@ -56,81 +51,76 @@ function parseArgs(argv) {
   const email = filtered[2]
   const passwordArg = filtered[3]
   const fullName = filtered[4] || 'PMC User'
-
   const allowlistOnlyMode =
     allowlistOnly || passwordArg === '' || passwordArg === undefined || passwordArg === '--allowlist-only'
-
   return { email, password: allowlistOnlyMode ? null : passwordArg, fullName, allowlistOnlyMode }
 }
 
 async function main() {
   loadEnvLocal()
-
   const { email, password, fullName, allowlistOnlyMode } = parseArgs(process.argv)
 
   if (!email) {
     console.error(
-      'Usage: node scripts/register-pmc-user.js <email> [password|--allowlist-only] [fullName]\n' +
-        '  Existing auth user (other portals): omit password or use --allowlist-only\n' +
-        '  New auth user: pass password as second argument'
+      'Usage: node scripts/register-pmc-user.js <email> [password|--allowlist-only] [fullName]'
     )
     process.exit(1)
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) {
-    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local')
+  const connectionString = databaseUrl()
+  if (!connectionString) {
+    console.error('Missing DATABASE_URL in .env.local')
     process.exit(1)
   }
 
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } })
+  try {
+    const existing = await pool.query(
+      `select id from auth.users where lower(email) = lower($1) limit 1`,
+      [email]
+    )
+    let userId = existing.rows[0]?.id ?? null
 
-  let userId = await findUserIdByEmail(admin, email)
-
-  if (allowlistOnlyMode) {
-    if (!userId) {
-      console.error(
-        `No auth user found for ${email}. Create them in Supabase Authentication first, or pass a password to create the account.`
+    if (allowlistOnlyMode) {
+      if (!userId) {
+        console.error(`No account found for ${email}. Pass a password to create one.`)
+        process.exit(1)
+      }
+      console.log('Account found — adding PMC allowlist only (password unchanged).')
+    } else if (userId) {
+      console.log('Account exists — updating password and PMC allowlist…')
+      const hash = await bcrypt.hash(password, 10)
+      await pool.query(
+        `update auth.users set encrypted_password = $2, updated_at = now() where id = $1`,
+        [userId, hash]
       )
-      process.exit(1)
+    } else {
+      console.log('Creating account and PMC allowlist…')
+      const hash = await bcrypt.hash(password, 10)
+      const created = await pool.query(
+        `insert into auth.users (email, encrypted_password, raw_user_meta_data)
+         values ($1, $2, $3::jsonb)
+         returning id`,
+        [email, hash, JSON.stringify({ full_name: fullName, role: 'owner' })]
+      )
+      userId = created.rows[0].id
     }
-    console.log('Auth user found — adding PMC allowlist only (password unchanged).')
-  } else if (userId) {
-    console.log('Auth user exists — updating password and PMC allowlist…')
-    const { error } = await admin.auth.admin.updateUserById(userId, {
-      password,
-      email_confirm: true,
-    })
-    if (error) throw error
-  } else {
-    console.log('Creating auth user and PMC allowlist…')
-    const { data, error } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    })
-    if (error) throw error
-    userId = data.user.id
+
+    await pool.query(
+      `insert into pmc_users (user_id, full_name, email, is_active)
+       values ($1, $2, $3, true)
+       on conflict (user_id) do update
+         set full_name = excluded.full_name,
+             email = excluded.email,
+             is_active = true`,
+      [userId, fullName, email]
+    )
+    console.log('Done.')
+    console.log('  email:   ', email)
+    console.log('  user id: ', userId)
+  } finally {
+    await pool.end()
   }
-
-  const { error: pmcError } = await admin.from('pmc_users').upsert(
-    {
-      user_id: userId,
-      full_name: fullName,
-      email,
-      is_active: true,
-    },
-    { onConflict: 'user_id' }
-  )
-  if (pmcError) throw pmcError
-
-  console.log('Done.')
-  console.log(`  Email:    ${email}`)
-  console.log(`  User ID:  ${userId}`)
-  console.log('  Sign in at /pmc with the same email/password used for other portals.')
 }
 
 main().catch((err) => {

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PMC Portal user manual | MADSToQ</title>
     <link rel="stylesheet" href="manual.css" />
-    <style>:root { --accent: var(--accent-pmc); }</style>
   </head>
   <body>
     <div class="manual-wrap">
@@ -16,7 +15,7 @@
 
       <h2>1. Sign in</h2>
       <ol>
-        <li>Open <a href="/pmc">/pmc</a> and sign in with the email and password provided by your administrator.</li>
+        <li>Open <a href="/portals/demo/pmc">/portals/demo/pmc</a> and sign in with the email and password provided by your administrator.</li>
         <li>Your account must be on the PMC allowlist (<code>pmc_users</code> in the database).</li>
         <li>After login, the app loads your procurement items, products, and batches for fast editing.</li>
       </ol>
@@ -110,7 +109,7 @@
       </div>
 
       <h2>10. Database setup (administrators)</h2>
-      <p>After a schema reset, run <code>pmc-schema.sql</code> in Supabase, then add users to <code>pmc_users</code> so they can sign in. Re-register PMC users before expecting any historical data.</p>
+      <p>After a schema reset, run <code>database/sql/pmc-schema.sql</code> in Supabase, then add users to <code>pmc_users</code> so they can sign in. Re-register PMC users before expecting any historical data.</p>
     </div>
   </body>
 </html>

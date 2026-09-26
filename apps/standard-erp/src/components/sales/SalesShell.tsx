@@ -10,6 +10,7 @@ import {
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import NotificationBell from '@/components/sales/NotificationBell'
 import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 
 const BASE = '/personal/sales'
 
@@ -29,16 +30,15 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
   const [themeMounted, setThemeMounted] = useState(false)
 
   useEffect(() => {
-    const saved = (localStorage.getItem('sales-theme') as 'dark' | 'light' | null) ?? 'light'
+    const saved = readStoredTheme()
     setTheme(saved)
-    document.documentElement.dataset.theme = saved
+    persistTheme(saved)
     setThemeMounted(true)
   }, [])
 
   useEffect(() => {
     if (!themeMounted) return
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem('sales-theme', theme)
+    persistTheme(theme)
   }, [theme, themeMounted])
 
   useEffect(() => { setSidebarOpen(false) }, [pathname])
@@ -147,7 +147,7 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-64 z-50 shadow-2xl"
+          <aside className="absolute left-0 top-0 h-full w-[min(20rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] z-50 shadow-2xl overflow-y-auto"
             style={{ background: 'var(--color-panel)', borderRight: '1px solid var(--color-border)' }}>
             <SidebarInner />
           </aside>
@@ -158,7 +158,7 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
         {/* Mobile topbar */}
         <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-border"
           style={{ background: 'var(--color-panel)' }}>
-          <button onClick={() => setSidebarOpen(true)} className="text-muted hover:text-primary">
+          <button onClick={() => setSidebarOpen(true)} className="text-muted hover:text-primary min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Open menu">
             <Menu size={20}/>
           </button>
           <div className="text-sm font-bold text-primary flex-1">Sales</div>

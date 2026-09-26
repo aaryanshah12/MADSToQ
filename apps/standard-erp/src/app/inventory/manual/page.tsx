@@ -14,7 +14,7 @@ export default function InventoryManualPage() {
         ? '/inventory/inputer'
         : profile?.role === 'chemist'
           ? '/inventory/chemist'
-          : '/inventory/login'
+          : '/portals/demo/inventory'
 
   return (
     <AppLayout>

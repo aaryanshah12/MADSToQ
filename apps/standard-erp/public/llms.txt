@@ -22,6 +22,7 @@
 - Inventory management software
 - Inward-Outward / chemical material movement software
 - Product costing and RMC (PMC Portal)
+- Plotting CRM for schemes, plots, leads, bookings, and payments
 - Digital transformation for industrial and mid-size operations teams
 
 ## Key pages
@@ -31,6 +32,7 @@
 - Inventory software: https://madstoq.com/inventory.html
 - Inward-Outward software: https://madstoq.com/io.html
 - PMC Portal: https://madstoq.com/pmc.html
+- CRM: https://madstoq.com/crm.html
 - Portfolio: https://madstoq.com/portfolio.html
 - About: https://madstoq.com/about.html
 - Contact: https://madstoq.com/contact.html

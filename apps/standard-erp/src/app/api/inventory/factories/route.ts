@@ -1,4 +1,4 @@
-import { supabaseAdmin, requireOwnerAccess } from '@madstoq/database'
+import { db, requireOwnerAccess } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
     }
 
     const [{ data: factories, error: factoriesError }, { data: pfRows }] = await Promise.all([
-      supabaseAdmin.from('factories').select('*').in('id', allowedFactoryIds).order('created_at', { ascending: true }),
-      supabaseAdmin.from('profile_factories').select('profile_id, factory_id').in('factory_id', allowedFactoryIds),
+      db.from('factories').select('*').in('id', allowedFactoryIds).order('created_at', { ascending: true }),
+      db.from('profile_factories').select('profile_id, factory_id').in('factory_id', allowedFactoryIds),
     ])
 
     if (factoriesError) return NextResponse.json({ error: factoriesError.message }, { status: 400 })
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const profileIds = Array.from(new Set((pfRows ?? []).map((r: any) => r.profile_id)))
 
     const { data: profiles } = profileIds.length > 0
-      ? await supabaseAdmin.from('profiles').select('id, full_name, role, is_active').in('id', profileIds).order('full_name')
+      ? await db.from('profiles').select('id, full_name, role, is_active').in('id', profileIds).order('full_name')
       : { data: [] }
 
     return NextResponse.json({
@@ -52,11 +52,11 @@ export async function POST(request: NextRequest) {
     const bearer = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null
     if (!bearer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(bearer)
+    const { data: authData, error: authError } = await db.auth.getUser(bearer)
     if (authError || !authData?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const userId = authData.user.id
 
-    const { data: ownerProfile } = await supabaseAdmin
+    const { data: ownerProfile } = await db
       .from('profiles').select('id, role').eq('id', userId).single()
     if (!ownerProfile || ownerProfile.role !== 'owner') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { name, location, materials } = await request.json()
     if (!name) return NextResponse.json({ error: 'Factory name is required' }, { status: 400 })
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('factories')
       .insert({ name, location: location || null, materials: materials ?? null })
       .select()
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     // Auto-assign the creating owner to this factory
-    await supabaseAdmin.from('profile_factories').insert({ profile_id: userId, factory_id: data.id })
+    await db.from('profile_factories').insert({ profile_id: userId, factory_id: data.id })
 
     return NextResponse.json({ success: true, factory: data })
   } catch (err: any) {
@@ -95,7 +95,7 @@ export async function PATCH(request: Request) {
     if (is_active !== undefined) updates.is_active = is_active
     if (materials !== undefined) updates.materials = materials ?? null
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('factories')
       .update(updates)
       .eq('id', id)
@@ -114,7 +114,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'Factory ID required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('factories')
       .delete()
       .eq('id', id)

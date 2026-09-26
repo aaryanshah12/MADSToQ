@@ -32,7 +32,7 @@ as $$
     );
 $$;
 
-grant execute on function public.can_access_pmc_factory(uuid) to authenticated;
+grant execute on function public.can_access_pmc_factory(uuid) to app_user;
 
 -- ─── 2) Add factory_id (nullable until backfill) ─────────────
 alter table public.pmc_raw_materials

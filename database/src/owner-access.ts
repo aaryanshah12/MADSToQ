@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { supabaseAdmin } from './supabase-admin'
+import { adminDb } from './client'
 import { getBearerToken, requireAuthenticatedUser } from './api-auth'
 
 const OWNER_CACHE_TTL_MS = 60_000
@@ -16,7 +16,7 @@ export async function requireOwnerAccess(request: NextRequest) {
     return { userId: user.id, allowedFactoryIds: cached.allowedFactoryIds }
   }
 
-  const { data: ownerProfile } = await supabaseAdmin
+  const { data: ownerProfile } = await adminDb
     .from('profiles')
     .select('id, role')
     .eq('id', user.id)
@@ -26,7 +26,7 @@ export async function requireOwnerAccess(request: NextRequest) {
     return { response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
 
-  const { data: ownerFactories } = await supabaseAdmin
+  const { data: ownerFactories } = await adminDb
     .from('profile_factories')
     .select('factory_id')
     .eq('profile_id', user.id)
@@ -39,5 +39,4 @@ export async function requireOwnerAccess(request: NextRequest) {
   return { userId: user.id, allowedFactoryIds }
 }
 
-/** For routes that only need a bearer token string (legacy). */
 export { getBearerToken }

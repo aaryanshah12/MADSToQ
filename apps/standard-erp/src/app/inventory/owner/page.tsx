@@ -10,6 +10,7 @@ import { DrilldownRow } from '@/lib/drilldown'
 import { Package, FlaskConical, Factory, TrendingUp, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useAuth } from '@/hooks/useAuth'
+import { chartColors, chartTick, chartTooltip } from '@/lib/chart-theme'
 
 export default function OwnerDashboard() {
   const { profile, loading: authLoading } = useAuth()
@@ -161,19 +162,16 @@ export default function OwnerDashboard() {
             <div className="font-mono text-xs text-muted uppercase tracking-widest mb-4">Factory-wise Stock Chart</div>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} barGap={4}>
-                <XAxis dataKey="name" tick={{ fill: '#4a6080', fontSize: 11, fontFamily: 'Share Tech Mono' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#c8d8ea' }}
-                />
-                <Bar dataKey="loaded"  name="Loaded"  radius={[4,4,0,0]} fill="#00c2ff" opacity={0.8} />
-                <Bar dataKey="used"    name="Used"    radius={[4,4,0,0]} fill="#00e5a0" opacity={0.8} />
-                <Bar dataKey="balance" name="Balance" radius={[4,4,0,0]} fill="#f0a500" opacity={0.8} />
+                <XAxis dataKey="name" tick={{ ...chartTick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={chartTick} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
+                <Bar dataKey="loaded"  name="Loaded"  radius={[4,4,0,0]} fill={chartColors[0]} opacity={0.8} />
+                <Bar dataKey="used"    name="Used"    radius={[4,4,0,0]} fill={chartColors[1]} opacity={0.8} />
+                <Bar dataKey="balance" name="Balance" radius={[4,4,0,0]} fill={chartColors[2]} opacity={0.8} />
               </BarChart>
             </ResponsiveContainer>
             <div className="flex gap-4 mt-2 justify-center">
-              {[['#00c2ff','Loaded'],['#00e5a0','Used'],['#f0a500','Balance']].map(([c,l])=>(
+              {[[chartColors[0],'Loaded'],[chartColors[1],'Used'],[chartColors[2],'Balance']].map(([c,l])=>(
                 <div key={l} className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm" style={{background:c}} />
                   <span className="font-mono text-[10px] text-muted">{l}</span>

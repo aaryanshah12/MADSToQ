@@ -131,7 +131,7 @@ async function computeNextNumber(
   const yy = pad2(date.getFullYear() % 100)
 
   // Pull a small slice of recent numbers and compute max for this year.
-  // This keeps the logic in-app, even if the Supabase RPC isn't updated.
+  // This keeps numbering in the app when the SQL function is missing.
   let query = getServerDb()
     .from(table)
     .select(column)

@@ -64,12 +64,12 @@ export default function ProductModal({ editing, factoryId: factoryIdProp, onClos
     setForm(prev => ({ ...prev, [field]: e.target.value }))
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-      <div className="rounded-2xl shadow-2xl w-full max-w-md border border-border"
+    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center overflow-y-auto overscroll-contain bg-black/60 p-4">
+      <div className="rounded-2xl shadow-2xl w-full max-w-md my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto min-h-0 border border-border"
         style={{ background: 'var(--color-panel)' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-base font-bold text-primary">{editing ? 'Edit Product' : 'Add Product'}</h2>
-          <button onClick={onClose} className="text-muted hover:text-primary transition-colors"><X size={18}/></button>
+          <button onClick={onClose} className="text-muted hover:text-primary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Close"><X size={18}/></button>
         </div>
 
         <div className="p-6 space-y-4">

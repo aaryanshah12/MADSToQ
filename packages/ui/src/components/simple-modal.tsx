@@ -24,10 +24,10 @@ export default function SimpleModal({ open, title, subtitle, onClose, children, 
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto overscroll-contain bg-black/60 backdrop-blur-sm p-4">
       <div
         className={clsx(
-          'bg-panel border border-border rounded-2xl shadow-2xl w-full mx-auto max-h-[calc(100vh-2.5rem)] overflow-y-auto',
+          'bg-panel border border-border rounded-2xl shadow-2xl w-full mx-auto my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto min-h-0',
           widthClass
         )}
       >
@@ -40,7 +40,7 @@ export default function SimpleModal({ open, title, subtitle, onClose, children, 
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-layer text-muted hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-layer text-muted hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             <X size={18} />
           </button>

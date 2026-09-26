@@ -1,6 +1,6 @@
 -- ============================================================
--- CHEMICAL FACTORY PORTAL — SUPABASE DATABASE SCHEMA
--- Run this entire file in Supabase SQL Editor
+-- CHEMICAL FACTORY PORTAL — DATABASE SCHEMA
+-- Run database/sql/neon/00-auth.sql first, then this file, in the Neon SQL editor.
 -- ============================================================
 
 -- ─── EXTENSIONS ───────────────────────────────────────────

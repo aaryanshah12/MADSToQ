@@ -1,4 +1,5 @@
--- Factory-scoped I/O PDF template settings (run in Supabase SQL editor)
+-- Factory-scoped I/O PDF template settings
+-- Run in the Neon SQL editor after database/sql/supabase-schema.sql
 
 create table if not exists io_pdf_config (
   factory_id  uuid not null references factories(id) on delete cascade,

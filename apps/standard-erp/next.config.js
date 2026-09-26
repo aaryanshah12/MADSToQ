@@ -1,5 +1,23 @@
 /** @type {import('next').NextConfig} */
+const fs = require('fs')
 const path = require('path')
+
+// Monorepo env lives at the repo root. Next only auto-loads files next to this config.
+const rootEnv = path.resolve(__dirname, '../../.env.local')
+if (fs.existsSync(rootEnv)) {
+  for (const line of fs.readFileSync(rootEnv, 'utf8').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    const key = trimmed.slice(0, eq).trim()
+    let val = trimmed.slice(eq + 1).trim()
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
 
 const nextConfig = {
   transpilePackages: [
@@ -15,7 +33,7 @@ const nextConfig = {
     '@madstoq/themes',
   ],
   images: {
-    domains: ['your-project.supabase.co'],
+    domains: [],
   },
   async redirects() {
     return [
@@ -29,7 +47,13 @@ const nextConfig = {
       { source: '/website/inventory.html', destination: '/inventory.html', permanent: true },
       { source: '/website/io.html', destination: '/io.html', permanent: true },
       { source: '/website/pmc.html', destination: '/pmc.html', permanent: true },
-      { source: '/pmc/login', destination: '/pmc', permanent: true },
+      { source: '/website/crm.html', destination: '/crm.html', permanent: true },
+      { source: '/pmc/login', destination: '/portals/demo/pmc', permanent: false },
+      { source: '/pmc', destination: '/portals/demo/pmc', permanent: false },
+      { source: '/inventory/login', destination: '/portals/demo/inventory', permanent: false },
+      { source: '/inward-outward/login', destination: '/portals/demo/inward-outward', permanent: false },
+      { source: '/personal/sales/login', destination: '/portals/demo/sales', permanent: false },
+      { source: '/crm/login', destination: '/portals/demo/crm', permanent: false },
       { source: '/website/portfolio.html', destination: '/portfolio.html', permanent: true },
       { source: '/website/ahmedabad-it-saas.html', destination: '/ahmedabad-it-saas.html', permanent: true },
       { source: '/website/styles.css', destination: '/styles.css', permanent: true },
@@ -54,6 +78,7 @@ const nextConfig = {
         { source: '/inventory.html', destination: '/website/inventory.html' },
         { source: '/io.html', destination: '/website/io.html' },
         { source: '/pmc.html', destination: '/website/pmc.html' },
+        { source: '/crm.html', destination: '/website/crm.html' },
         { source: '/portfolio.html', destination: '/website/portfolio.html' },
         { source: '/ahmedabad-it-saas.html', destination: '/website/ahmedabad-it-saas.html' },
         { source: '/portfolio/:path*', destination: '/website/portfolio/:path*' },

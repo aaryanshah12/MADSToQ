@@ -18,13 +18,13 @@ function escapeHtml(s: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getSalesContext()
+  const ctx = await getSalesContext(req)
   if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
   const { document_id } = await req.json()
   if (!document_id) return NextResponse.json({ error: 'document_id required' }, { status: 400 })
 
-  const { data: doc, error } = await ctx.supabase
+  const { data: doc, error } = await ctx.db
     .from('sales_documents')
     .select('*')
     .eq('id', document_id)
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     // Mark sent + record metadata.
     const sentAt = new Date().toISOString()
-    await ctx.supabase
+    await ctx.db
       .from('sales_documents')
       .update({
         status: 'sent',
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     // Log a lead activity if attached to a lead.
     if (doc.lead_id) {
-      await ctx.supabase.from('sales_lead_activities').insert({
+      await ctx.db.from('sales_lead_activities').insert({
         lead_id: doc.lead_id,
         activity_type: doc.doc_type === 'purchase_order' ? 'po' : 'quotation',
         title: `${docTypeLabel} ${doc.doc_number} sent`,

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#f3f6f8"/>
+  <rect width="248" height="720" fill="#ffffff"/>
+  <rect x="248" width="1" height="720" fill="#d5e0e8"/>
+  <text x="28" y="52" fill="#122033" font-family="Inter,sans-serif" font-size="18" font-weight="700">CRM</text>
+  <rect x="16" y="84" width="216" height="36" rx="8" fill="#e7eef2"/>
+  <text x="32" y="107" fill="#122033" font-family="Inter,sans-serif" font-size="14" font-weight="600">Schemes</text>
+  <text x="32" y="156" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Blocks &amp; Plots</text>
+  <text x="32" y="196" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Leads</text>
+  <text x="32" y="236" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Brokers</text>
+  <text x="32" y="276" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Bookings</text>
+  <text x="32" y="316" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Payments</text>
+  <text x="32" y="356" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Handover</text>
+  <text x="292" y="64" fill="#122033" font-family="Inter,sans-serif" font-size="28" font-weight="700">Schemes</text>
+  <rect x="292" y="96" width="300" height="140" rx="14" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="316" y="136" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="13">Published</text>
+  <text x="316" y="188" fill="#1f6f8b" font-family="Inter,sans-serif" font-size="36" font-weight="700">6</text>
+  <rect x="612" y="96" width="300" height="140" rx="14" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="636" y="136" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="13">Open plots</text>
+  <text x="636" y="188" fill="#122033" font-family="Inter,sans-serif" font-size="36" font-weight="700">128</text>
+  <rect x="932" y="96" width="300" height="140" rx="14" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="956" y="136" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="13">Bookings</text>
+  <text x="956" y="188" fill="#122033" font-family="Inter,sans-serif" font-size="36" font-weight="700">41</text>
+  <rect x="292" y="260" width="940" height="400" rx="14" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="316" y="304" fill="#122033" font-family="Inter,sans-serif" font-size="16" font-weight="600">Recent schemes</text>
+  <text x="316" y="364" fill="#122033" font-family="Inter,sans-serif" font-size="15">SCH-2026-0142</text>
+  <text x="560" y="364" fill="#1f6f8b" font-family="Inter,sans-serif" font-size="15" font-weight="600">Published</text>
+  <text x="316" y="414" fill="#122033" font-family="Inter,sans-serif" font-size="15">SCH-2026-0138</text>
+  <text x="560" y="414" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="15">Draft</text>
+  <text x="316" y="464" fill="#122033" font-family="Inter,sans-serif" font-size="15">SCH-2026-0121</text>
+  <text x="560" y="464" fill="#1f6f8b" font-family="Inter,sans-serif" font-size="15" font-weight="600">Published</text>
+</svg>

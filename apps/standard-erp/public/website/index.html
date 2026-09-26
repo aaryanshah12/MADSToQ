@@ -73,6 +73,7 @@
               "Inventory management software",
               "Inward-Outward software",
               "Product costing",
+              "Plotting CRM",
               "Custom software development",
               "Digital transformation"
             ],
@@ -128,7 +129,7 @@
                   "itemOffered": {
                     "@type": "Service",
                     "name": "IT SaaS Products",
-                    "description": "Cloud SaaS for inventory, Inward-Outward, and product costing."
+                    "description": "Cloud SaaS for inventory, Inward-Outward, product costing, and plotting CRM."
                   }
                 },
                 {
@@ -232,14 +233,12 @@
     <header class="site-header">
       <div class="container nav-wrap">
         <a href="index.html" class="brand" aria-label="MADSToQ Home">
-          <img src="MADSToQ.png" alt="MADSToQ logo" class="brand-logo" />
+          <img src="MADSToQ-logo.png" alt="MADSToQ logo" class="brand-logo" />
         </a>
         <nav class="nav-links">
           <a href="index.html">Home</a>
           <a href="services.html">Services</a>
           <a href="portfolio.html">Portfolio</a>
-          <a href="inventory.html">Inventory</a>
-          <a href="io.html">Inward-Outward</a>
           <a href="about.html">About</a>
         </nav>
         <div class="nav-actions">
@@ -280,7 +279,7 @@
 
       <section class="metrics container reveal">
         <div class="metric-item">
-          <p class="metric-value">2</p>
+          <p class="metric-value">4</p>
           <p class="metric-label">Core Platforms</p>
         </div>
         <div class="metric-item">
@@ -300,15 +299,15 @@
       <section id="products" class="products container reveal">
         <h2>Our Products</h2>
         <p class="section-copy">
-          Two purpose-built platforms designed to simplify operations and
-          decision-making.
+          Four purpose-built platforms for inventory, material movement,
+          product costing, and plotting sales.
         </p>
 
         <div class="products-simple-grid">
-          <article class="product-simple-card tilt-card">
+          <a class="product-simple-card" href="inventory.html">
             <img
               src="Software/Inventory/Owner/Dashboard.png"
-              alt="Inventory dashboard preview"
+              alt="Inventory owner dashboard"
               class="product-simple-image"
             />
             <div class="product-simple-copy">
@@ -322,16 +321,14 @@
                 <li>Chemist, Inputer, and Owner role flows</li>
                 <li>Reports for better inventory decisions</li>
               </ul>
-              <a href="inventory.html" class="btn btn-primary"
-                >Open Inventory</a
-              >
+              <span class="btn btn-primary">Open Inventory</span>
             </div>
-          </article>
+          </a>
 
-          <article class="product-simple-card tilt-card">
+          <a class="product-simple-card" href="io.html">
             <img
               src="Software/IO/Company Listing.png"
-              alt="Inward-Outward dashboard preview"
+              alt="Inward-Outward company listing"
               class="product-simple-image"
             />
             <div class="product-simple-copy">
@@ -345,16 +342,58 @@
                 <li>Replace manual inward-outward registers with audited logs</li>
                 <li>Improve compliance and inventory accuracy</li>
               </ul>
-              <a href="io.html" class="btn btn-primary">Open Inward-Outward</a>
+              <span class="btn btn-primary">Open Inward-Outward</span>
             </div>
-          </article>
+          </a>
+
+          <a class="product-simple-card" href="pmc.html">
+            <img
+              src="Software/PMC/Dashboard.png"
+              alt="PMC dashboard preview"
+              class="product-simple-image"
+            />
+            <div class="product-simple-copy">
+              <h3>PMC</h3>
+              <p>
+                Product costing that turns raw-material price references and
+                recipes into a final RMC.
+              </p>
+              <ul>
+                <li>Reference numbers for saved price sets</li>
+                <li>Recipes, overhead, yield, and tons/kg</li>
+                <li>Dashboard and master data in one portal</li>
+              </ul>
+              <span class="btn btn-primary">Open PMC</span>
+            </div>
+          </a>
+
+          <a class="product-simple-card" href="crm.html">
+            <img
+              src="Software/CRM/overview.svg"
+              alt="CRM schemes workspace preview"
+              class="product-simple-image"
+            />
+            <div class="product-simple-copy">
+              <h3>CRM</h3>
+              <p>
+                Plotting CRM for schemes, plots, leads, brokers, bookings, and
+                collections through handover.
+              </p>
+              <ul>
+                <li>Scheme master with draft and publish</li>
+                <li>Blocks, plots, leads, and brokers</li>
+                <li>Bookings, payments, and handover</li>
+              </ul>
+              <span class="btn btn-primary">Open CRM</span>
+            </div>
+          </a>
         </div>
       </section>
 
       <section id="portfolio" class="portfolio-teaser container reveal">
         <h2>Portfolio</h2>
         <p class="section-copy">
-          Client websites designed and delivered by MADSToQ — chemicals, dyes,
+          Client websites designed and delivered by MADSToQ — chemicals,
           paper, and professional services.
         </p>
         <div class="portfolio-teaser-grid">
@@ -394,25 +433,6 @@
             <div class="portfolio-teaser-body">
               <h3>Nexa Papers</h3>
               <p>Paper products brand site with clear catalogue and enquiry flows.</p>
-            </div>
-          </a>
-          <a
-            href="https://www.zenithdyechem.com"
-            class="portfolio-teaser-card"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <div class="portfolio-teaser-media">
-              <img
-                src="/portfolio/zenithdyechem-screenshot.png"
-                alt="Zenith Dye Chem website landing page"
-                loading="lazy"
-              />
-              <span class="portfolio-teaser-domain">zenithdyechem.com</span>
-            </div>
-            <div class="portfolio-teaser-body">
-              <h3>Zenith Dye Chem</h3>
-              <p>Industrial dyes &amp; intermediates — catalogue, lab story, and export enquiries.</p>
             </div>
           </a>
           <a
@@ -474,6 +494,8 @@
           <h4>Products</h4>
           <a class="footer-link" href="inventory.html">Inventory</a>
           <a class="footer-link" href="io.html">Inward-Outward</a>
+          <a class="footer-link" href="pmc.html">PMC Portal</a>
+          <a class="footer-link" href="crm.html">CRM</a>
         </div>
         <div>
           <h4>Company</h4>

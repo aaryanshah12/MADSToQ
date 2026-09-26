@@ -1,9 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { authClient } from '@/lib/auth-client'
 import { setCachedAccessToken } from '@madstoq/core'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
+import DemoCredentials from '@/components/auth/DemoCredentials'
+import { DEMO_PORTALS } from '@/lib/demo-portals'
 
 const SESSION_KEY = 'io-last-activity'
 const EMAIL_KEY   = 'io-last-email'
@@ -17,8 +20,7 @@ export default function IOLoginPage() {
   const [loading, setLoading]         = useState(false)
 
   useEffect(() => {
-    const saved = (localStorage.getItem('io-theme') as 'dark' | 'light' | null) ?? 'light'
-    document.documentElement.dataset.theme = saved
+    persistTheme(readStoredTheme())
 
     const lastEmail = localStorage.getItem(EMAIL_KEY)
     if (lastEmail) setEmail(lastEmail)
@@ -31,7 +33,7 @@ export default function IOLoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await authClient.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -93,7 +95,7 @@ export default function IOLoginPage() {
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
-                  className="input w-full pr-10"
+                  className="input w-full pr-14"
                 />
                 <button
                   type="button"
@@ -125,11 +127,8 @@ export default function IOLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-muted text-center">
-              Software is managed by MADSToQ
-            </p>
-          </div>
+          <DemoCredentials accounts={DEMO_PORTALS['inward-outward'].accounts} />
+          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
         </div>
       </div>
     </div>

@@ -15,7 +15,6 @@
   "dependencies": {
     "@madstoq/core": "*",
     "@madstoq/database": "*",
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "pdf-lib": "^1.17.1"
   },
   "peerDependencies": {

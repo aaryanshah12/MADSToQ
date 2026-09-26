@@ -15,13 +15,13 @@ type PmcSimpleModalProps = {
 export function PmcSimpleModal({ title, onClose, children, footer, wide }: PmcSimpleModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto overscroll-contain p-4 bg-black/50"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className={`pmc-card w-full max-h-[90vh] overflow-y-auto shadow-xl ${wide ? 'max-w-2xl' : 'max-w-md'}`}
+        className={`pmc-card w-full my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto min-h-0 shadow-xl ${wide ? 'max-w-2xl' : 'max-w-md'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-4">
@@ -29,7 +29,7 @@ export function PmcSimpleModal({ title, onClose, children, footer, wide }: PmcSi
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-muted hover:text-primary hover:bg-layer-sm"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:text-primary hover:bg-layer-sm"
             aria-label="Close"
           >
             <X size={18} />

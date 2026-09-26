@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -9,13 +9,13 @@ async function getUserId(request: NextRequest) {
   const bearer = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null
 
   if (!bearer) return null
-  const { data, error } = await supabaseAdmin.auth.getUser(bearer)
+  const { data, error } = await db.auth.getUser(bearer)
   if (error || !data?.user) return null
   return data.user.id
 }
 
 async function allowedFactoryIdsFor(userId: string) {
-  const { data } = await supabaseAdmin
+  const { data } = await db
     .from('profile_factories')
     .select('factory_id')
     .eq('profile_id', userId)
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const allowed = await allowedFactoryIdsFor(userId)
     if (allowed.length === 0) return NextResponse.json({ products: [] })
 
-    let query = supabaseAdmin
+    let query = db
       .from('factory_inout_products')
       .select('*')
       .eq('kind', kind)
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     const userId = await getUserId(request)
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabaseAdmin.from('profiles').select('id, role').eq('id', userId).single()
+    const { data: profile } = await db.from('profiles').select('id, role').eq('id', userId).single()
     if (!profile || profile.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { factory_id, kind, name } = await request.json()
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     const allowed = await allowedFactoryIdsFor(userId)
     if (!allowed.includes(factory_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('factory_inout_products')
       .insert({
         factory_id,
@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest) {
     const userId = await getUserId(request)
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabaseAdmin.from('profiles').select('id, role').eq('id', userId).single()
+    const { data: profile } = await db.from('profiles').select('id, role').eq('id', userId).single()
     if (!profile || profile.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { id, is_active, name } = await request.json()
@@ -115,7 +115,7 @@ export async function PATCH(request: NextRequest) {
     if (is_active !== undefined) updates.is_active = Boolean(is_active)
     if (name !== undefined) updates.name = String(name).trim()
 
-    const { data: existing, error: existingErr } = await supabaseAdmin
+    const { data: existing, error: existingErr } = await db
       .from('factory_inout_products')
       .select('id, factory_id')
       .eq('id', id)
@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest) {
     const allowed = await allowedFactoryIdsFor(userId)
     if (!allowed.includes(existing.factory_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { error } = await supabaseAdmin.from('factory_inout_products').update(updates).eq('id', id)
+    const { error } = await db.from('factory_inout_products').update(updates).eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
   } catch (err: any) {

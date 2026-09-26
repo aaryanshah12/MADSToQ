@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type OutwardInput = {
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
 
-  let query = supabaseAdmin
+  let query = db
     .from('outward_entries')
     .select('*')
     .order('entry_date', { ascending: false })
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'factory_id, product_id, entry_date, batch_no, no_of_bags, as_is, purity, created_by are required' }, { status: 400 })
     }
 
-    const { data: productRow, error: productErr } = await supabaseAdmin
+    const { data: productRow, error: productErr } = await db
       .from('factory_inout_products')
       .select('id, factory_id, kind, name, is_active')
       .eq('id', payload.product_id)
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
     const real = computeReal(payload)
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('outward_entries')
       .insert({
         factory_id: payload.factory_id,
@@ -101,7 +101,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('outward_entries')
       .delete()
       .eq('id', id)

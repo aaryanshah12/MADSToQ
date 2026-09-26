@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#f3f6f8"/>
+  <rect width="248" height="720" fill="#ffffff"/>
+  <rect x="248" width="1" height="720" fill="#d5e0e8"/>
+  <text x="28" y="52" fill="#122033" font-family="Inter,sans-serif" font-size="18" font-weight="700">CRM</text>
+  <text x="32" y="107" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Schemes</text>
+  <rect x="16" y="128" width="216" height="36" rx="8" fill="#e7eef2"/>
+  <text x="32" y="151" fill="#122033" font-family="Inter,sans-serif" font-size="14" font-weight="600">Blocks &amp; Plots</text>
+  <text x="32" y="200" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Leads</text>
+  <text x="32" y="240" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Bookings</text>
+  <text x="292" y="64" fill="#122033" font-family="Inter,sans-serif" font-size="28" font-weight="700">Blocks &amp; plots</text>
+  <text x="292" y="98" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">SCH-2026-0142 - Block A</text>
+  <rect x="292" y="124" width="200" height="120" rx="12" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="312" y="168" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="13">Open</text>
+  <text x="312" y="210" fill="#1f6f8b" font-family="Inter,sans-serif" font-size="32" font-weight="700">18</text>
+  <rect x="508" y="124" width="200" height="120" rx="12" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="528" y="168" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="13">Booked</text>
+  <text x="528" y="210" fill="#122033" font-family="Inter,sans-serif" font-size="32" font-weight="700">9</text>
+  <rect x="724" y="124" width="200" height="120" rx="12" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="744" y="168" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="13">Hold</text>
+  <text x="744" y="210" fill="#122033" font-family="Inter,sans-serif" font-size="32" font-weight="700">3</text>
+  <rect x="292" y="268" width="940" height="400" rx="14" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="316" y="312" fill="#122033" font-family="Inter,sans-serif" font-size="16" font-weight="600">Plot register</text>
+  <text x="316" y="368" fill="#122033" font-family="Inter,sans-serif" font-size="15">A-12</text>
+  <text x="460" y="368" fill="#1f6f8b" font-family="Inter,sans-serif" font-size="15" font-weight="600">Open</text>
+  <text x="316" y="418" fill="#122033" font-family="Inter,sans-serif" font-size="15">A-13</text>
+  <text x="460" y="418" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="15">Booked</text>
+  <text x="316" y="468" fill="#122033" font-family="Inter,sans-serif" font-size="15">A-14</text>
+  <text x="460" y="468" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="15">Hold</text>
+</svg>

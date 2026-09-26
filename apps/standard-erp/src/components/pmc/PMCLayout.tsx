@@ -21,9 +21,9 @@ import {
 import { usePMC } from '@/contexts/PMCContext'
 import { usePMCFactory } from '@/contexts/PMCFactoryContext'
 import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 
 const BASE = '/pmc'
-const THEME_KEY = 'theme'
 
 const NAV = [
   { href: `${BASE}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
@@ -32,15 +32,6 @@ const NAV = [
   { href: `${BASE}/batches`, label: 'Batches', icon: Layers },
   { href: `${BASE}/compare`, label: 'Compare', icon: GitCompare },
 ]
-
-function readTheme(): 'dark' | 'light' {
-  if (typeof window === 'undefined') return 'light'
-  return (
-    (localStorage.getItem(THEME_KEY) as 'dark' | 'light' | null) ??
-    (localStorage.getItem('pmc-theme') as 'dark' | 'light' | null) ??
-    'light'
-  )
-}
 
 export default function PMCLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -52,21 +43,19 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
   const [themeMounted, setThemeMounted] = useState(false)
 
   useEffect(() => {
-    const saved = readTheme()
+    const saved = readStoredTheme()
     setTheme(saved)
-    document.documentElement.dataset.theme = saved
+    persistTheme(saved)
     setThemeMounted(true)
   }, [])
 
   useEffect(() => {
     if (!themeMounted) return
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem(THEME_KEY, theme)
-    localStorage.removeItem('pmc-theme')
+    persistTheme(theme)
   }, [theme, themeMounted])
 
   useEffect(() => {
-    if (!loading && !email) router.replace('/pmc')
+    if (!loading && !email) router.replace('/portals/demo/pmc')
   }, [loading, email, router])
 
   useEffect(() => setSidebarOpen(false), [pathname])

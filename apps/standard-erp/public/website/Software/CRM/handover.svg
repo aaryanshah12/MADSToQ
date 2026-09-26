@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#f3f6f8"/>
+  <rect width="248" height="720" fill="#ffffff"/>
+  <rect x="248" width="1" height="720" fill="#d5e0e8"/>
+  <text x="28" y="52" fill="#122033" font-family="Inter,sans-serif" font-size="18" font-weight="700">CRM</text>
+  <text x="32" y="107" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Payments</text>
+  <rect x="16" y="128" width="216" height="36" rx="8" fill="#e7eef2"/>
+  <text x="32" y="151" fill="#122033" font-family="Inter,sans-serif" font-size="14" font-weight="600">Handover</text>
+  <text x="292" y="64" fill="#122033" font-family="Inter,sans-serif" font-size="28" font-weight="700">Handover</text>
+  <rect x="292" y="108" width="940" height="540" rx="14" fill="#ffffff" stroke="#d5e0e8"/>
+  <text x="316" y="156" fill="#122033" font-family="Inter,sans-serif" font-size="16" font-weight="600">Ready to close</text>
+  <text x="316" y="220" fill="#122033" font-family="Inter,sans-serif" font-size="15">Plot A-08</text>
+  <text x="560" y="220" fill="#1f6f8b" font-family="Inter,sans-serif" font-size="15" font-weight="600">Documents in</text>
+  <text x="316" y="280" fill="#122033" font-family="Inter,sans-serif" font-size="15">Plot A-11</text>
+  <text x="560" y="280" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="15">Possession date set</text>
+  <text x="316" y="340" fill="#122033" font-family="Inter,sans-serif" font-size="15">Plot B-02</text>
+  <text x="560" y="340" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="15">Waiting on payment</text>
+  <text x="316" y="420" fill="#5a6b7c" font-family="Inter,sans-serif" font-size="14">Handover closes the booking once the plot file is complete.</text>
+</svg>

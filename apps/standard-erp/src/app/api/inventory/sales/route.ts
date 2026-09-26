@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type SalesEntryInput = {
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   if (!fiscalYear) return NextResponse.json({ error: 'fiscal_year is required' }, { status: 400 })
   if (!factoryId)  return NextResponse.json({ error: 'factory_id is required' },  { status: 400 })
 
-  let query = supabaseAdmin
+  let query = db
     .from('sales_entries')
     .select('*, sales_entry_lines(*)')
     .eq('fiscal_year', fiscalYear)
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     const hydrazoneLine = byKey('hydrazone')
 
     // Upsert by FY+month+factory (enforced by unique index)
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('sales_entries')
       .upsert({
         fiscal_year: String(payload.fiscal_year).trim(),
@@ -98,21 +98,21 @@ export async function POST(request: Request) {
 
     const entryId = data?.id
     if (entryId) {
-      const { error: delErr } = await supabaseAdmin
+      const { error: delErr } = await db
         .from('sales_entry_lines')
         .delete()
         .eq('sales_entry_id', entryId)
       if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 })
 
       if (lines.length > 0) {
-        const { error: insErr } = await supabaseAdmin
+        const { error: insErr } = await db
           .from('sales_entry_lines')
           .insert(lines.map(l => ({ ...l, sales_entry_id: entryId })))
         if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 })
       }
     }
 
-    const { data: fresh, error: freshErr } = await supabaseAdmin
+    const { data: fresh, error: freshErr } = await db
       .from('sales_entries')
       .select('*, sales_entry_lines(*)')
       .eq('id', data.id)
@@ -130,7 +130,7 @@ export async function PATCH(request: Request) {
     const payload: SalesEntryInput = await request.json()
     if (!payload.id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('sales_entries')
       .update({
         fiscal_year: payload.fiscal_year ? String(payload.fiscal_year).trim() : undefined,
@@ -154,7 +154,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('sales_entries')
       .delete()
       .eq('id', id)

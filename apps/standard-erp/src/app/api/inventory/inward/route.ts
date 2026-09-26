@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type InwardInput = {
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
 
-  let query = supabaseAdmin
+  let query = db
     .from('inward_entries')
     .select('*')
     .order('entry_date', { ascending: false })
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'factory_id, product_id, tons, created_by are required' }, { status: 400 })
     }
 
-    const { data: productRow, error: productErr } = await supabaseAdmin
+    const { data: productRow, error: productErr } = await db
       .from('factory_inout_products')
       .select('id, factory_id, kind, name, is_active')
       .eq('id', payload.product_id)
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Product does not belong to factory/kind' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('inward_entries')
       .insert({
         factory_id: payload.factory_id,
@@ -76,7 +76,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('inward_entries')
       .delete()
       .eq('id', id)

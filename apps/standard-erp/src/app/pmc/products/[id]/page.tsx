@@ -15,6 +15,7 @@ import {
   YAxis,
 } from 'recharts'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
+import { chartColors } from '@/lib/chart-theme'
 import type { PMCBatch, PMCRawMaterial } from '@madstoq/pmc-system/types'
 
 type ChartPoint = {
@@ -373,7 +374,7 @@ export default function PMCProductDetailPage() {
                     {chartData.map((entry) => (
                       <Cell
                         key={entry.label}
-                        fill={entry.kind === 'template' ? '#0086b3' : '#00c2ff'}
+                        fill={entry.kind === 'template' ? chartColors[1] : chartColors[0]}
                         fillOpacity={entry.kind === 'template' ? 0.9 : 0.75}
                       />
                     ))}
@@ -383,10 +384,10 @@ export default function PMCProductDetailPage() {
             </div>
             <div className="flex flex-wrap gap-4 mt-3 justify-center text-xs text-muted">
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-[#0086b3]" /> Template
+                <span className="w-3 h-3 rounded-sm" style={{ background: chartColors[1] }} /> Template
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-[#00c2ff] opacity-80" /> Batch
+                <span className="w-3 h-3 rounded-sm opacity-80" style={{ background: chartColors[0] }} /> Batch
               </span>
             </div>
           </>

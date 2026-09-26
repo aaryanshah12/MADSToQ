@@ -1,4 +1,4 @@
-import { supabaseAdmin, requireOwnerAccess } from '@madstoq/database'
+import { db, requireOwnerAccess } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch profile-factory links limited to owner’s factories
-    const { data: pfRows } = await supabaseAdmin
+    const { data: pfRows } = await db
       .from('profile_factories')
       .select('profile_id, factory_id')
       .in('factory_id', allowedFactoryIds)
@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
     }
 
     const [{ data: users, error: usersError }, { data: factories }] = await Promise.all([
-      supabaseAdmin.from('profiles').select('*').in('id', profileIds).order('role').order('full_name'),
-      supabaseAdmin.from('factories').select('*').in('id', allowedFactoryIds).eq('is_active', true).order('name'),
+      db.from('profiles').select('*').in('id', profileIds).order('role').order('full_name'),
+      db.from('factories').select('*').in('id', allowedFactoryIds).eq('is_active', true).order('name'),
     ])
 
     if (usersError) return NextResponse.json({ error: usersError.message }, { status: 400 })
@@ -67,24 +67,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({
-        error: 'SUPABASE_SERVICE_ROLE_KEY missing from .env.local — add it and restart the server'
-      }, { status: 500 })
-    }
-
-    // Create auth user
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    const { data, error } = await db.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
       user_metadata: { full_name, role }
     })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error || !data.user) return NextResponse.json({ error: error?.message ?? 'Could not create user' }, { status: 400 })
 
     // Upsert profile — works whether trigger fired or not
-    await supabaseAdmin.from('profiles').upsert({
+    await db.from('profiles').upsert({
       id:        data.user.id,
       full_name,
       email,
@@ -103,7 +96,7 @@ export async function POST(request: NextRequest) {
         profile_id: data.user.id,
         factory_id,
       }))
-      await supabaseAdmin.from('profile_factories').insert(rows)
+      await db.from('profile_factories').insert(rows)
     }
 
     return NextResponse.json({ success: true })
@@ -134,7 +127,7 @@ export async function PATCH(request: NextRequest) {
     if (is_active  !== undefined) updates.is_active  = is_active
 
     if (Object.keys(updates).length > 0) {
-      const { error } = await supabaseAdmin.from('profiles').update(updates).eq('id', id)
+      const { error } = await db.from('profiles').update(updates).eq('id', id)
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -144,7 +137,7 @@ export async function PATCH(request: NextRequest) {
 
       // Only touch factory links the owner actually controls
       if (allowedFactoryIds.length > 0) {
-        await supabaseAdmin
+        await db
           .from('profile_factories')
           .delete()
           .eq('profile_id', id)
@@ -153,7 +146,7 @@ export async function PATCH(request: NextRequest) {
 
       if (safeIds.length > 0) {
         const rows = safeIds.map((factory_id: string) => ({ profile_id: id, factory_id }))
-        await supabaseAdmin.from('profile_factories').insert(rows)
+        await db.from('profile_factories').insert(rows)
       }
     }
 
@@ -177,7 +170,7 @@ export async function DELETE(request: NextRequest) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
 
-    const { data: targetFactories } = await supabaseAdmin
+    const { data: targetFactories } = await db
       .from('profile_factories')
       .select('factory_id')
       .eq('profile_id', id)
@@ -185,7 +178,7 @@ export async function DELETE(request: NextRequest) {
     const hasAccess = (targetFactories ?? []).some((r: any) => allowedFactoryIds.includes(r.factory_id))
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
+    const { error } = await db.auth.admin.deleteUser(id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     return NextResponse.json({ success: true })

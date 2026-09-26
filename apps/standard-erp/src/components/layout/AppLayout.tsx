@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useInventoryFactory, clearInventoryFactory } from '@/contexts/InventoryFactoryContext'
 import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 
 interface NavItem { href: string; label: string; icon: React.ReactNode }
 
@@ -65,23 +66,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Read saved theme on mount (avoids SSR/client hydration mismatch)
   useEffect(() => {
-    const saved = (localStorage.getItem('theme') as 'dark' | 'light' | null) ?? 'light'
+    const saved = readStoredTheme()
     setTheme(saved)
-    document.documentElement.dataset.theme = saved
+    persistTheme(saved)
     setThemeMounted(true)
   }, [])
 
-  // Persist theme changes
   useEffect(() => {
     if (!themeMounted) return
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem('theme', theme)
+    persistTheme(theme)
   }, [theme, themeMounted])
 
   async function handleSignOut() {
     clearInventoryFactory()
     await signOut()
-    router.replace('/inventory/login')
+    router.replace('/portals/demo/inventory')
   }
 
   function navigate(href: string) {
@@ -255,7 +254,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Mobile top bar */}
         <div className="lg:hidden sticky top-0 z-20 flex items-center gap-2 px-4 py-3 bg-panel border-b border-border">
-          <button onClick={() => setSidebarOpen(true)} className="text-muted hover:text-primary p-2 flex-shrink-0">
+          <button onClick={() => setSidebarOpen(true)} className="text-muted hover:text-primary min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0" aria-label="Open menu">
             <Menu size={22} />
           </button>
           <div className="font-display text-base font-bold text-primary tracking-wider uppercase flex-1 min-w-0 truncate">

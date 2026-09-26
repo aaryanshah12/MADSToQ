@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { authClient } from '@/lib/auth-client'
 import { useAuth } from '@/hooks/useAuth'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
 import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
+import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 import clsx from 'clsx'
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpToLine,
@@ -43,15 +44,15 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authLoading) return
     if (!authUser) {
-      router.replace('/inward-outward/login')
+      router.replace('/portals/demo/inward-outward')
       return
     }
 
     const last = parseInt(localStorage.getItem(SESSION_KEY) ?? '0', 10)
     if (last && Date.now() - last > INACTIVITY_MS) {
       localStorage.removeItem('io-factory-id')
-      void supabase.auth.signOut()
-      router.replace('/inward-outward/login')
+      void authClient.auth.signOut()
+      router.replace('/portals/demo/inward-outward')
       return
     }
 
@@ -68,8 +69,8 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
       const last = parseInt(localStorage.getItem(SESSION_KEY) ?? '0', 10)
       if (last && Date.now() - last > INACTIVITY_MS) {
         localStorage.removeItem('io-factory-id')
-        supabase.auth.signOut()
-        router.replace('/inward-outward/login')
+        authClient.auth.signOut()
+        router.replace('/portals/demo/inward-outward')
       }
     }, CHECK_INTERVAL)
 
@@ -80,16 +81,15 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const saved = (localStorage.getItem('io-theme') as 'dark' | 'light' | null) ?? 'light'
+    const saved = readStoredTheme()
     setTheme(saved)
-    document.documentElement.dataset.theme = saved
+    persistTheme(saved)
     setThemeMounted(true)
   }, [])
 
   useEffect(() => {
     if (!themeMounted) return
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem('io-theme', theme)
+    persistTheme(theme)
   }, [theme, themeMounted])
 
   useEffect(() => { setSidebarOpen(false) }, [pathname])
@@ -98,8 +98,8 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
     if (authUser?.email) localStorage.setItem(EMAIL_KEY, authUser.email)
     localStorage.removeItem(SESSION_KEY)
     localStorage.removeItem('io-factory-id')
-    await supabase.auth.signOut()
-    router.replace('/inward-outward/login')
+    await authClient.auth.signOut()
+    router.replace('/portals/demo/inward-outward')
   }
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')

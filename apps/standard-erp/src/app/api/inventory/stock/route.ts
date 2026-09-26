@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@madstoq/database'
+import { db } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 // POST /api/stock — Create stock entry
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await db
       .from('stock_entries')
       .insert({
         factory_id,
@@ -47,7 +47,7 @@ export async function PATCH(request: Request) {
     const { id, ...updates } = await request.json()
     if (!id) return NextResponse.json({ error: 'Entry ID required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('stock_entries')
       .update(updates)
       .eq('id', id)
@@ -66,7 +66,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'Entry ID required' }, { status: 400 })
 
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from('stock_entries')
       .delete()
       .eq('id', id)

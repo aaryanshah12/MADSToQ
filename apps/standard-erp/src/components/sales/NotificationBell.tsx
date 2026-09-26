@@ -6,7 +6,6 @@ import {
   fetchNotifications, markNotificationRead, markAllNotificationsRead, fmtDate,
 } from '@madstoq/sales-system/api'
 import type { SalesNotification } from '@madstoq/sales-system/types'
-import { supabase } from '@/lib/supabase'
 
 const POLL_MS = 30_000
 
@@ -16,7 +15,6 @@ export default function NotificationBell() {
   const [items, setItems] = useState<SalesNotification[]>([])
   const [loading, setLoading] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const unread = items.filter(i => !i.is_read).length
 
@@ -36,39 +34,6 @@ export default function NotificationBell() {
     load()
     const t = setInterval(load, POLL_MS)
     return () => clearInterval(t)
-  }, [org?.id])
-
-  // Realtime — best-effort. If the Supabase project doesn't have realtime
-  // enabled for this table, the polling above still keeps the bell fresh.
-  useEffect(() => {
-    if (!org) return
-    if (rtChannelRef.current) {
-      supabase.removeChannel(rtChannelRef.current)
-      rtChannelRef.current = null
-    }
-
-    const channelName =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? `sales-notifications-${org.id}-${crypto.randomUUID()}`
-        : `sales-notifications-${org.id}-${Date.now()}`
-
-    const channel = supabase.channel(channelName)
-    rtChannelRef.current = channel
-
-    channel.on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'sales_notifications', filter: `org_id=eq.${org.id}` },
-      () => load(),
-    )
-
-    channel.subscribe()
-
-    return () => {
-      if (rtChannelRef.current) {
-        supabase.removeChannel(rtChannelRef.current)
-        rtChannelRef.current = null
-      }
-    }
   }, [org?.id])
 
   // Close on outside click.

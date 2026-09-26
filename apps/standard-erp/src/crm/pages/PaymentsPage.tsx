@@ -1015,59 +1015,6 @@ export function PaymentsPage() {
     }
   }
 
-  if (activeBookings.length === 0) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <Card>
-          <div className="py-8 text-center">
-            <Wallet className="mx-auto h-10 w-10 text-brand" />
-            <h1 className="mt-3 font-display text-2xl">No bookings yet</h1>
-            <p className="mt-1 text-sm text-ink-muted">
-              Create a booking and payment plan first to see pending dues.
-            </p>
-            <Link to="/bookings" className="mt-5 inline-block">
-              <Button>Go to Bookings</Button>
-            </Link>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-
-  const selectedPayRow = dueRows.find((r) =>
-    r.parts.some((p) => p.installment.id === payInstallmentId),
-  )
-  const selectedPayPart = selectedPayRow?.parts.find(
-    (p) => p.installment.id === payInstallmentId,
-  )
-
-  const collectInstallment = collectInstallmentId
-    ? installments.find((i) => i.id === collectInstallmentId)
-    : undefined
-  const collectBalance = collectInstallment
-    ? Math.max(0, collectInstallment.amount - collectInstallment.paidAmount)
-    : 0
-  const collectQuota =
-    collectOpen && collectBooking && collectInstallment
-      ? quotaForBookingCategory(
-          collectBooking,
-          collectInstallment.category,
-          installments,
-          getReceiptsByBooking(collectBooking.id),
-          getScheme(collectBooking.schemeId),
-        )
-      : null
-  const historyDetail = historyDetailId
-    ? historyRows.find((r) => r.receipt.id === historyDetailId)
-    : undefined
-
-  const handoverPromptBooking = handoverPromptBookingId
-    ? bookings.find((b) => b.id === handoverPromptBookingId)
-    : undefined
-  const handoverBooking = handoverBookingId
-    ? bookings.find((b) => b.id === handoverBookingId)
-    : undefined
-
   const readyForHandoverBookings = useMemo(() => {
     return bookings.filter(
       (b) =>
@@ -1128,6 +1075,59 @@ export function PaymentsPage() {
     otherReceipts,
     plots,
   ])
+
+  if (activeBookings.length === 0) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <Card>
+          <div className="py-8 text-center">
+            <Wallet className="mx-auto h-10 w-10 text-brand" />
+            <h1 className="mt-3 font-display text-2xl">No bookings yet</h1>
+            <p className="mt-1 text-sm text-ink-muted">
+              Create a booking and payment plan first to see pending dues.
+            </p>
+            <Link to="/bookings" className="mt-5 inline-block">
+              <Button>Go to Bookings</Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  const selectedPayRow = dueRows.find((r) =>
+    r.parts.some((p) => p.installment.id === payInstallmentId),
+  )
+  const selectedPayPart = selectedPayRow?.parts.find(
+    (p) => p.installment.id === payInstallmentId,
+  )
+
+  const collectInstallment = collectInstallmentId
+    ? installments.find((i) => i.id === collectInstallmentId)
+    : undefined
+  const collectBalance = collectInstallment
+    ? Math.max(0, collectInstallment.amount - collectInstallment.paidAmount)
+    : 0
+  const collectQuota =
+    collectOpen && collectBooking && collectInstallment
+      ? quotaForBookingCategory(
+          collectBooking,
+          collectInstallment.category,
+          installments,
+          getReceiptsByBooking(collectBooking.id),
+          getScheme(collectBooking.schemeId),
+        )
+      : null
+  const historyDetail = historyDetailId
+    ? historyRows.find((r) => r.receipt.id === historyDetailId)
+    : undefined
+
+  const handoverPromptBooking = handoverPromptBookingId
+    ? bookings.find((b) => b.id === handoverPromptBookingId)
+    : undefined
+  const handoverBooking = handoverBookingId
+    ? bookings.find((b) => b.id === handoverBookingId)
+    : undefined
 
   const confirmHandover = (input: { handoverDate: string; note: string }) => {
     if (!handoverBookingId || !user) return

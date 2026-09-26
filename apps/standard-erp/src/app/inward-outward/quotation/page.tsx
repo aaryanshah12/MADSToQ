@@ -8,7 +8,7 @@ import type { IOQuotation, IOQuotationItem, IOCompany, IOProduct } from '@madsto
 import ProductModal from '@/components/io/ProductModal'
 import CompanyModal from '@/components/io/CompanyModal'
 import RichTextEditor from '@/components/io/RichTextEditor'
-import { Plus, Pencil, Trash2, X, Save, Download, Upload, Printer, Eye } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Save, Download, Upload, Printer, Eye, Mail } from 'lucide-react'
 import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { printLetterHeadQuotation } from '@madstoq/io-system/print'
 

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { CrmShell } from '@/crm/CrmShell'
 
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 }
 
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
-  return <CrmShell>{children}</CrmShell>
+  return (
+    <Suspense fallback={<div className="crm-app min-h-screen bg-canvas" />}>
+      <CrmShell>{children}</CrmShell>
+    </Suspense>
+  )
 }

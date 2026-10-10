@@ -11,12 +11,14 @@ if (!authSecret) {
   )
 }
 
-const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
-process.env.AUTH_URL = authUrl
-process.env.NEXTAUTH_URL = authUrl
+const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL
+if (authUrl) {
+  process.env.AUTH_URL = authUrl
+  process.env.NEXTAUTH_URL = authUrl
+}
 
 /** Secure cookie names (__Host-/__Secure-) only work on HTTPS — never on http://localhost. */
-const useSecureCookies = authUrl.startsWith('https://')
+const useSecureCookies = Boolean(authUrl?.startsWith('https://'))
 
 /** Auth.js session layer using app-managed credentials (Neon/Prisma). */
 export const { handlers, auth, signIn, signOut } = NextAuth({

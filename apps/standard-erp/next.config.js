@@ -22,6 +22,17 @@ if (fs.existsSync(rootEnv)) {
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  outputFileTracingRoot: path.join(__dirname, '../..'),
+  experimental: {
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer', 'puppeteer-core'],
+    outputFileTracingIncludes: {
+      '/api/**/*': ['../../database/src/generated/client/**/*'],
+      '/inventory/**/*': ['../../database/src/generated/client/**/*'],
+      '/pmc/**/*': ['../../database/src/generated/client/**/*'],
+      '/inward-outward/**/*': ['../../database/src/generated/client/**/*'],
+      '/personal/**/*': ['../../database/src/generated/client/**/*'],
+    },
+  },
   transpilePackages: [
     '@madstoq/auth',
     '@madstoq/core',
@@ -36,9 +47,6 @@ const nextConfig = {
   ],
   images: {
     domains: [],
-  },
-  experimental: {
-    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer', 'puppeteer-core'],
   },
   async redirects() {
     return [

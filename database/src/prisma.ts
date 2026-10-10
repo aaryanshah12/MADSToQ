@@ -1,6 +1,46 @@
 import './load-env'
+import { existsSync, readdirSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { PrismaClient } from './generated/client'
 import { fieldEncryptionExtension } from './prisma-extension'
+
+/** Point Prisma at the engine binary. Bundled server functions do not sit next to it. */
+function configureQueryEngine() {
+  const current = process.env.PRISMA_QUERY_ENGINE_LIBRARY
+  if (current && existsSync(current)) return
+
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const dirs = [
+    path.join(here, 'generated/client'),
+    path.join(process.cwd(), 'database/src/generated/client'),
+    path.join(process.cwd(), '../../database/src/generated/client'),
+    path.join(process.cwd(), 'src/generated/client'),
+  ]
+  const platformHint =
+    process.platform === 'linux'
+      ? 'rhel-openssl-3.0.x'
+      : process.platform === 'darwin'
+        ? `darwin-${process.arch}`
+        : ''
+
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue
+    let names: string[] = []
+    try {
+      names = readdirSync(dir)
+    } catch {
+      continue
+    }
+    const engines = names.filter((name) => name.startsWith('libquery_engine-') && name.endsWith('.node'))
+    const match = (platformHint && engines.find((name) => name.includes(platformHint))) || engines[0]
+    if (!match) continue
+    process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(dir, match)
+    return
+  }
+}
+
+configureQueryEngine()
 
 /** Bump when `prisma generate` adds fields that must replace a hot-reloaded client. */
 const PRISMA_CLIENT_REVISION = 'list-roundtrip-v2'

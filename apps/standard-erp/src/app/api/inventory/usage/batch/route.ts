@@ -1,4 +1,4 @@
-import { db } from '@madstoq/database'
+import { createUsageFromLot, prisma, queryStockBalance, parseStockKind, serializeUsageEntry, UsageLotError } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 interface UsageItem {
@@ -39,20 +39,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Each usage needs factory_id, invoice_number, tons_used' }, { status: 400 })
     }
 
-    // Aggregate usage per invoice to validate balances
     const invoiceTotals: Record<string, number> = {}
     cleaned.forEach(u => {
       invoiceTotals[u.invoice_number] = (invoiceTotals[u.invoice_number] ?? 0) + Number(u.tons_used)
     })
 
     const invoiceNumbers = Object.keys(invoiceTotals)
-    const { data: balances, error: balError } = await db
-      .from('stock_balance')
-      .select('invoice_number, tons_remaining')
-      .in('invoice_number', invoiceNumbers)
+    const balances = await queryStockBalance({ invoiceNumbers })
 
-    if (balError) return NextResponse.json({ error: balError.message }, { status: 400 })
-    if (!balances || balances.length !== invoiceNumbers.length) {
+    if (balances.length !== invoiceNumbers.length) {
       return NextResponse.json({ error: 'One or more invoices not found' }, { status: 404 })
     }
 
@@ -63,30 +58,45 @@ export async function POST(request: Request) {
           error: `Invoice ${bal.invoice_number} has only ${Number(bal.tons_remaining).toFixed(3)} KGS available`,
         }, { status: 400 })
       }
+      if (parseStockKind(bal.stock_kind) !== 'rm') {
+        return NextResponse.json({
+          error: `Lot ${bal.invoice_number} is not raw material. Chemist log usage is RM only.`,
+        }, { status: 400 })
+      }
     }
 
-    const rows = cleaned.map(u => ({
-      factory_id: u.factory_id,
-      invoice_number: u.invoice_number,
-      tons_used: Number(u.tons_used),
-      process_id:  process_id  || null,
-      batch_notes: batch_notes || null,
-      shift:       shift       || null,
-      usage_date:  usage_date  || new Date().toISOString().split('T')[0],
-      batch_month: normalizedMonth,
-      batch_id:    normalizedBatchId,
-      created_by,
-    }))
+    const usageDate = new Date(usage_date || new Date().toISOString().split('T')[0])
+    const entries = await prisma.$transaction(async (tx) => {
+      const created = []
+      for (const u of cleaned) {
+        created.push(
+          await createUsageFromLot(tx, {
+            factoryId: u.factory_id,
+            invoiceNumber: u.invoice_number,
+            tonsUsed: Number(u.tons_used),
+            processId: process_id || null,
+            batchNotes: batch_notes || null,
+            shift: shift || null,
+            usageDate,
+            batchMonth: normalizedMonth,
+            batchId: normalizedBatchId,
+            createdBy: created_by,
+            usageReason: 'plant_consume',
+            expectedKind: 'rm',
+          }),
+        )
+      }
+      return created
+    })
 
-    const { data, error } = await db
-      .from('usage_entries')
-      .insert(rows)
-      .select()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-    return NextResponse.json({ success: true, entries: data })
+    return NextResponse.json({
+      success: true,
+      entries: entries.map((e) => serializeUsageEntry(e as any)),
+    })
   } catch (err: any) {
+    if (err instanceof UsageLotError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import { useAuth } from '@/hooks/useAuth'
 import { createInOutProduct, fetchInOutProducts, InOutKind, InOutProduct, updateInOutProduct } from '@/lib/inoutProducts'
 import { Plus, ToggleLeft, ToggleRight } from 'lucide-react'
 import clsx from 'clsx'
+import { Spinner } from '@/components/ui'
 
 export default function OwnerInOutProductsPage() {
   const { profile } = useAuth()
@@ -76,7 +77,7 @@ export default function OwnerInOutProductsPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="Inward/Outward Products"
           subtitle="Owner · Configure products for inward/outward modules"
@@ -85,14 +86,14 @@ export default function OwnerInOutProductsPage() {
 
         <div className="card p-4 md:p-6 mb-4 grid gap-4 md:grid-cols-3 items-end">
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Factory</label>
-            <select className="input" value={factoryId} onChange={e => setFactoryId(e.target.value)}>
+            <label htmlFor="factory" className="text-xs text-muted font-mono">Factory</label>
+            <select id="factory" className="input" value={factoryId} onChange={e => setFactoryId(e.target.value)}>
               {factories.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Module</label>
-            <select className="input" value={kind} onChange={e => setKind(e.target.value as InOutKind)}>
+            <label htmlFor="module" className="text-xs text-muted font-mono">Module</label>
+            <select id="module" className="input" value={kind} onChange={e => setKind(e.target.value as InOutKind)}>
               <option value="inward">Inward</option>
               <option value="outward">Outward</option>
             </select>
@@ -124,7 +125,7 @@ export default function OwnerInOutProductsPage() {
           <div className="card overflow-hidden">
             <div className="px-4 md:px-6 py-4 border-b border-border flex items-center justify-between">
               <div className="font-mono text-xs text-muted uppercase tracking-widest">Active</div>
-              {loading && <div className="text-xs text-muted">Loading…</div>}
+              {loading && <Spinner size="xs" accent="owner" label="Loading products" />}
             </div>
             <div className="p-4 md:p-6 space-y-2">
               {active.length === 0 && !loading && (

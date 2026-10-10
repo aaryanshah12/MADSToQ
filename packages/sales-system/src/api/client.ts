@@ -1,10 +1,10 @@
-import { rpcPost } from '@madstoq/core'
+import { rpcPost } from "@madstoq/core";
 import type {
   SalesOrg, SalesUser, SalesLead, SalesLeadActivity,
   SalesDocument, SalesDocType, DocStatus,
   SalesExpenseSplit, SalesExpenseWithSplits,
   SalesNotification, ActivityType, SplitMethod,
-} from '../types/index'
+} from './types'
 
 const RPC = '/api/rpc/sales'
 const READ_CACHE_TTL_MS = 60_000
@@ -54,8 +54,29 @@ export async function fetchOrgUsers(orgId: string): Promise<SalesUser[]> {
   return rpcPost<SalesUser[]>(RPC, 'fetchOrgUsers', { orgId })
 }
 
-export async function fetchLeads(orgId: string): Promise<SalesLead[]> {
-  const cacheKey = `leads:${orgId}`; const cached = getCached<SalesLead[]>(cacheKey); if (cached) return cached; const rows = await rpcPost<SalesLead[]>(RPC, 'fetchLeads', { orgId }); setCached(cacheKey, rows); return rows
+export type SalesListQuery = {
+  page?: number
+  page_size?: number
+  all?: boolean
+  q?: string
+  status?: string
+}
+
+export type SalesPage<T> = {
+  rows: T[]
+  total: number
+  page: number
+  pageSize: number
+  statusCounts?: Record<string, number>
+}
+
+export async function fetchLeads(orgId: string): Promise<SalesLead[]>
+export async function fetchLeads(orgId: string, query: SalesListQuery): Promise<SalesPage<SalesLead>>
+export async function fetchLeads(orgId: string, query?: SalesListQuery): Promise<SalesLead[] | SalesPage<SalesLead>> {
+  if (!query) {
+    const cacheKey = `leads:${orgId}`; const cached = getCached<SalesLead[]>(cacheKey); if (cached) return cached; const rows = await rpcPost<SalesLead[]>(RPC, 'fetchLeads', { orgId }); setCached(cacheKey, rows); return rows
+  }
+  return rpcPost<SalesPage<SalesLead>>(RPC, 'fetchLeads', { orgId, ...query })
 }
 
 export async function fetchLead(id: string): Promise<SalesLead | null> {
@@ -82,8 +103,13 @@ export async function nextDocNumber(orgId: string, docType: SalesDocType): Promi
   return rpcPost<string>(RPC, 'nextDocNumber', { orgId, docType })
 }
 
-export async function fetchDocuments(orgId: string, docType?: SalesDocType): Promise<SalesDocument[]> {
-  const cacheKey = `documents:${orgId}:${docType ?? 'all'}`; const cached = getCached<SalesDocument[]>(cacheKey); if (cached) return cached; const rows = await rpcPost<SalesDocument[]>(RPC, 'fetchDocuments', { orgId, docType }); setCached(cacheKey, rows); return rows
+export async function fetchDocuments(orgId: string, docType?: SalesDocType): Promise<SalesDocument[]>
+export async function fetchDocuments(orgId: string, docType: SalesDocType | undefined, query: SalesListQuery): Promise<SalesPage<SalesDocument>>
+export async function fetchDocuments(orgId: string, docType?: SalesDocType, query?: SalesListQuery): Promise<SalesDocument[] | SalesPage<SalesDocument>> {
+  if (!query) {
+    const cacheKey = `documents:${orgId}:${docType ?? 'all'}`; const cached = getCached<SalesDocument[]>(cacheKey); if (cached) return cached; const rows = await rpcPost<SalesDocument[]>(RPC, 'fetchDocuments', { orgId, docType }); setCached(cacheKey, rows); return rows
+  }
+  return rpcPost<SalesPage<SalesDocument>>(RPC, 'fetchDocuments', { orgId, docType, ...query })
 }
 
 export async function fetchDocument(id: string): Promise<SalesDocument | null> {

@@ -18,7 +18,7 @@
       "@/*": ["./src/*"],
       "@madstoq/auth": ["../../packages/auth/src/index.ts"],
       "@madstoq/core": ["../../packages/core/src/index.ts"],
-      "@madstoq/database": ["../../packages/database/src/index.ts"]
+      "@madstoq/database": ["../../database/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

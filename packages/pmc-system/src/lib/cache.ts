@@ -1,12 +1,10 @@
-import type { PMCStore } from '../lib/types'
-import { migrateStore } from '../lib/storage'
+import type { PMCStore } from '../types'
+import { migrateStore } from './storage'
 
 const emptyStore = (): PMCStore => ({
   raw_materials: [],
   products: [],
   product_materials: [],
-  batches: [],
-  batch_lines: [],
   references: [],
   reference_prices: [],
   product_params: [],

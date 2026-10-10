@@ -1,0 +1,12 @@
+{
+  "extends": "@madstoq/typescript-config/node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@madstoq/database": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "seeds/**/*", "prisma/**/*"],
+  "exclude": ["node_modules"]
+}

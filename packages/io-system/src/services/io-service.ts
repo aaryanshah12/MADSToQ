@@ -1,14 +1,43 @@
-import { existsSync } from 'fs'
-import { access, mkdir, readFile, writeFile } from 'fs/promises'
-import path from 'path'
-import { getAuthenticatedUser, getServerDb } from '@madstoq/database'
+import {
+  getPrisma,
+  getRequestUser,
+  moneyStr,
+  textOrNull,
+  pageDocumentIds,
+  parsePageParams,
+  reorderByIds,
+  type DocumentTable,
+  type PageResult,
+} from '@madstoq/database'
+import {
+  assertCanDeleteDocuments,
+  assertCanManageMaster,
+  assertCanWriteDocuments,
+  assertDocumentFactoryAccess,
+  assertFactoryAccess,
+  factoryListWhere,
+} from '../auth/io-access'
+import { isIoDomesticEnabled, isIoInternationalEnabled } from '../io-module-flags'
+import type { IoNumberFormat } from '../numbering-formats'
 import type {
-  IOUnit, IOCountry, IOState, IOCity,
-  IOCompany, IOProduct,
-  IOInward, IOOutward, IODomestic, IOInternational,
-  IOQuotation, IOLineItem, IOQuotationItem,
-  CompanyType, DocType,
-} from '../types/index'
+  IOUnit,
+  IOCountry,
+  IOState,
+  IOCity,
+  IOCompany,
+  IOProduct,
+  IOInward,
+  IOOutward,
+  IODomestic,
+  IOInternational,
+  IOQuotation,
+  IOLineItem,
+  IOQuotationItem,
+  CompanyType,
+  DocType,
+} from '../types'
+
+const prisma = getPrisma()
 
 const READ_CACHE_TTL_MS = 60_000
 const readCache = new Map<string, { data: unknown; expiresAt: number }>()
@@ -33,48 +62,397 @@ function clearCachedPrefix(prefix: string) {
   })
 }
 
-// ── Auth helpers ───────────────────────────────────────────────
-async function userId() {
-  try {
-    return getAuthenticatedUser().id
-  } catch {
-    const { data } = await getServerDb().auth.getUser()
-    return data.user?.id ?? null
+function userId() {
+  return getRequestUser()?.id ?? null
+}
+
+function num(v: unknown): number {
+  if (v == null) return 0
+  if (typeof v === 'number') return v
+  if (typeof v === 'object' && v !== null && 'toNumber' in v) {
+    return (v as { toNumber(): number }).toNumber()
+  }
+  return Number(v) || 0
+}
+
+function dateStr(d: Date | null | undefined): string | undefined {
+  if (!d) return undefined
+  return d.toISOString().slice(0, 10)
+}
+
+function iso(d: Date | null | undefined): string | undefined {
+  return d?.toISOString()
+}
+
+function parseDate(s: string): Date {
+  return new Date(`${s.slice(0, 10)}T00:00:00.000Z`)
+}
+
+function rowToUnit(r: { id: number; name: string; abbreviation: string | null; createdAt: Date }): IOUnit {
+  return { id: r.id, name: r.name, abbreviation: r.abbreviation, created_at: iso(r.createdAt) }
+}
+
+function rowToCountry(r: { id: number; name: string; code: string | null; createdAt: Date }): IOCountry {
+  return { id: r.id, name: r.name, code: r.code, created_at: iso(r.createdAt) }
+}
+
+function rowToState(
+  r: { id: number; countryId: number; name: string; code: string | null; createdAt: Date; country?: { name: string } | null }
+): IOState {
+  return {
+    id: r.id,
+    country_id: r.countryId,
+    name: r.name,
+    code: r.code,
+    created_at: iso(r.createdAt),
+    country: r.country ? { name: r.country.name } : undefined,
   }
 }
 
-export async function assertFactoryAccess(factory_id: string) {
-  const uid = await userId()
-  if (!uid) throw new Error('Unauthorized')
-  const { data, error } = await getServerDb()
-    .from('profile_factories')
-    .select('factory_id')
-    .eq('profile_id', uid)
-    .eq('factory_id', factory_id)
-    .maybeSingle()
-  if (error) throw error
-  if (!data) throw new Error('You do not have access to this factory')
+function rowToCity(
+  r: { id: number; stateId: number; name: string; createdAt: Date; state?: { name: string } | null }
+): IOCity {
+  return {
+    id: r.id,
+    state_id: r.stateId,
+    name: r.name,
+    created_at: iso(r.createdAt),
+    state: r.state ? { name: r.state.name } : undefined,
+  }
 }
 
-function isMissingTableError(error: { code?: string; message?: string } | null) {
-  if (!error) return false
-  return error.code === '42P01' || (error.message ?? '').includes('io_pdf_')
+function rowToCompany(r: {
+  id: string
+  factoryId: string | null
+  companyType: string
+  companyName: string
+  personTitle: string | null
+  personName: string | null
+  countryId: number | null
+  stateId: number | null
+  cityId: number | null
+  address: string | null
+  pincode: string | null
+  mobile: string | null
+  email: string | null
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+  country?: { name: string } | null
+  state?: { name: string } | null
+  city?: { name: string } | null
+}): IOCompany {
+  return {
+    id: r.id,
+    factory_id: r.factoryId,
+    company_type: r.companyType as CompanyType,
+    company_name: r.companyName,
+    person_title: r.personTitle,
+    person_name: r.personName,
+    country_id: r.countryId,
+    state_id: r.stateId,
+    city_id: r.cityId,
+    address: r.address,
+    pincode: r.pincode,
+    mobile: r.mobile,
+    email: r.email,
+    is_active: r.isActive,
+    created_at: iso(r.createdAt),
+    updated_at: iso(r.updatedAt),
+    country: r.country ? { name: r.country.name } : null,
+    state: r.state ? { name: r.state.name } : null,
+    city: r.city ? { name: r.city.name } : null,
+  }
+}
+
+function rowToProduct(r: {
+  id: string
+  factoryId: string | null
+  productName: string
+  description: string | null
+  hsnCode: string | null
+  unitId: number | null
+  rate: unknown
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+  unit?: { name: string; abbreviation: string | null } | null
+}): IOProduct {
+  return {
+    id: r.id,
+    factory_id: r.factoryId,
+    product_name: r.productName,
+    description: r.description,
+    hsn_code: r.hsnCode,
+    unit_id: r.unitId,
+    rate: r.rate != null ? num(r.rate) : null,
+    is_active: r.isActive,
+    created_at: iso(r.createdAt),
+    updated_at: iso(r.updatedAt),
+    unit: r.unit ? { name: r.unit.name, abbreviation: r.unit.abbreviation } : null,
+  }
+}
+
+function rowToLineItem(r: {
+  id: string
+  productId: string
+  quantity: unknown
+  price: unknown
+  remarks: string | null
+  sortOrder: number
+  product?: { productName: string; hsnCode: string | null } | null
+}): IOLineItem {
+  return {
+    id: r.id,
+    product_id: r.productId,
+    quantity: num(r.quantity),
+    price: num(r.price),
+    remarks: r.remarks ?? undefined,
+    sort_order: r.sortOrder,
+    product: r.product
+      ? { product_name: r.product.productName, hsn_code: r.product.hsnCode } as IOProduct
+      : null,
+  }
+}
+
+function rowToQuotationItem(r: {
+  id: string
+  quotationId: string
+  referenceNo: string | null
+  productId: string | null
+  productNameOverride: string | null
+  price: unknown
+  priceUnit?: string | null
+  sortOrder: number
+  product?: { productName: string } | null
+}): IOQuotationItem {
+  return {
+    id: r.id,
+    quotation_id: r.quotationId,
+    reference_no: r.referenceNo,
+    product_id: r.productId,
+    product_name_override: r.productNameOverride,
+    price: num(r.price),
+    price_unit: (r.priceUnit === 'USD/KG' ? 'USD/KG' : 'INR/KG') as IOQuotationItem['price_unit'],
+    sort_order: r.sortOrder,
+    product: r.product ? { product_name: r.product.productName } as IOProduct : null,
+  }
+}
+
+const lineItemInclude = {
+  orderBy: { sortOrder: 'asc' as const },
+  include: { product: { select: { productName: true, hsnCode: true } } },
+}
+
+const inwardInclude = {
+  factory: { select: { id: true, name: true } },
+  supplier: { select: { id: true, companyName: true, personName: true } },
+  items: lineItemInclude,
+}
+
+const outwardInclude = {
+  factory: { select: { id: true, name: true } },
+  supplier: { select: { id: true, companyName: true, personName: true } },
+  items: lineItemInclude,
+}
+
+const domesticInclude = {
+  factory: { select: { id: true, name: true } },
+  customer: { select: { id: true, companyName: true, personName: true } },
+  items: lineItemInclude,
+}
+
+const internationalInclude = {
+  factory: { select: { id: true, name: true } },
+  customer: { select: { id: true, companyName: true, personName: true } },
+  items: lineItemInclude,
+}
+
+const quotationInclude = {
+  factory: { select: { id: true, name: true } },
+  customer: { select: { id: true, companyName: true, personTitle: true, personName: true } },
+  items: {
+    orderBy: { sortOrder: 'asc' as const },
+    include: { product: { select: { productName: true } } },
+  },
+}
+
+function rowToInward(r: {
+  id: string
+  factoryId: string | null
+  inwardNumber: string
+  inwardDate: Date
+  supplierId: string | null
+  supplierRefNo: string | null
+  remarks: string | null
+  createdBy: string | null
+  createdAt: Date
+  updatedAt: Date
+  factory?: { id: string; name: string } | null
+  supplier?: { id: string; companyName: string; personName: string | null } | null
+  items?: Array<Parameters<typeof rowToLineItem>[0] & { inwardId?: string }>
+}): IOInward {
+  return {
+    id: r.id,
+    factory_id: r.factoryId,
+    inward_number: r.inwardNumber,
+    inward_date: dateStr(r.inwardDate)!,
+    supplier_id: r.supplierId,
+    supplier_ref_no: r.supplierRefNo,
+    remarks: r.remarks,
+    created_by: r.createdBy ?? undefined,
+    created_at: iso(r.createdAt),
+    updated_at: iso(r.updatedAt),
+    factory: r.factory ?? null,
+    supplier: r.supplier
+      ? {
+          id: r.supplier.id,
+          company_name: r.supplier.companyName,
+          person_name: r.supplier.personName,
+          company_type: 'supplier',
+          is_active: true,
+        }
+      : null,
+    items: r.items?.map(rowToLineItem),
+  }
+}
+
+function rowToOutward(r: {
+  id: string
+  factoryId: string | null
+  outwardNumber: string
+  outwardDate: Date
+  supplierId: string | null
+  supplierRefNo: string | null
+  remarks: string | null
+  createdBy: string | null
+  createdAt: Date
+  updatedAt: Date
+  factory?: { id: string; name: string } | null
+  supplier?: { id: string; companyName: string; personName: string | null } | null
+  items?: Array<Parameters<typeof rowToLineItem>[0]>
+}): IOOutward {
+  return {
+    id: r.id,
+    factory_id: r.factoryId,
+    outward_number: r.outwardNumber,
+    outward_date: dateStr(r.outwardDate)!,
+    supplier_id: r.supplierId,
+    supplier_ref_no: r.supplierRefNo,
+    remarks: r.remarks,
+    created_at: iso(r.createdAt),
+    updated_at: iso(r.updatedAt),
+    factory: r.factory ?? null,
+    supplier: r.supplier
+      ? {
+          id: r.supplier.id,
+          company_name: r.supplier.companyName,
+          person_name: r.supplier.personName,
+          company_type: 'supplier',
+          is_active: true,
+        }
+      : null,
+    items: r.items?.map(rowToLineItem),
+  }
+}
+
+function rowToDomestic(r: {
+  id: string
+  factoryId: string | null
+  invoiceNumber: string
+  taxInvoiceNumber: string | null
+  invoiceDate: Date
+  customerId: string | null
+  remarks: string | null
+  createdBy: string | null
+  createdAt: Date
+  updatedAt: Date
+  factory?: { id: string; name: string } | null
+  customer?: { id: string; companyName: string; personName: string | null } | null
+  items?: Array<Parameters<typeof rowToLineItem>[0]>
+}): IODomestic {
+  return {
+    id: r.id,
+    factory_id: r.factoryId,
+    invoice_number: r.invoiceNumber,
+    tax_invoice_number: r.taxInvoiceNumber,
+    invoice_date: dateStr(r.invoiceDate)!,
+    customer_id: r.customerId,
+    remarks: r.remarks,
+    created_at: iso(r.createdAt),
+    updated_at: iso(r.updatedAt),
+    factory: r.factory ?? null,
+    customer: r.customer
+      ? {
+          id: r.customer.id,
+          company_name: r.customer.companyName,
+          person_name: r.customer.personName,
+          company_type: 'customer',
+          is_active: true,
+        }
+      : null,
+    items: r.items?.map(rowToLineItem),
+  }
+}
+
+function rowToInternational(r: Parameters<typeof rowToDomestic>[0]): IOInternational {
+  return rowToDomestic(r) as IOInternational
+}
+
+function rowToQuotation(r: {
+  id: string
+  factoryId: string | null
+  quotationNumber: string
+  quotationDate: Date
+  customerId: string | null
+  outwardRefNo: string | null
+  headerContent: string | null
+  footerContent: string | null
+  createdBy: string | null
+  createdAt: Date
+  updatedAt: Date
+  factory?: { id: string; name: string } | null
+  customer?: { id: string; companyName: string; personTitle: string | null; personName: string | null } | null
+  items?: Array<Parameters<typeof rowToQuotationItem>[0]>
+}): IOQuotation {
+  return {
+    id: r.id,
+    factory_id: r.factoryId,
+    quotation_number: r.quotationNumber,
+    quotation_date: dateStr(r.quotationDate)!,
+    customer_id: r.customerId,
+    outward_ref_no: r.outwardRefNo,
+    header_content: r.headerContent,
+    footer_content: r.footerContent,
+    created_at: iso(r.createdAt),
+    updated_at: iso(r.updatedAt),
+    factory: r.factory ?? null,
+    customer: r.customer
+      ? {
+          id: r.customer.id,
+          company_name: r.customer.companyName,
+          person_title: r.customer.personTitle,
+          person_name: r.customer.personName,
+          company_type: 'customer',
+          is_active: true,
+        }
+      : null,
+    items: r.items?.map(rowToQuotationItem),
+  }
 }
 
 // ── Next Document Number ───────────────────────────────────────
-const DOC_TABLE: Record<DocType, { table: string; column: string }> = {
-  inward:        { table: 'io_inward',        column: 'inward_number' },
-  outward:       { table: 'io_outward',       column: 'outward_number' },
-  quotation:     { table: 'io_quotations',    column: 'quotation_number' },
-  domestic:      { table: 'io_domestic',      column: 'invoice_number' },
-  international: { table: 'io_international', column: 'invoice_number' },
-}
+const NO_VH_TYPES: DocType[] = ['domestic', 'international']
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
 }
 
-const NO_VH_TYPES: DocType[] = ['domestic', 'international']
+function makeVHNumber(seq: number, date: Date) {
+  const mm = pad2(date.getMonth() + 1)
+  const yy = pad2(date.getFullYear() % 100)
+  return `VH ${seq}/${mm}/${yy}`
+}
 
 function makePlainNumber(seq: number, date: Date) {
   const mm = pad2(date.getMonth() + 1)
@@ -82,9 +460,36 @@ function makePlainNumber(seq: number, date: Date) {
   return `${seq}/${mm}/${yy}`
 }
 
+export type { IoNumberFormat } from '../numbering-formats'
+export { IO_NUMBER_FORMAT_OPTIONS, ioNumberFormatLabel } from '../numbering-formats'
+
+function normalizeNumberFormat(v: unknown): IoNumberFormat {
+  return String(v ?? '').trim().toLowerCase() === 'slash_pad3' ? 'slash_pad3' : 'standard'
+}
+
+function isSlashPad3Format(format: IoNumberFormat) {
+  return format === 'slash_pad3'
+}
+
+function makeSlashPad3Number(seq: number, date: Date, prefix: string) {
+  const yy = pad2(date.getFullYear() % 100)
+  const p = String(prefix ?? '').trim()
+  const seqPad = String(seq).padStart(3, '0')
+  return p ? `${p}/${seqPad}/${yy}` : `${seqPad}/${yy}`
+}
+
+function parseSlashPad3Number(v: unknown, prefix: string): { seq: number; yy: string } | null {
+  if (typeof v !== 'string') return null
+  const p = String(prefix ?? '').trim()
+  if (!p) return null
+  const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = v.trim().match(new RegExp(`^${escaped}\\/(\\d+)\\/(\\d{2})$`, 'i'))
+  if (!m) return null
+  return { seq: parseInt(m[1], 10) || 0, yy: m[2] }
+}
+
 function parseVHNumber(v: unknown): { seq: number; yy: string } | null {
   if (typeof v !== 'string') return null
-  // Accept both `VH1/04/26` and `VH 1/04/26`
   const m = v.trim().match(/^VH\s*(\d+)\/(\d{2})\/(\d{2})$/i)
   if (!m) return null
   return { seq: parseInt(m[1], 10) || 0, yy: m[3] }
@@ -107,17 +512,89 @@ function stripOuterAffixes(full: string, prefix: string, suffix: string): string
 }
 
 function applyOuterAffixes(core: string, prefix: string, suffix: string): string {
-  return `${prefix ?? ''}${core}${suffix ?? ''}`
+  const p = prefix ?? ''
+  let suf = suffix ?? ''
+  if (suf) {
+    const sufBare = suf.replace(/^\//, '')
+    if (sufBare && (core.endsWith(suf) || core.endsWith(sufBare))) suf = ''
+  }
+  if (!p && !suf) return core
+  const gap = p && core && !/^\s/.test(core) ? ' ' : ''
+  return `${p}${gap}${core}${suf}`
 }
 
-/** Legacy numbers embed "VH" in the core; affixes are configured separately in Master. */
-function stripLegacyVHPrefix(s: string): string {
-  return String(s ?? '').trim().replace(/^VH\s*/i, '').trim()
+/** Master prefix/suffix replace legacy VH in the core (avoids VIB + VH 1/05/26 → VIBVH …). */
+function usesCustomAffixes(prefix: string, suffix: string): boolean {
+  return Boolean(String(prefix ?? '').trim() || String(suffix ?? '').trim())
 }
 
-function parseSeqForType(type: DocType, raw: unknown, prefix: string, suffix: string): { seq: number; yy: string } | null {
-  const stripped = stripLegacyVHPrefix(stripOuterAffixes(String(raw ?? ''), prefix, suffix))
-  return parsePlainNumber(stripped) ?? parseVHNumber(stripped)
+function parseSeqForType(
+  type: DocType,
+  raw: unknown,
+  prefix: string,
+  suffix: string,
+  numberFormat: IoNumberFormat = 'standard',
+): { seq: number; yy: string } | null {
+  const full = String(raw ?? '')
+  const stripped = stripOuterAffixes(full, prefix, suffix)
+  const noVH = NO_VH_TYPES.includes(type)
+  if (isSlashPad3Format(numberFormat) && !noVH && String(prefix ?? '').trim()) {
+    return (
+      parseSlashPad3Number(full, prefix)
+      ?? parseSlashPad3Number(stripped, prefix)
+      ?? parsePlainNumber(stripped)
+      ?? parseVHNumber(stripped)
+    )
+  }
+  if (noVH || usesCustomAffixes(prefix, suffix)) {
+    return parsePlainNumber(stripped) ?? parseVHNumber(stripped)
+  }
+  return parseVHNumber(stripped)
+}
+
+async function loadRecentNumbers(
+  type: DocType,
+  factoryId?: string | null
+): Promise<Array<{ number: string; createdAt: Date }>> {
+  const where = factoryId ? { factoryId } : factoryListWhere()
+  const take = 2000
+  switch (type) {
+    case 'inward':
+      return prisma.ioInward.findMany({
+        where,
+        select: { inwardNumber: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }).then((rows) => rows.map((r) => ({ number: r.inwardNumber, createdAt: r.createdAt })))
+    case 'outward':
+      return prisma.ioOutward.findMany({
+        where,
+        select: { outwardNumber: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }).then((rows) => rows.map((r) => ({ number: r.outwardNumber, createdAt: r.createdAt })))
+    case 'quotation':
+      return prisma.ioQuotation.findMany({
+        where,
+        select: { quotationNumber: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }).then((rows) => rows.map((r) => ({ number: r.quotationNumber, createdAt: r.createdAt })))
+    case 'domestic':
+      return prisma.ioDomestic.findMany({
+        where,
+        select: { invoiceNumber: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }).then((rows) => rows.map((r) => ({ number: r.invoiceNumber, createdAt: r.createdAt })))
+    case 'international':
+      return prisma.ioInternational.findMany({
+        where,
+        select: { invoiceNumber: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }).then((rows) => rows.map((r) => ({ number: r.invoiceNumber, createdAt: r.createdAt })))
+  }
 }
 
 async function computeNextNumber(
@@ -126,227 +603,191 @@ async function computeNextNumber(
   factoryId?: string | null,
   prefix = '',
   suffix = '',
+  numberFormat: IoNumberFormat = 'standard',
 ): Promise<string> {
-  const { table, column } = DOC_TABLE[type]
   const yy = pad2(date.getFullYear() % 100)
-
-  // Pull a small slice of recent numbers and compute max for this year.
-  // This keeps numbering in the app when the SQL function is missing.
-  let query = getServerDb()
-    .from(table)
-    .select(column)
-    .order('created_at', { ascending: false })
-    .limit(2000)
-  if (factoryId) query = query.eq('factory_id', factoryId)
-  const { data, error } = await query
-  if (error) throw error
+  const rows = await loadRecentNumbers(type, factoryId)
 
   let max = 0
-  for (const row of (data ?? []) as any[]) {
-    const parsed = parseSeqForType(type, row?.[column], prefix, suffix)
+  for (const row of rows) {
+    const parsed = parseSeqForType(type, row.number, prefix, suffix, numberFormat)
     if (!parsed) continue
     if (parsed.yy !== yy) continue
     if (parsed.seq > max) max = parsed.seq
   }
 
-  return makePlainNumber(max + 1, date)
+  const nextSeq = max + 1
+  if (isSlashPad3Format(numberFormat) && !NO_VH_TYPES.includes(type) && String(prefix ?? '').trim()) {
+    return makeSlashPad3Number(nextSeq, date, prefix)
+  }
+
+  const plainCore = NO_VH_TYPES.includes(type) || usesCustomAffixes(prefix, suffix)
+  return plainCore ? makePlainNumber(nextSeq, date) : makeVHNumber(nextSeq, date)
 }
 
 export async function getNextNumber(type: DocType, date?: string, factoryId?: string | null): Promise<string> {
-  const d = date ? new Date(date) : new Date()
+  const d = date ? parseDate(date) : new Date()
   let prefix = ''
   let suffix = ''
+  let numberFormat: IoNumberFormat = 'standard'
   if (factoryId) {
+    assertFactoryAccess(factoryId)
     try {
       const cfg = await fetchNumberingConfig(factoryId)
       prefix = cfg[type]?.prefix ?? ''
       suffix = cfg[type]?.suffix ?? ''
+      numberFormat = cfg[type]?.numberFormat ?? 'standard'
     } catch {
       /* ignore */
     }
   }
-
-  if (factoryId) {
-    try {
-      const { data, error } = await getServerDb().rpc('io_next_number_by_factory', {
-        p_doc_type: type,
-        p_factory_id: factoryId,
-        p_doc_date: d.toISOString().slice(0, 10),
-      })
-      if (!error && typeof data === 'string' && data.trim()) {
-        const trimmed = data.trim()
-        const core = stripLegacyVHPrefix(stripOuterAffixes(trimmed, prefix, suffix))
-        if (parsePlainNumber(core) || parseVHNumber(trimmed)) {
-          return applyOuterAffixes(core, prefix, suffix)
-        }
-      }
-    } catch {
-      // ignore and fallback
-    }
+  const core = await computeNextNumber(type, d, factoryId, prefix, suffix, numberFormat)
+  if (isSlashPad3Format(numberFormat) && !NO_VH_TYPES.includes(type) && String(prefix ?? '').trim()) {
+    return core
   }
-  // Legacy RPC (non factory-wise). Domestic & International use plain numbering.
-  if (!NO_VH_TYPES.includes(type) && !factoryId) {
-    try {
-      const { data, error } = await getServerDb().rpc('io_next_number', { p_doc_type: type })
-      if (!error && typeof data === 'string' && data.trim()) {
-        const trimmed = data.trim()
-        const core = stripLegacyVHPrefix(stripOuterAffixes(trimmed, prefix, suffix))
-        if (parsePlainNumber(core) || parseVHNumber(trimmed)) {
-          return applyOuterAffixes(core, prefix, suffix)
-        }
-      }
-    } catch {
-      // ignore and fallback
-    }
-  }
-  const core = await computeNextNumber(type, d, factoryId, prefix, suffix)
   return applyOuterAffixes(core, prefix, suffix)
 }
 
 // ── Units ──────────────────────────────────────────────────────
 export const fetchUnits = async (): Promise<IOUnit[]> => {
-  const { data, error } = await getServerDb().from('io_units').select('*').order('name')
-  if (error) throw error
-  return data ?? []
+  const rows = await prisma.ioUnit.findMany({ orderBy: { name: 'asc' } })
+  return rows.map(rowToUnit)
 }
+
 export const saveUnit = async (unit: Partial<IOUnit>) => {
+  assertCanManageMaster()
   if (unit.id) {
-    const { error } = await getServerDb().from('io_units').update({ name: unit.name, abbreviation: unit.abbreviation }).eq('id', unit.id)
-    if (error) throw error
+    await prisma.ioUnit.update({
+      where: { id: unit.id },
+      data: { name: unit.name!, abbreviation: unit.abbreviation ?? null },
+    })
   } else {
-    const { error } = await getServerDb().from('io_units').insert({ name: unit.name, abbreviation: unit.abbreviation })
-    if (error) throw error
+    await prisma.ioUnit.create({
+      data: { name: unit.name!, abbreviation: unit.abbreviation ?? null },
+    })
   }
 }
+
 export const deleteUnit = async (id: number) => {
-  const { error } = await getServerDb().from('io_units').delete().eq('id', id)
-  if (error) throw error
+  assertCanManageMaster()
+  await prisma.ioUnit.delete({ where: { id } })
 }
 
 // ── Countries ──────────────────────────────────────────────────
 export const fetchCountries = async (): Promise<IOCountry[]> => {
-  const { data, error } = await getServerDb().from('io_countries').select('*').order('name')
-  if (error) throw error
-  return data ?? []
+  const rows = await prisma.ioCountry.findMany({ orderBy: { name: 'asc' } })
+  return rows.map(rowToCountry)
 }
+
 export const saveCountry = async (c: Partial<IOCountry>) => {
+  assertCanManageMaster()
   if (c.id) {
-    const { error } = await getServerDb().from('io_countries').update({ name: c.name, code: c.code }).eq('id', c.id)
-    if (error) throw error
+    await prisma.ioCountry.update({
+      where: { id: c.id },
+      data: { name: c.name!, code: c.code ?? null },
+    })
   } else {
-    const { error } = await getServerDb().from('io_countries').insert({ name: c.name, code: c.code })
-    if (error) throw error
+    await prisma.ioCountry.create({ data: { name: c.name!, code: c.code ?? null } })
   }
 }
+
 export const deleteCountry = async (id: number) => {
-  const { error } = await getServerDb().from('io_countries').delete().eq('id', id)
-  if (error) throw error
+  assertCanManageMaster()
+  await prisma.ioCountry.delete({ where: { id } })
 }
 
 export const ensureCountry = async (name: string, code?: string | null): Promise<IOCountry> => {
+  assertCanManageMaster()
   const n = (name ?? '').trim()
   if (!n) throw new Error('country name required')
-  const { data: existing, error: se } = await getServerDb()
-    .from('io_countries')
-    .select('*')
-    .ilike('name', n)
-    .limit(1)
-  if (se) throw se
-  if (existing?.[0]) return existing[0] as any
-
-  const { data, error } = await getServerDb()
-    .from('io_countries')
-    .insert({ name: n, code: (code ?? null) })
-    .select('*')
-    .single()
-  if (error) throw error
-  return data as any
+  const existing = await prisma.ioCountry.findFirst({
+    where: { name: { equals: n, mode: 'insensitive' } },
+  })
+  if (existing) return rowToCountry(existing)
+  const created = await prisma.ioCountry.create({ data: { name: n, code: code ?? null } })
+  return rowToCountry(created)
 }
 
 // ── States ────────────────────────────────────────────────────
 export const fetchStates = async (country_id?: number): Promise<IOState[]> => {
-  let q = getServerDb().from('io_states').select('*, country:io_countries(name)').order('name')
-  if (country_id) q = q.eq('country_id', country_id)
-  const { data, error } = await q
-  if (error) throw error
-  return data ?? []
+  const rows = await prisma.ioState.findMany({
+    where: country_id ? { countryId: country_id } : undefined,
+    include: { country: { select: { name: true } } },
+    orderBy: { name: 'asc' },
+  })
+  return rows.map(rowToState)
 }
+
 export const saveState = async (s: Partial<IOState>) => {
+  assertCanManageMaster()
   if (s.id) {
-    const { error } = await getServerDb().from('io_states').update({ name: s.name, code: s.code, country_id: s.country_id }).eq('id', s.id)
-    if (error) throw error
+    await prisma.ioState.update({
+      where: { id: s.id },
+      data: { name: s.name!, code: s.code ?? null, countryId: s.country_id! },
+    })
   } else {
-    const { error } = await getServerDb().from('io_states').insert({ name: s.name, code: s.code, country_id: s.country_id })
-    if (error) throw error
+    await prisma.ioState.create({
+      data: { name: s.name!, code: s.code ?? null, countryId: s.country_id! },
+    })
   }
 }
+
 export const deleteState = async (id: number) => {
-  const { error } = await getServerDb().from('io_states').delete().eq('id', id)
-  if (error) throw error
+  assertCanManageMaster()
+  await prisma.ioState.delete({ where: { id } })
 }
 
 export const ensureState = async (name: string, country_id: number, code?: string | null): Promise<IOState> => {
+  assertCanManageMaster()
   const n = (name ?? '').trim()
   if (!n) throw new Error('state name required')
-  const { data: existing, error: se } = await getServerDb()
-    .from('io_states')
-    .select('*')
-    .eq('country_id', country_id)
-    .ilike('name', n)
-    .limit(1)
-  if (se) throw se
-  if (existing?.[0]) return existing[0] as any
-
-  const { data, error } = await getServerDb()
-    .from('io_states')
-    .insert({ name: n, country_id, code: (code ?? null) })
-    .select('*')
-    .single()
-  if (error) throw error
-  return data as any
+  const existing = await prisma.ioState.findFirst({
+    where: { countryId: country_id, name: { equals: n, mode: 'insensitive' } },
+  })
+  if (existing) return rowToState(existing)
+  const created = await prisma.ioState.create({
+    data: { name: n, countryId: country_id, code: code ?? null },
+  })
+  return rowToState(created)
 }
 
 // ── Cities ────────────────────────────────────────────────────
 export const fetchCities = async (state_id?: number): Promise<IOCity[]> => {
-  let q = getServerDb().from('io_cities').select('*, state:io_states(name)').order('name')
-  if (state_id) q = q.eq('state_id', state_id)
-  const { data, error } = await q
-  if (error) throw error
-  return data ?? []
+  const rows = await prisma.ioCity.findMany({
+    where: state_id ? { stateId: state_id } : undefined,
+    include: { state: { select: { name: true } } },
+    orderBy: { name: 'asc' },
+  })
+  return rows.map(rowToCity)
 }
+
 export const saveCity = async (c: Partial<IOCity>) => {
+  assertCanManageMaster()
   if (c.id) {
-    const { error } = await getServerDb().from('io_cities').update({ name: c.name, state_id: c.state_id }).eq('id', c.id)
-    if (error) throw error
+    await prisma.ioCity.update({
+      where: { id: c.id },
+      data: { name: c.name!, stateId: c.state_id! },
+    })
   } else {
-    const { error } = await getServerDb().from('io_cities').insert({ name: c.name, state_id: c.state_id })
-    if (error) throw error
+    await prisma.ioCity.create({ data: { name: c.name!, stateId: c.state_id! } })
   }
 }
+
 export const deleteCity = async (id: number) => {
-  const { error } = await getServerDb().from('io_cities').delete().eq('id', id)
-  if (error) throw error
+  assertCanManageMaster()
+  await prisma.ioCity.delete({ where: { id } })
 }
 
 export const ensureCity = async (name: string, state_id: number): Promise<IOCity> => {
+  assertCanManageMaster()
   const n = (name ?? '').trim()
   if (!n) throw new Error('city name required')
-  const { data: existing, error: se } = await getServerDb()
-    .from('io_cities')
-    .select('*')
-    .eq('state_id', state_id)
-    .ilike('name', n)
-    .limit(1)
-  if (se) throw se
-  if (existing?.[0]) return existing[0] as any
-
-  const { data, error } = await getServerDb()
-    .from('io_cities')
-    .insert({ name: n, state_id })
-    .select('*')
-    .single()
-  if (error) throw error
-  return data as any
+  const existing = await prisma.ioCity.findFirst({
+    where: { stateId: state_id, name: { equals: n, mode: 'insensitive' } },
+  })
+  if (existing) return rowToCity(existing)
+  const created = await prisma.ioCity.create({ data: { name: n, stateId: state_id } })
+  return rowToCity(created)
 }
 
 // ── Companies ─────────────────────────────────────────────────
@@ -355,274 +796,114 @@ export const fetchCompanies = async (type?: CompanyType | 'all', factory_id?: st
   const cached = getCached<IOCompany[]>(cacheKey)
   if (cached) return cached
 
-  let q = getServerDb().from('io_companies')
-    .select('*, country:io_countries(name), state:io_states(name), city:io_cities(name)')
-    .eq('is_active', true).order('company_name')
-  if (type && type !== 'all') q = q.or(`company_type.eq.${type},company_type.eq.both`)
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  const rows = data ?? []
-  setCached(cacheKey, rows)
-  return rows
+  const rows = await prisma.ioCompany.findMany({
+    where: {
+      isActive: true,
+      ...factoryListWhere(factory_id),
+      ...(type && type !== 'all'
+        ? { OR: [{ companyType: type }, { companyType: 'both' }] }
+        : {}),
+    },
+    include: {
+      country: { select: { name: true } },
+      state: { select: { name: true } },
+      city: { select: { name: true } },
+    },
+    orderBy: { companyName: 'asc' },
+  })
+  const mapped = rows.map(rowToCompany)
+  setCached(cacheKey, mapped)
+  return mapped
 }
+
 export const saveCompany = async (c: Partial<IOCompany>): Promise<IOCompany> => {
-  const payload = {
-    factory_id: c.factory_id || null,
-    company_type: c.company_type, company_name: c.company_name,
-    person_name: c.person_name || null, country_id: c.country_id || null,
-    state_id: c.state_id || null, city_id: c.city_id || null,
-    address: c.address || null, pincode: c.pincode || null,
-    mobile: c.mobile || null, email: c.email || null,
-    is_active: true, updated_at: new Date().toISOString(),
-  }
+  assertCanManageMaster()
+  if (c.factory_id) assertFactoryAccess(c.factory_id)
   if (c.id) {
-    const { data, error } = await getServerDb().from('io_companies').update(payload).eq('id', c.id).select().single()
-    if (error) throw error
-    clearCachedPrefix('companies:')
-    return data
-  } else {
-    const { data, error } = await getServerDb().from('io_companies').insert(payload).select().single()
-    if (error) throw error
-    clearCachedPrefix('companies:')
-    return data
+    const existing = await prisma.ioCompany.findUnique({ where: { id: c.id }, select: { factoryId: true } })
+    if (existing?.factoryId) assertDocumentFactoryAccess(existing.factoryId)
   }
+  const data = {
+    factoryId: c.factory_id || null,
+    companyType: c.company_type!,
+    companyName: c.company_name!,
+    personTitle: c.person_title || null,
+    personName: c.person_name || null,
+    countryId: c.country_id || null,
+    stateId: c.state_id || null,
+    cityId: c.city_id || null,
+    address: c.address || null,
+    pincode: c.pincode || null,
+    mobile: c.mobile || null,
+    email: c.email || null,
+    isActive: true,
+  }
+  const companyInclude = {
+    country: { select: { name: true } },
+    state: { select: { name: true } },
+    city: { select: { name: true } },
+  } as const
+  const row = c.id
+    ? await prisma.ioCompany.update({ where: { id: c.id }, data, include: companyInclude })
+    : await prisma.ioCompany.create({ data, include: companyInclude })
+  clearCachedPrefix('companies:')
+  return rowToCompany(row)
 }
+
 export const deleteCompany = async (id: string) => {
-  const { error } = await getServerDb().from('io_companies').update({ is_active: false }).eq('id', id)
-  if (error) throw error
+  assertCanManageMaster()
+  const existing = await prisma.ioCompany.findUnique({ where: { id }, select: { factoryId: true } })
+  if (existing?.factoryId) assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioCompany.update({ where: { id }, data: { isActive: false } })
   clearCachedPrefix('companies:')
 }
 
 // ── Numbering Config (Factory-wise) ───────────────────────────
-export const fetchNumberingConfig = async (factory_id: string): Promise<Record<DocType, { prefix: string; suffix: string }>> => {
-  await assertFactoryAccess(factory_id)
-  const defaults: Record<DocType, { prefix: string; suffix: string }> = {
-    inward: { prefix: 'VH ', suffix: '' },
-    outward: { prefix: 'VH ', suffix: '' },
-    domestic: { prefix: '', suffix: '' },
-    international: { prefix: '', suffix: '' },
-    quotation: { prefix: 'VH ', suffix: '' },
+export type IoNumberingRow = { prefix: string; suffix: string; numberFormat: IoNumberFormat }
+
+export const fetchNumberingConfig = async (factory_id: string): Promise<Record<DocType, IoNumberingRow>> => {
+  assertFactoryAccess(factory_id)
+  const defaults: Record<DocType, IoNumberingRow> = {
+    inward: { prefix: '', suffix: '', numberFormat: 'standard' },
+    outward: { prefix: '', suffix: '', numberFormat: 'standard' },
+    domestic: { prefix: '', suffix: '', numberFormat: 'standard' },
+    international: { prefix: '', suffix: '', numberFormat: 'standard' },
+    quotation: { prefix: '', suffix: '', numberFormat: 'standard' },
   }
-  const { data, error } = await getServerDb()
-    .from('io_numbering_config')
-    .select('doc_type,prefix,suffix')
-    .eq('factory_id', factory_id)
-  if (error) throw error
-  for (const row of data ?? []) {
-    const key = row.doc_type as DocType
-    if (defaults[key]) defaults[key] = { prefix: row.prefix ?? '', suffix: row.suffix ?? '' }
+  const rows = await prisma.ioNumberingConfig.findMany({ where: { factoryId: factory_id } })
+  for (const row of rows) {
+    const key = row.docType as DocType
+    if (defaults[key]) {
+      defaults[key] = {
+        prefix: row.prefix ?? '',
+        suffix: row.suffix ?? '',
+        numberFormat: normalizeNumberFormat(row.numberFormat),
+      }
+    }
   }
   return defaults
 }
 
 export const saveNumberingConfig = async (
   factory_id: string,
-  values: Record<DocType, { prefix: string; suffix: string }>
+  values: Record<DocType, IoNumberingRow>
 ) => {
-  await assertFactoryAccess(factory_id)
+  assertCanManageMaster()
+  assertFactoryAccess(factory_id)
   const docTypes: DocType[] = ['inward', 'outward', 'domestic', 'international', 'quotation']
-  const rows = (['inward', 'outward', 'domestic', 'international', 'quotation'] as DocType[]).map((doc_type) => ({
-    factory_id,
-    doc_type,
+  const rows = docTypes.map((doc_type) => ({
+    factoryId: factory_id,
+    docType: doc_type,
     prefix: values[doc_type]?.prefix ?? '',
     suffix: values[doc_type]?.suffix ?? '',
-    updated_at: new Date().toISOString(),
+    numberFormat: normalizeNumberFormat(values[doc_type]?.numberFormat),
   }))
-  // Safer than upsert when unique constraint/onConflict is inconsistent across environments.
-  const { error: delError } = await getServerDb()
-    .from('io_numbering_config')
-    .delete()
-    .eq('factory_id', factory_id)
-    .in('doc_type', docTypes)
-  if (delError) throw delError
-
-  const { error: insError } = await getServerDb()
-    .from('io_numbering_config')
-    .insert(rows)
-  if (insError) throw insError
-}
-
-// ── PDF templates (Factory-wise) ──────────────────────────────
-export type IOPdfSlot = 'label' | 'letter-head' | 'customer-print'
-
-const PDF_DEFAULTS: Record<IOPdfSlot, string> = {
-  label: '/Label.pdf',
-  'letter-head': '/letter-head.pdf',
-  'customer-print': '',
-}
-
-const PDF_SLOTS: IOPdfSlot[] = ['label', 'letter-head', 'customer-print']
-
-function resolvePdfPublicRoot(): string {
-  const candidates = [
-    path.join(process.cwd(), 'public'),
-    path.join(process.cwd(), 'apps/standard-erp/public'),
-  ]
-  for (const dir of candidates) {
-    try {
-      if (existsSync(path.join(dir, 'Label.pdf')) || existsSync(path.join(dir, 'letter-head.pdf'))) {
-        return dir
-      }
-    } catch {
-      /* continue */
-    }
-  }
-  return candidates[0]
-}
-
-function pdfDirForFactory(factory_id: string) {
-  return path.join(resolvePdfPublicRoot(), 'io-pdfs', factory_id)
-}
-
-function pdfManifestPath(factory_id: string) {
-  return path.join(pdfDirForFactory(factory_id), 'templates.json')
-}
-
-async function pdfExistsOnDisk(webPath: string): Promise<boolean> {
-  if (!webPath.startsWith('/') || webPath.includes('..')) return false
-  try {
-    await access(path.join(resolvePdfPublicRoot(), webPath.replace(/^\//, '')))
-    return true
-  } catch {
-    return false
-  }
-}
-
-type PdfManifest = { files: string[]; selected: Record<IOPdfSlot, string> }
-
-async function readFsPdfManifest(factory_id: string): Promise<PdfManifest> {
-  try {
-    const raw = await readFile(pdfManifestPath(factory_id), 'utf8')
-    const parsed = JSON.parse(raw) as PdfManifest
-    return {
-      files: Array.isArray(parsed.files) ? parsed.files : [],
-      selected: {
-        label: parsed?.selected?.label || PDF_DEFAULTS.label,
-        'letter-head': parsed?.selected?.['letter-head'] || PDF_DEFAULTS['letter-head'],
-        'customer-print': parsed?.selected?.['customer-print'] || PDF_DEFAULTS['customer-print'],
-      },
-    }
-  } catch {
-    return { files: [], selected: { ...PDF_DEFAULTS } }
-  }
-}
-
-async function writeFsPdfManifest(factory_id: string, m: PdfManifest) {
-  const dir = pdfDirForFactory(factory_id)
-  await mkdir(dir, { recursive: true })
-  await writeFile(pdfManifestPath(factory_id), JSON.stringify(m, null, 2), 'utf8')
-}
-
-async function sanitizePdfManifest(m: PdfManifest): Promise<PdfManifest> {
-  const files: string[] = []
-  for (const f of m.files) {
-    if (await pdfExistsOnDisk(f)) files.push(f)
-  }
-  const selected = { ...m.selected }
-  for (const slot of PDF_SLOTS) {
-    const p = selected[slot]
-    if (!p) {
-      selected[slot] = PDF_DEFAULTS[slot]
-      continue
-    }
-    if (!(await pdfExistsOnDisk(p))) selected[slot] = PDF_DEFAULTS[slot]
-  }
-  return { files, selected }
-}
-
-export async function fetchPdfConfig(factory_id: string) {
-  await assertFactoryAccess(factory_id)
-  const selected: Record<IOPdfSlot, string> = { ...PDF_DEFAULTS }
-  const files = new Set<string>()
-
-  const { data: slotRows, error: slotErr } = await getServerDb()
-    .from('io_pdf_config')
-    .select('slot,file_path')
-    .eq('factory_id', factory_id)
-
-  if (!isMissingTableError(slotErr)) {
-    if (slotErr) throw slotErr
-    for (const row of slotRows ?? []) {
-      const slot = row.slot as IOPdfSlot
-      if (PDF_SLOTS.includes(slot) && row.file_path) selected[slot] = row.file_path
-    }
-    const { data: fileRows, error: fileErr } = await getServerDb()
-      .from('io_pdf_files')
-      .select('file_path')
-      .eq('factory_id', factory_id)
-      .order('uploaded_at', { ascending: false })
-    if (!isMissingTableError(fileErr)) {
-      if (fileErr) throw fileErr
-      for (const row of fileRows ?? []) {
-        if (row.file_path) files.add(row.file_path)
-      }
-    }
-  } else {
-    const fs = await readFsPdfManifest(factory_id)
-    for (const f of fs.files) files.add(f)
-    Object.assign(selected, fs.selected)
-  }
-
-  const manifest = await sanitizePdfManifest({ files: Array.from(files), selected })
-  return {
-    files: manifest.files,
-    selected: manifest.selected,
-  }
-}
-
-export async function assignPdfConfig(factory_id: string, slot: IOPdfSlot, file_path: string) {
-  await assertFactoryAccess(factory_id)
-  if (!PDF_SLOTS.includes(slot)) throw new Error('Invalid PDF slot')
-  const pathToUse = file_path || PDF_DEFAULTS[slot]
-  if (pathToUse && !(await pdfExistsOnDisk(pathToUse))) {
-    throw new Error(`PDF not found: ${pathToUse}`)
-  }
-
-  const { error } = await getServerDb()
-    .from('io_pdf_config')
-    .upsert({
-      factory_id,
-      slot,
-      file_path: pathToUse,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'factory_id,slot' })
-
-  if (isMissingTableError(error)) {
-    const manifest = await readFsPdfManifest(factory_id)
-    manifest.selected[slot] = pathToUse
-    await writeFsPdfManifest(factory_id, manifest)
-    return
-  }
-  if (error) throw error
-}
-
-export async function registerPdfFile(factory_id: string, file_path: string) {
-  await assertFactoryAccess(factory_id)
-  const { error } = await getServerDb()
-    .from('io_pdf_files')
-    .upsert({ factory_id, file_path }, { onConflict: 'factory_id,file_path' })
-  if (isMissingTableError(error)) {
-    const manifest = await readFsPdfManifest(factory_id)
-    manifest.files = Array.from(new Set([file_path, ...manifest.files]))
-    await writeFsPdfManifest(factory_id, manifest)
-    return
-  }
-  if (error) throw error
-}
-
-export async function saveUploadedPdf(factory_id: string, bytes: ArrayBuffer, originalName: string) {
-  await assertFactoryAccess(factory_id)
-  const dir = pdfDirForFactory(factory_id)
-  await mkdir(dir, { recursive: true })
-  const sanitized = originalName.toLowerCase().replace(/[^a-z0-9._-]/g, '-')
-  const stampedName = `${Date.now()}-${sanitized.endsWith('.pdf') ? sanitized : `${sanitized}.pdf`}`
-  const dest = path.join(dir, stampedName)
-  await writeFile(dest, Buffer.from(bytes))
-  const webPath = `/io-pdfs/${factory_id}/${stampedName}`
-  await registerPdfFile(factory_id, webPath)
-  const cfg = await fetchPdfConfig(factory_id)
-  return { filePath: webPath, files: cfg.files, selected: cfg.selected }
+  await prisma.$transaction([
+    prisma.ioNumberingConfig.deleteMany({
+      where: { factoryId: factory_id, docType: { in: docTypes } },
+    }),
+    prisma.ioNumberingConfig.createMany({ data: rows }),
+  ])
 }
 
 // ── Products ──────────────────────────────────────────────────
@@ -631,438 +912,577 @@ export const fetchProducts = async (factory_id?: string): Promise<IOProduct[]> =
   const cached = getCached<IOProduct[]>(cacheKey)
   if (cached) return cached
 
-  let q = getServerDb().from('io_products')
-    .select('*, unit:io_units(name, abbreviation)').eq('is_active', true).order('product_name')
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  const rows = data ?? []
-  setCached(cacheKey, rows)
-  return rows
+  const rows = await prisma.ioProduct.findMany({
+    where: {
+      isActive: true,
+      ...factoryListWhere(factory_id),
+    },
+    include: { unit: { select: { name: true, abbreviation: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+  const mapped = rows.map(rowToProduct).sort((a, b) => a.product_name.localeCompare(b.product_name))
+  setCached(cacheKey, mapped)
+  return mapped
 }
+
 export const saveProduct = async (p: Partial<IOProduct>): Promise<IOProduct> => {
-  const payload = {
-    factory_id: p.factory_id || null,
-    product_name: p.product_name, description: p.description || null,
-    hsn_code: p.hsn_code || null, unit_id: p.unit_id || null,
-    rate: p.rate ?? null, is_active: true, updated_at: new Date().toISOString(),
-  }
+  assertCanManageMaster()
+  if (p.factory_id) assertFactoryAccess(p.factory_id)
   if (p.id) {
-    const { data, error } = await getServerDb().from('io_products').update(payload).eq('id', p.id).select().single()
-    if (error) throw error
-    clearCachedPrefix('products:')
-    return data
-  } else {
-    const { data, error } = await getServerDb().from('io_products').insert(payload).select().single()
-    if (error) throw error
-    clearCachedPrefix('products:')
-    return data
+    const existing = await prisma.ioProduct.findUnique({ where: { id: p.id }, select: { factoryId: true } })
+    if (existing?.factoryId) assertDocumentFactoryAccess(existing.factoryId)
   }
+  const data = {
+    factoryId: p.factory_id || null,
+    productName: p.product_name!,
+    description: p.description || null,
+    hsnCode: p.hsn_code || null,
+    unitId: p.unit_id || null,
+    rate: p.rate != null ? moneyStr(p.rate) : null,
+    isActive: true,
+  }
+  const row = p.id
+    ? await prisma.ioProduct.update({ where: { id: p.id }, data, include: { unit: { select: { name: true, abbreviation: true } } } })
+    : await prisma.ioProduct.create({ data, include: { unit: { select: { name: true, abbreviation: true } } } })
+  clearCachedPrefix('products:')
+  return rowToProduct(row)
 }
+
 export const deleteProduct = async (id: string) => {
-  const { error } = await getServerDb().from('io_products').update({ is_active: false }).eq('id', id)
-  if (error) throw error
+  assertCanManageMaster()
+  const existing = await prisma.ioProduct.findUnique({ where: { id }, select: { factoryId: true } })
+  if (existing?.factoryId) assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioProduct.update({ where: { id }, data: { isActive: false } })
   clearCachedPrefix('products:')
 }
 
-// ── Inward ────────────────────────────────────────────────────
-export const fetchInwards = async (factory_id?: string): Promise<IOInward[]> => {
-  let q = getServerDb().from('io_inward')
-    .select(`
-      id, inward_number, inward_date, supplier_id, supplier_ref_no, remarks, factory_id, created_by, created_at, updated_at,
-      factory:factories(id,name),
-      supplier:io_companies(id,company_name,person_name),
-      items:io_inward_items(id,inward_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-    `)
-    .order('inward_date', { ascending: true })
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  return (data ?? []) as unknown as IOInward[]
+export type IoDocListQuery = {
+  factory_id?: string | null
+  q?: string | null
+  party_id?: string | null
+  fy_start?: number | null
+  month?: number | null
+  date?: string | null
+  page?: number | null
+  page_size?: number | null
+  all?: boolean | null
 }
-export const saveInward = async (inward: Partial<IOInward> & { items: IOLineItem[] }): Promise<IOInward> => {
-  const uid = await userId()
-  if (inward.id) {
-    const { data, error } = await getServerDb().from('io_inward').update({
-      factory_id: inward.factory_id || null, inward_date: inward.inward_date,
-      supplier_id: inward.supplier_id || null, supplier_ref_no: inward.supplier_ref_no || null,
-      remarks: inward.remarks || null, updated_at: new Date().toISOString(),
-    }).eq('id', inward.id).select().single()
-    if (error) throw error
-    await getServerDb().from('io_inward_items').delete().eq('inward_id', inward.id)
-    if (inward.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_inward_items').insert(
-        inward.items.map((it, i) => ({ inward_id: inward.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
-  } else {
-    const number = await getNextNumber('inward', inward.inward_date, inward.factory_id || null)
-    const { data, error } = await getServerDb().from('io_inward').insert({
-      inward_number: number, factory_id: inward.factory_id || null,
-      inward_date: inward.inward_date, supplier_id: inward.supplier_id || null,
-      supplier_ref_no: inward.supplier_ref_no || null, remarks: inward.remarks || null, created_by: uid,
-    }).select().single()
-    if (error) throw error
-    if (inward.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_inward_items').insert(
-        inward.items.map((it, i) => ({ inward_id: data.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
+
+function asIoQuery(input?: string | IoDocListQuery): IoDocListQuery {
+  if (typeof input === 'string' || input == null) return { factory_id: input ?? undefined }
+  return input
+}
+
+function factoryIdsForList(factory_id?: string | null): string[] {
+  const where = factoryListWhere(factory_id)
+  return typeof where.factoryId === 'string' ? [where.factoryId] : where.factoryId.in
+}
+
+async function fetchIoDocPage<T extends { id: string }>(
+  table: DocumentTable,
+  query: IoDocListQuery | undefined,
+  load: (ids: string[]) => Promise<T[]>,
+): Promise<PageResult<T>> {
+  const page = parsePageParams(
+    {
+      page: query?.page ?? undefined,
+      page_size: query?.page_size ?? undefined,
+      all: query?.all ? '1' : undefined,
+    },
+    query?.page_size ? { defaultPageSize: query.page_size } : undefined,
+  )
+  const listed = await pageDocumentIds(
+    prisma,
+    table,
+    {
+      factoryIds: factoryIdsForList(query?.factory_id),
+      q: query?.q,
+      partyId: query?.party_id,
+      fyStart: query?.fy_start,
+      month: query?.month,
+      date: query?.date,
+    },
+    page,
+  )
+  if (listed.ids.length === 0) {
+    return { rows: [], total: listed.total, page: listed.page, pageSize: listed.pageSize }
   }
+  const rows = reorderByIds(await load(listed.ids), listed.ids)
+  return { rows, total: listed.total, page: listed.page, pageSize: listed.pageSize }
 }
+
+// ── Inward ────────────────────────────────────────────────────
+export const fetchInwards = async (factoryOrQuery?: string | IoDocListQuery): Promise<PageResult<IOInward>> => {
+  const query = asIoQuery(factoryOrQuery)
+  return fetchIoDocPage('io_inward', query, async (ids) => {
+    const rows = await prisma.ioInward.findMany({ where: { id: { in: ids } }, include: inwardInclude })
+    return rows.map(rowToInward)
+  })
+}
+
+export const saveInward = async (inward: Partial<IOInward> & { items: IOLineItem[] }): Promise<IOInward> => {
+  assertCanWriteDocuments()
+  if (inward.id) {
+    const existing = await prisma.ioInward.findUnique({ where: { id: inward.id }, select: { factoryId: true } })
+    if (!existing) throw new Error('Inward not found')
+    assertDocumentFactoryAccess(existing.factoryId)
+  }
+  if (inward.factory_id) assertFactoryAccess(inward.factory_id)
+
+  const uid = userId()
+  const itemData = inward.items.map((it, i) => ({
+    productId: it.product_id,
+    quantity: it.quantity,
+    price: moneyStr(it.price),
+    remarks: textOrNull(it.remarks),
+    sortOrder: i,
+  }))
+
+  if (inward.id) {
+    const row = await prisma.$transaction(async (tx) => {
+      const header = await tx.ioInward.update({
+        where: { id: inward.id },
+        data: {
+          factoryId: inward.factory_id || null,
+          inwardDate: parseDate(inward.inward_date!),
+          supplierId: inward.supplier_id || null,
+          supplierRefNo: inward.supplier_ref_no || null,
+          remarks: inward.remarks || null,
+        },
+      })
+      await tx.ioInwardItem.deleteMany({ where: { inwardId: header.id } })
+      if (itemData.length > 0) {
+        await tx.ioInwardItem.createMany({
+          data: itemData.map((it) => ({ ...it, inwardId: header.id })),
+        })
+      }
+      return tx.ioInward.findUniqueOrThrow({ where: { id: header.id }, include: inwardInclude })
+    })
+    return rowToInward(row)
+  }
+
+  const number = await getNextNumber('inward', inward.inward_date, inward.factory_id || null)
+  const row = await prisma.$transaction(async (tx) => {
+    const header = await tx.ioInward.create({
+      data: {
+        inwardNumber: number,
+        factoryId: inward.factory_id || null,
+        inwardDate: parseDate(inward.inward_date!),
+        supplierId: inward.supplier_id || null,
+        supplierRefNo: inward.supplier_ref_no || null,
+        remarks: inward.remarks || null,
+        createdBy: uid,
+      },
+    })
+    if (itemData.length > 0) {
+      await tx.ioInwardItem.createMany({
+        data: itemData.map((it) => ({ ...it, inwardId: header.id })),
+      })
+    }
+    return tx.ioInward.findUniqueOrThrow({ where: { id: header.id }, include: inwardInclude })
+  })
+  return rowToInward(row)
+}
+
 export const deleteInward = async (id: string) => {
-  const { error } = await getServerDb().from('io_inward').delete().eq('id', id)
-  if (error) throw error
+  assertCanDeleteDocuments()
+  const existing = await prisma.ioInward.findUnique({ where: { id }, select: { factoryId: true } })
+  if (!existing) throw new Error('Inward not found')
+  assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioInward.delete({ where: { id } })
 }
 
 // ── Outward ───────────────────────────────────────────────────
-export const fetchOutwards = async (factory_id?: string): Promise<IOOutward[]> => {
-  let q = getServerDb().from('io_outward')
-    .select(`
-      id, outward_number, outward_date, supplier_id, supplier_ref_no, remarks, factory_id, created_by, created_at, updated_at,
-      factory:factories(id,name),
-      supplier:io_companies(id,company_name,person_name),
-      items:io_outward_items(id,outward_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-    `)
-    .order('outward_date', { ascending: true })
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  return (data ?? []) as unknown as IOOutward[]
+export const fetchOutwards = async (factoryOrQuery?: string | IoDocListQuery): Promise<PageResult<IOOutward>> => {
+  const query = asIoQuery(factoryOrQuery)
+  return fetchIoDocPage('io_outward', query, async (ids) => {
+    const rows = await prisma.ioOutward.findMany({ where: { id: { in: ids } }, include: outwardInclude })
+    return rows.map(rowToOutward)
+  })
 }
 
 export const fetchOutwardByRefNo = async (refNo: string, factory_id?: string): Promise<IOOutward | null> => {
   const ref = (refNo ?? '').trim()
   if (!ref) return null
-  let q = getServerDb().from('io_outward')
-    .select('*, factory:factories(id,name), supplier:io_companies(id,company_name,person_name), items:io_outward_items(*, product:io_products(product_name,hsn_code))')
-    .or(`supplier_ref_no.eq.${ref},outward_number.eq.${ref}`)
-    .order('outward_date', { ascending: false })
-    .limit(1)
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  return (data?.[0] as any) ?? null
+  const row = await prisma.ioOutward.findFirst({
+    where: {
+      ...factoryListWhere(factory_id),
+      OR: [{ supplierRefNo: ref }, { outwardNumber: ref }],
+    },
+    include: outwardInclude,
+    orderBy: [{ outwardNumber: 'desc' }, { createdAt: 'desc' }],
+  })
+  return row ? rowToOutward(row) : null
 }
 
 export const searchOutwards = async (query: string, factory_id?: string) => {
   const q = (query ?? '').trim()
-  if (!q) return []
-  let s = getServerDb().from('io_outward')
-    .select('id, outward_number, outward_date, supplier_ref_no, supplier:io_companies(id,company_name)')
-    .order('outward_date', { ascending: false })
-    .limit(25)
-    .or(`outward_number.ilike.%${q}%,supplier_ref_no.ilike.%${q}%`)
-  if (factory_id) s = s.eq('factory_id', factory_id)
-  const { data, error } = await s
-  if (error) throw error
-  return data ?? []
+  const rows = await prisma.ioOutward.findMany({
+    where: {
+      ...factoryListWhere(factory_id),
+      ...(q
+        ? {
+            OR: [
+              { outwardNumber: { contains: q, mode: 'insensitive' } },
+              { supplierRefNo: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      outwardNumber: true,
+      outwardDate: true,
+      supplierRefNo: true,
+      supplier: { select: { id: true, companyName: true } },
+    },
+    orderBy: [{ outwardNumber: 'desc' }, { createdAt: 'desc' }],
+    take: 25,
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    outward_number: r.outwardNumber,
+    outward_date: dateStr(r.outwardDate),
+    supplier_ref_no: r.supplierRefNo,
+    supplier: r.supplier ? { id: r.supplier.id, company_name: r.supplier.companyName } : null,
+  }))
 }
+
 export const saveOutward = async (outward: Partial<IOOutward> & { items: IOLineItem[] }): Promise<IOOutward> => {
-  const uid = await userId()
+  assertCanWriteDocuments()
   if (outward.id) {
-    const { data, error } = await getServerDb().from('io_outward').update({
-      factory_id: outward.factory_id || null, outward_date: outward.outward_date,
-      supplier_id: outward.supplier_id || null, supplier_ref_no: outward.supplier_ref_no || null,
-      remarks: outward.remarks || null, updated_at: new Date().toISOString(),
-    }).eq('id', outward.id).select().single()
-    if (error) throw error
-    await getServerDb().from('io_outward_items').delete().eq('outward_id', outward.id)
-    if (outward.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_outward_items').insert(
-        outward.items.map((it, i) => ({ outward_id: outward.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
-  } else {
-    const number = await getNextNumber('outward', outward.outward_date, outward.factory_id || null)
-    const { data, error } = await getServerDb().from('io_outward').insert({
-      outward_number: number, factory_id: outward.factory_id || null,
-      outward_date: outward.outward_date, supplier_id: outward.supplier_id || null,
-      supplier_ref_no: outward.supplier_ref_no || null, remarks: outward.remarks || null, created_by: uid,
-    }).select().single()
-    if (error) throw error
-    if (outward.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_outward_items').insert(
-        outward.items.map((it, i) => ({ outward_id: data.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
+    const existing = await prisma.ioOutward.findUnique({ where: { id: outward.id }, select: { factoryId: true } })
+    if (!existing) throw new Error('Outward not found')
+    assertDocumentFactoryAccess(existing.factoryId)
   }
+  if (outward.factory_id) assertFactoryAccess(outward.factory_id)
+
+  const uid = userId()
+  const itemData = outward.items.map((it, i) => ({
+    productId: it.product_id,
+    quantity: it.quantity,
+    price: moneyStr(it.price),
+    remarks: textOrNull(it.remarks),
+    sortOrder: i,
+  }))
+
+  if (outward.id) {
+    const row = await prisma.$transaction(async (tx) => {
+      const header = await tx.ioOutward.update({
+        where: { id: outward.id },
+        data: {
+          factoryId: outward.factory_id || null,
+          outwardDate: parseDate(outward.outward_date!),
+          supplierId: outward.supplier_id || null,
+          supplierRefNo: outward.supplier_ref_no || null,
+          remarks: outward.remarks || null,
+        },
+      })
+      await tx.ioOutwardItem.deleteMany({ where: { outwardId: header.id } })
+      if (itemData.length > 0) {
+        await tx.ioOutwardItem.createMany({
+          data: itemData.map((it) => ({ ...it, outwardId: header.id })),
+        })
+      }
+      return tx.ioOutward.findUniqueOrThrow({ where: { id: header.id }, include: outwardInclude })
+    })
+    return rowToOutward(row)
+  }
+
+  const number = await getNextNumber('outward', outward.outward_date, outward.factory_id || null)
+  const row = await prisma.$transaction(async (tx) => {
+    const header = await tx.ioOutward.create({
+      data: {
+        outwardNumber: number,
+        factoryId: outward.factory_id || null,
+        outwardDate: parseDate(outward.outward_date!),
+        supplierId: outward.supplier_id || null,
+        supplierRefNo: outward.supplier_ref_no || null,
+        remarks: outward.remarks || null,
+        createdBy: uid,
+      },
+    })
+    if (itemData.length > 0) {
+      await tx.ioOutwardItem.createMany({
+        data: itemData.map((it) => ({ ...it, outwardId: header.id })),
+      })
+    }
+    return tx.ioOutward.findUniqueOrThrow({ where: { id: header.id }, include: outwardInclude })
+  })
+  return rowToOutward(row)
 }
+
 export const deleteOutward = async (id: string) => {
-  const { error } = await getServerDb().from('io_outward').delete().eq('id', id)
-  if (error) throw error
+  assertCanDeleteDocuments()
+  const existing = await prisma.ioOutward.findUnique({ where: { id }, select: { factoryId: true } })
+  if (!existing) throw new Error('Outward not found')
+  assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioOutward.delete({ where: { id } })
 }
 
 // ── Domestic ──────────────────────────────────────────────────
-export const fetchDomestics = async (factory_id?: string): Promise<IODomestic[]> => {
-  let q = getServerDb().from('io_domestic')
-    .select(`
-      id, invoice_number, tax_invoice_number, invoice_date, customer_id, remarks, factory_id, created_by, created_at, updated_at,
-      factory:factories(id,name),
-      customer:io_companies(id,company_name,person_name),
-      items:io_domestic_items(id,domestic_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-    `)
-    .order('invoice_date', { ascending: true })
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  return (data ?? []) as unknown as IODomestic[]
+export const fetchDomestics = async (factoryOrQuery?: string | IoDocListQuery): Promise<PageResult<IODomestic>> => {
+  const query = asIoQuery(factoryOrQuery)
+  return fetchIoDocPage('io_domestic', query, async (ids) => {
+    const rows = await prisma.ioDomestic.findMany({ where: { id: { in: ids } }, include: domesticInclude })
+    return rows.map(rowToDomestic)
+  })
 }
+
 export const saveDomestic = async (doc: Partial<IODomestic> & { items: IOLineItem[] }): Promise<IODomestic> => {
-  const uid = await userId()
+  assertCanWriteDocuments()
   if (doc.id) {
-    const { data, error } = await getServerDb().from('io_domestic').update({
-      factory_id: doc.factory_id || null, invoice_date: doc.invoice_date,
-      customer_id: doc.customer_id || null,
-      remarks: doc.remarks || null, updated_at: new Date().toISOString(),
-    }).eq('id', doc.id).select().single()
-    if (error) throw error
-    await getServerDb().from('io_domestic').update({ tax_invoice_number: data.invoice_number }).eq('id', doc.id)
-    await getServerDb().from('io_domestic_items').delete().eq('domestic_id', doc.id)
-    if (doc.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_domestic_items').insert(
-        doc.items.map((it, i) => ({ domestic_id: doc.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
-  } else {
-    const number = await getNextNumber('domestic', doc.invoice_date, doc.factory_id || null)
-    const { data, error } = await getServerDb().from('io_domestic').insert({
-      invoice_number: number, factory_id: doc.factory_id || null,
-      invoice_date: doc.invoice_date, customer_id: doc.customer_id || null,
-      tax_invoice_number: number,
-      remarks: doc.remarks || null, created_by: uid,
-    }).select().single()
-    if (error) throw error
-    if (doc.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_domestic_items').insert(
-        doc.items.map((it, i) => ({ domestic_id: data.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
+    const existing = await prisma.ioDomestic.findUnique({ where: { id: doc.id }, select: { factoryId: true } })
+    if (!existing) throw new Error('Domestic not found')
+    assertDocumentFactoryAccess(existing.factoryId)
   }
+  if (doc.factory_id) assertFactoryAccess(doc.factory_id)
+
+  const uid = userId()
+  const itemData = doc.items.map((it, i) => ({
+    productId: it.product_id,
+    quantity: it.quantity,
+    price: moneyStr(it.price),
+    remarks: textOrNull(it.remarks),
+    sortOrder: i,
+  }))
+
+  if (doc.id) {
+    const row = await prisma.$transaction(async (tx) => {
+      const header = await tx.ioDomestic.update({
+        where: { id: doc.id },
+        data: {
+          factoryId: doc.factory_id || null,
+          invoiceDate: parseDate(doc.invoice_date!),
+          customerId: doc.customer_id || null,
+          remarks: doc.remarks || null,
+        },
+      })
+      await tx.ioDomestic.update({
+        where: { id: header.id },
+        data: { taxInvoiceNumber: header.invoiceNumber },
+      })
+      await tx.ioDomesticItem.deleteMany({ where: { domesticId: header.id } })
+      if (itemData.length > 0) {
+        await tx.ioDomesticItem.createMany({
+          data: itemData.map((it) => ({ ...it, domesticId: header.id })),
+        })
+      }
+      return tx.ioDomestic.findUniqueOrThrow({ where: { id: header.id }, include: domesticInclude })
+    })
+    return rowToDomestic(row)
+  }
+
+  const number = await getNextNumber('domestic', doc.invoice_date, doc.factory_id || null)
+  const row = await prisma.$transaction(async (tx) => {
+    const header = await tx.ioDomestic.create({
+      data: {
+        invoiceNumber: number,
+        taxInvoiceNumber: number,
+        factoryId: doc.factory_id || null,
+        invoiceDate: parseDate(doc.invoice_date!),
+        customerId: doc.customer_id || null,
+        remarks: doc.remarks || null,
+        createdBy: uid,
+      },
+    })
+    if (itemData.length > 0) {
+      await tx.ioDomesticItem.createMany({
+        data: itemData.map((it) => ({ ...it, domesticId: header.id })),
+      })
+    }
+    return tx.ioDomestic.findUniqueOrThrow({ where: { id: header.id }, include: domesticInclude })
+  })
+  return rowToDomestic(row)
 }
+
 export const deleteDomestic = async (id: string) => {
-  const { error } = await getServerDb().from('io_domestic').delete().eq('id', id)
-  if (error) throw error
+  assertCanDeleteDocuments()
+  const existing = await prisma.ioDomestic.findUnique({ where: { id }, select: { factoryId: true } })
+  if (!existing) throw new Error('Domestic not found')
+  assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioDomestic.delete({ where: { id } })
 }
 
 // ── International ─────────────────────────────────────────────
-export const fetchInternationals = async (factory_id?: string): Promise<IOInternational[]> => {
-  let q = getServerDb().from('io_international')
-    .select(`
-      id, invoice_number, tax_invoice_number, invoice_date, customer_id, remarks, factory_id, created_by, created_at, updated_at,
-      factory:factories(id,name),
-      customer:io_companies(id,company_name,person_name),
-      items:io_international_items(id,international_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-    `)
-    .order('invoice_date', { ascending: true })
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  return (data ?? []) as unknown as IOInternational[]
+export const fetchInternationals = async (factoryOrQuery?: string | IoDocListQuery): Promise<PageResult<IOInternational>> => {
+  const query = asIoQuery(factoryOrQuery)
+  return fetchIoDocPage('io_international', query, async (ids) => {
+    const rows = await prisma.ioInternational.findMany({ where: { id: { in: ids } }, include: internationalInclude })
+    return rows.map(rowToInternational)
+  })
 }
+
 export const saveInternational = async (doc: Partial<IOInternational> & { items: IOLineItem[] }): Promise<IOInternational> => {
-  const uid = await userId()
+  assertCanWriteDocuments()
   if (doc.id) {
-    const { data, error } = await getServerDb().from('io_international').update({
-      factory_id: doc.factory_id || null, invoice_date: doc.invoice_date,
-      customer_id: doc.customer_id || null,
-      remarks: doc.remarks || null, updated_at: new Date().toISOString(),
-    }).eq('id', doc.id).select().single()
-    if (error) throw error
-    await getServerDb().from('io_international').update({ tax_invoice_number: data.invoice_number }).eq('id', doc.id)
-    await getServerDb().from('io_international_items').delete().eq('international_id', doc.id)
-    if (doc.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_international_items').insert(
-        doc.items.map((it, i) => ({ international_id: doc.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
-  } else {
-    const number = await getNextNumber('international', doc.invoice_date, doc.factory_id || null)
-    const { data, error } = await getServerDb().from('io_international').insert({
-      invoice_number: number, factory_id: doc.factory_id || null,
-      invoice_date: doc.invoice_date, customer_id: doc.customer_id || null,
-      tax_invoice_number: number,
-      remarks: doc.remarks || null, created_by: uid,
-    }).select().single()
-    if (error) throw error
-    if (doc.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_international_items').insert(
-        doc.items.map((it, i) => ({ international_id: data.id, product_id: it.product_id, quantity: it.quantity, price: it.price, remarks: it.remarks || null, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
+    const existing = await prisma.ioInternational.findUnique({ where: { id: doc.id }, select: { factoryId: true } })
+    if (!existing) throw new Error('International not found')
+    assertDocumentFactoryAccess(existing.factoryId)
   }
+  if (doc.factory_id) assertFactoryAccess(doc.factory_id)
+
+  const uid = userId()
+  const itemData = doc.items.map((it, i) => ({
+    productId: it.product_id,
+    quantity: it.quantity,
+    price: moneyStr(it.price),
+    remarks: textOrNull(it.remarks),
+    sortOrder: i,
+  }))
+
+  if (doc.id) {
+    const row = await prisma.$transaction(async (tx) => {
+      const header = await tx.ioInternational.update({
+        where: { id: doc.id },
+        data: {
+          factoryId: doc.factory_id || null,
+          invoiceDate: parseDate(doc.invoice_date!),
+          customerId: doc.customer_id || null,
+          remarks: doc.remarks || null,
+        },
+      })
+      await tx.ioInternational.update({
+        where: { id: header.id },
+        data: { taxInvoiceNumber: header.invoiceNumber },
+      })
+      await tx.ioInternationalItem.deleteMany({ where: { internationalId: header.id } })
+      if (itemData.length > 0) {
+        await tx.ioInternationalItem.createMany({
+          data: itemData.map((it) => ({ ...it, internationalId: header.id })),
+        })
+      }
+      return tx.ioInternational.findUniqueOrThrow({ where: { id: header.id }, include: internationalInclude })
+    })
+    return rowToInternational(row)
+  }
+
+  const number = await getNextNumber('international', doc.invoice_date, doc.factory_id || null)
+  const row = await prisma.$transaction(async (tx) => {
+    const header = await tx.ioInternational.create({
+      data: {
+        invoiceNumber: number,
+        taxInvoiceNumber: number,
+        factoryId: doc.factory_id || null,
+        invoiceDate: parseDate(doc.invoice_date!),
+        customerId: doc.customer_id || null,
+        remarks: doc.remarks || null,
+        createdBy: uid,
+      },
+    })
+    if (itemData.length > 0) {
+      await tx.ioInternationalItem.createMany({
+        data: itemData.map((it) => ({ ...it, internationalId: header.id })),
+      })
+    }
+    return tx.ioInternational.findUniqueOrThrow({ where: { id: header.id }, include: internationalInclude })
+  })
+  return rowToInternational(row)
 }
+
 export const deleteInternational = async (id: string) => {
-  const { error } = await getServerDb().from('io_international').delete().eq('id', id)
-  if (error) throw error
+  assertCanDeleteDocuments()
+  const existing = await prisma.ioInternational.findUnique({ where: { id }, select: { factoryId: true } })
+  if (!existing) throw new Error('International not found')
+  assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioInternational.delete({ where: { id } })
 }
 
 // ── Quotations ────────────────────────────────────────────────
-export const fetchQuotations = async (factory_id?: string): Promise<IOQuotation[]> => {
-  let q = getServerDb().from('io_quotations')
-    .select(`
-      id, quotation_number, quotation_date, customer_id, outward_ref_no, header_content, footer_content, factory_id, created_by, created_at, updated_at,
-      factory:factories(id,name),
-      customer:io_companies(id,company_name,person_name),
-      items:io_quotation_items(id,quotation_id,reference_no,product_id,product_name_override,price,sort_order,product:io_products(product_name))
-    `)
-    .order('quotation_date', { ascending: true })
-  if (factory_id) q = q.eq('factory_id', factory_id)
-  const { data, error } = await q
-  if (error) throw error
-  return (data ?? []) as unknown as IOQuotation[]
+export const fetchQuotations = async (factoryOrQuery?: string | IoDocListQuery): Promise<PageResult<IOQuotation>> => {
+  const query = asIoQuery(factoryOrQuery)
+  return fetchIoDocPage('io_quotations', query, async (ids) => {
+    const rows = await prisma.ioQuotation.findMany({ where: { id: { in: ids } }, include: quotationInclude })
+    return rows.map(rowToQuotation)
+  })
 }
+
 export const saveQuotation = async (doc: Partial<IOQuotation> & { items: IOQuotationItem[] }): Promise<IOQuotation> => {
-  const uid = await userId()
+  assertCanWriteDocuments()
   if (doc.id) {
-    const { data, error } = await getServerDb().from('io_quotations').update({
-      factory_id: doc.factory_id || null, quotation_date: doc.quotation_date,
-      customer_id: doc.customer_id || null, outward_ref_no: doc.outward_ref_no || null,
-      header_content: doc.header_content || null,
-      footer_content: doc.footer_content || null, updated_at: new Date().toISOString(),
-    }).eq('id', doc.id).select().single()
-    if (error) throw error
-    await getServerDb().from('io_quotation_items').delete().eq('quotation_id', doc.id)
-    if (doc.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_quotation_items').insert(
-        doc.items.map((it, i) => ({ quotation_id: doc.id, reference_no: it.reference_no || null, product_id: it.product_id || null, product_name_override: it.product_name_override || null, price: it.price, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
-  } else {
-    const number = await getNextNumber('quotation', doc.quotation_date, doc.factory_id || null)
-    const { data, error } = await getServerDb().from('io_quotations').insert({
-      quotation_number: number, factory_id: doc.factory_id || null,
-      quotation_date: doc.quotation_date, customer_id: doc.customer_id || null,
-      outward_ref_no: doc.outward_ref_no || null,
-      header_content: doc.header_content || null, footer_content: doc.footer_content || null, created_by: uid,
-    }).select().single()
-    if (error) throw error
-    if (doc.items.length > 0) {
-      const { error: ie } = await getServerDb().from('io_quotation_items').insert(
-        doc.items.map((it, i) => ({ quotation_id: data.id, reference_no: it.reference_no || null, product_id: it.product_id || null, product_name_override: it.product_name_override || null, price: it.price, sort_order: i }))
-      )
-      if (ie) throw ie
-    }
-    return data as any
+    const existing = await prisma.ioQuotation.findUnique({ where: { id: doc.id }, select: { factoryId: true } })
+    if (!existing) throw new Error('Quotation not found')
+    assertDocumentFactoryAccess(existing.factoryId)
   }
+  if (doc.factory_id) assertFactoryAccess(doc.factory_id)
+
+  const uid = userId()
+  const itemData = doc.items.map((it, i) => ({
+    referenceNo: it.reference_no || null,
+    productId: it.product_id || null,
+    productNameOverride: textOrNull(it.product_name_override),
+    price: moneyStr(it.price),
+    priceUnit: it.price_unit === 'USD/KG' ? 'USD/KG' : 'INR/KG',
+    sortOrder: i,
+  }))
+
+  if (doc.id) {
+    const row = await prisma.$transaction(async (tx) => {
+      const header = await tx.ioQuotation.update({
+        where: { id: doc.id },
+        data: {
+          factoryId: doc.factory_id || null,
+          quotationDate: parseDate(doc.quotation_date!),
+          customerId: doc.customer_id || null,
+          outwardRefNo: doc.outward_ref_no || null,
+          headerContent: doc.header_content || null,
+          footerContent: doc.footer_content || null,
+        },
+      })
+      await tx.ioQuotationItem.deleteMany({ where: { quotationId: header.id } })
+      if (itemData.length > 0) {
+        await tx.ioQuotationItem.createMany({
+          data: itemData.map((it) => ({ ...it, quotationId: header.id })),
+        })
+      }
+      return tx.ioQuotation.findUniqueOrThrow({ where: { id: header.id }, include: quotationInclude })
+    })
+    return rowToQuotation(row)
+  }
+
+  const number = await getNextNumber('quotation', doc.quotation_date, doc.factory_id || null)
+  const row = await prisma.$transaction(async (tx) => {
+    const header = await tx.ioQuotation.create({
+      data: {
+        quotationNumber: number,
+        factoryId: doc.factory_id || null,
+        quotationDate: parseDate(doc.quotation_date!),
+        customerId: doc.customer_id || null,
+        outwardRefNo: doc.outward_ref_no || null,
+        headerContent: doc.header_content || null,
+        footerContent: doc.footer_content || null,
+        createdBy: uid,
+      },
+    })
+    if (itemData.length > 0) {
+      await tx.ioQuotationItem.createMany({
+        data: itemData.map((it) => ({ ...it, quotationId: header.id })),
+      })
+    }
+    return tx.ioQuotation.findUniqueOrThrow({ where: { id: header.id }, include: quotationInclude })
+  })
+  return rowToQuotation(row)
 }
+
 export const deleteQuotation = async (id: string) => {
-  const { error } = await getServerDb().from('io_quotations').delete().eq('id', id)
-  if (error) throw error
-}
-
-const INWARD_RECENT_SELECT = `
-  id, inward_number, inward_date, supplier_id, supplier_ref_no, remarks, factory_id, created_by, created_at, updated_at,
-  factory:factories(id,name),
-  supplier:io_companies(id,company_name,person_name),
-  items:io_inward_items(id,inward_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-`
-
-const OUTWARD_RECENT_SELECT = `
-  id, outward_number, outward_date, supplier_id, supplier_ref_no, remarks, factory_id, created_by, created_at, updated_at,
-  factory:factories(id,name),
-  supplier:io_companies(id,company_name,person_name),
-  items:io_outward_items(id,outward_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-`
-
-const DOMESTIC_RECENT_SELECT = `
-  id, invoice_number, tax_invoice_number, invoice_date, customer_id, remarks, factory_id, created_by, created_at, updated_at,
-  factory:factories(id,name),
-  customer:io_companies(id,company_name,person_name),
-  items:io_domestic_items(id,domestic_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-`
-
-const INTERNATIONAL_RECENT_SELECT = `
-  id, invoice_number, tax_invoice_number, invoice_date, customer_id, remarks, factory_id, created_by, created_at, updated_at,
-  factory:factories(id,name),
-  customer:io_companies(id,company_name,person_name),
-  items:io_international_items(id,international_id,product_id,quantity,price,remarks,sort_order,product:io_products(product_name,hsn_code))
-`
-
-/** Stats + recent rows in one round-trip (single RPC auth check). */
-export const fetchIODashboard = async (factory_id?: string) => {
-  const applyFactory = <T extends { eq: (col: string, val: string) => T }>(q: T) =>
-    factory_id ? q.eq('factory_id', factory_id) : q
-
-  const [stats, inwardRes, outwardRes, domesticRes, internationalRes] = await Promise.all([
-    fetchIOStats(factory_id),
-    applyFactory(
-      getServerDb()
-        .from('io_inward')
-        .select(INWARD_RECENT_SELECT)
-        .order('inward_date', { ascending: false })
-        .limit(5)
-    ),
-    applyFactory(
-      getServerDb()
-        .from('io_outward')
-        .select(OUTWARD_RECENT_SELECT)
-        .order('outward_date', { ascending: false })
-        .limit(5)
-    ),
-    applyFactory(
-      getServerDb()
-        .from('io_domestic')
-        .select(DOMESTIC_RECENT_SELECT)
-        .order('invoice_date', { ascending: false })
-        .limit(5)
-    ),
-    applyFactory(
-      getServerDb()
-        .from('io_international')
-        .select(INTERNATIONAL_RECENT_SELECT)
-        .order('invoice_date', { ascending: false })
-        .limit(5)
-    ),
-  ])
-
-  if (inwardRes.error) throw inwardRes.error
-  if (outwardRes.error) throw outwardRes.error
-  if (domesticRes.error) throw domesticRes.error
-  if (internationalRes.error) throw internationalRes.error
-
-  return {
-    stats,
-    recentInwards: (inwardRes.data ?? []) as unknown as IOInward[],
-    recentOutwards: (outwardRes.data ?? []) as unknown as IOOutward[],
-    recentDomestics: (domesticRes.data ?? []) as unknown as IODomestic[],
-    recentInternationals: (internationalRes.data ?? []) as unknown as IOInternational[],
-  }
+  assertCanDeleteDocuments()
+  const existing = await prisma.ioQuotation.findUnique({ where: { id }, select: { factoryId: true } })
+  if (!existing) throw new Error('Quotation not found')
+  assertDocumentFactoryAccess(existing.factoryId)
+  await prisma.ioQuotation.delete({ where: { id } })
 }
 
 // ── Dashboard Stats ───────────────────────────────────────────
 export const fetchIOStats = async (factory_id?: string) => {
-  const filter = (q: any) => factory_id ? q.eq('factory_id', factory_id) : q
+  const where = factoryListWhere(factory_id)
   const [inward, outward, domestic, international, quotations] = await Promise.all([
-    filter(getServerDb().from('io_inward').select('id', { count: 'exact', head: true })),
-    filter(getServerDb().from('io_outward').select('id', { count: 'exact', head: true })),
-    filter(getServerDb().from('io_domestic').select('id', { count: 'exact', head: true })),
-    filter(getServerDb().from('io_international').select('id', { count: 'exact', head: true })),
-    filter(getServerDb().from('io_quotations').select('id', { count: 'exact', head: true })),
+    prisma.ioInward.count({ where }),
+    prisma.ioOutward.count({ where }),
+    isIoDomesticEnabled() ? prisma.ioDomestic.count({ where }) : Promise.resolve(0),
+    isIoInternationalEnabled() ? prisma.ioInternational.count({ where }) : Promise.resolve(0),
+    prisma.ioQuotation.count({ where }),
   ])
-  return {
-    inward: inward.count ?? 0, outward: outward.count ?? 0,
-    domestic: domestic.count ?? 0, international: international.count ?? 0,
-    quotations: quotations.count ?? 0,
-  }
+  return { inward, outward, domestic, international, quotations }
 }
 
 // ── Helpers ───────────────────────────────────────────────────

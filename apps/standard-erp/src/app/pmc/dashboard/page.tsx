@@ -1,65 +1,96 @@
 'use client'
 
 import Link from 'next/link'
-import { usePMCData } from '@/contexts/PMCContext'
+import { useState } from 'react'
+import { usePMC, usePMCData } from '@/contexts/PMCContext'
+import { pmcApi } from '@madstoq/pmc-system/api'
+import { seedPMCDemoIfEmpty } from '@madstoq/pmc-system'
 
 export default function PMCDashboardPage() {
-  const { api: pmcApi, tick } = usePMCData()
+  const { refresh } = usePMC()
+  const { tick } = usePMCData()
+  const [seeding, setSeeding] = useState(false)
   void tick
+
   const stats = pmcApi.dashboardStats()
+
+  async function loadDemo() {
+    if (seeding) return
+    setSeeding(true)
+    try {
+      if (await seedPMCDemoIfEmpty()) refresh()
+      else alert('Data already exists.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not load sample data.')
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   return (
     <div className="pmc-page">
       <div>
         <h1 className="pmc-page-title">Dashboard</h1>
-        <p className="text-sm text-muted mt-1">Overview of procurement, products, and batches</p>
+        <p className="text-sm text-muted mt-1">Reference counts, products, and recent activity</p>
+        {stats.referenceCount === 0 && (
+          <button
+            type="button"
+            onClick={loadDemo}
+            disabled={seeding}
+            className="mt-3 text-xs text-pmc hover:underline disabled:opacity-50"
+          >
+            {seeding ? 'Loading sample…' : 'Load sample data from pricing sheet'}
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Procurement items" value={stats.procurementCount} href="/pmc/procurement" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <StatCard label="References" value={stats.referenceCount} href="/pmc/references" />
         <StatCard label="Products" value={stats.productCount} href="/pmc/products" />
-        <StatCard label="Batches" value={stats.batchCount} href="/pmc/batches" />
-        <StatCard label="Active batches" value={stats.activeBatchCount} href="/pmc/batches" />
+        <StatCard label="Raw materials" value={stats.rawMaterialCount} href="/pmc/master/raw-materials" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <section className="pmc-card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-primary">Recent batches</h2>
-            <Link href="/pmc/batches" className="text-xs font-medium text-pmc hover:underline">View all</Link>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="font-semibold text-primary">Recent references</h2>
+            <Link href="/pmc/references" className="text-xs font-medium text-pmc hover:underline">
+              View all
+            </Link>
           </div>
-          {stats.recentBatches.length === 0 ? (
-            <p className="text-sm text-muted">No batches yet. Create one under Batches.</p>
+          {stats.recentRefs.length === 0 ? (
+            <p className="text-sm text-muted">No references yet. Create one under Reference Number.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
-              {stats.recentBatches.map((b) => {
-                const p = pmcApi.getProduct(b.product_id)
-                return (
-                  <li key={b.id} className="flex justify-between border-b border-border pb-2 last:border-0">
-                    <Link href={`/pmc/batches/${b.id}`} className="font-mono text-pmc hover:underline">{b.batch_code}</Link>
-                    <span className="text-muted truncate max-w-[120px]">{p?.name ?? '—'}</span>
-                    <span>₹{b.unit_price.toFixed(0)}</span>
-                  </li>
-                )
-              })}
+            <ul className="space-y-2">
+              {stats.recentRefs.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap justify-between gap-2 text-sm border-b border-border pb-2 last:border-0"
+                >
+                  <span className="font-mono font-medium break-all">{r.ref_number}</span>
+                  <span className="text-muted shrink-0">{new Date(r.created_at).toLocaleDateString()}</span>
+                </li>
+              ))}
             </ul>
           )}
         </section>
 
         <section className="pmc-card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-primary">Recent products</h2>
-            <Link href="/pmc/products" className="text-xs font-medium text-pmc hover:underline">View all</Link>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="font-semibold text-primary">Products</h2>
+            <Link href="/pmc/products" className="text-xs font-medium text-pmc hover:underline">
+              View all
+            </Link>
           </div>
           {stats.recentProducts.length === 0 ? (
-            <p className="text-sm text-muted">Add products under Products.</p>
+            <p className="text-sm text-muted">Add products in Master.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2">
               {stats.recentProducts.map((p) => (
-                <li key={p.id} className="flex justify-between border-b border-border pb-2 last:border-0">
-                  <Link href={`/pmc/products/${p.id}`} className="font-medium text-pmc hover:underline">{p.name}</Link>
-                  <span className="font-mono text-muted">{p.code}</span>
-                  <span>₹{p.unit_price.toFixed(0)}</span>
+                <li key={p.id}>
+                  <Link href={`/pmc/products/${p.id}`} className="text-sm font-medium text-pmc hover:underline">
+                    {p.name}
+                  </Link>
                 </li>
               ))}
             </ul>

@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
-import { fetchIODashboard, fmtDate } from '@madstoq/io-system/api'
+import { fetchIOStats, fetchInwards, fetchOutwards, fetchDomestics, fetchInternationals, fetchQuotations, fmtDate, type IoPage } from '@madstoq/io-system/api'
 import {
   ArrowDownToLine, ArrowUpToLine, Home, Globe, FileText,
 } from 'lucide-react'
+import { useIoFeatures } from '@/contexts/IoFeaturesContext'
 
 const BASE = '/inward-outward'
+const EMPTY_PAGE: IoPage<never> = { rows: [], total: 0, page: 1, pageSize: 5 }
 
 interface Stats {
   inward: number; outward: number; domestic: number; international: number; quotations: number
@@ -15,11 +17,13 @@ interface Stats {
 
 export default function IODashboard() {
   const { factoryId, factories } = useIOFactory()
+  const ioFeatures = useIoFeatures()
   const [stats, setStats] = useState<Stats | null>(null)
   const [recentInwards, setRecentInwards] = useState<any[]>([])
   const [recentOutwards, setRecentOutwards] = useState<any[]>([])
   const [recentDomestics, setRecentDomestics] = useState<any[]>([])
   const [recentInternationals, setRecentInternationals] = useState<any[]>([])
+  const [recentQuotations, setRecentQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,12 +34,21 @@ export default function IODashboard() {
     setLoading(true)
     try {
       const fid = factoryId || undefined
-      const dash = await fetchIODashboard(fid)
-      setStats(dash.stats)
-      setRecentInwards(dash.recentInwards)
-      setRecentOutwards(dash.recentOutwards)
-      setRecentDomestics(dash.recentDomestics)
-      setRecentInternationals(dash.recentInternationals)
+      const recent = { factory_id: fid, page: 1, page_size: 5 }
+      const [s, inwards, outwards, domestics, internationals, quotations] = await Promise.all([
+        fetchIOStats(fid),
+        fetchInwards(recent),
+        fetchOutwards(recent),
+        ioFeatures.domestic ? fetchDomestics(recent) : Promise.resolve(EMPTY_PAGE),
+        ioFeatures.international ? fetchInternationals(recent) : Promise.resolve(EMPTY_PAGE),
+        fetchQuotations(recent),
+      ])
+      setStats(s)
+      setRecentInwards(inwards.rows)
+      setRecentOutwards(outwards.rows)
+      setRecentDomestics(domestics.rows)
+      setRecentInternationals(internationals.rows)
+      setRecentQuotations(quotations.rows)
     } catch (e) {
       console.error(e)
     } finally {
@@ -46,8 +59,8 @@ export default function IODashboard() {
   const kpis = stats ? [
     { label: 'Inward',        value: stats.inward,         icon: ArrowDownToLine, colorVar: 'var(--color-inputer)', href: `${BASE}/inward` },
     { label: 'Outward',       value: stats.outward,        icon: ArrowUpToLine,   colorVar: 'var(--color-owner)',   href: `${BASE}/outward` },
-    { label: 'Domestic',      value: stats.domestic,       icon: Home,            colorVar: 'var(--color-chemist)', href: `${BASE}/domestic` },
-    { label: 'International', value: stats.international,  icon: Globe,           colorVar: 'var(--color-owner)',   href: `${BASE}/international` },
+    ...(ioFeatures.domestic ? [{ label: 'Domestic', value: stats.domestic, icon: Home, colorVar: 'var(--color-chemist)', href: `${BASE}/domestic` }] : []),
+    ...(ioFeatures.international ? [{ label: 'International', value: stats.international, icon: Globe, colorVar: 'var(--color-owner)', href: `${BASE}/international` }] : []),
     { label: 'Quotations',    value: stats.quotations,     icon: FileText,        colorVar: 'var(--color-muted)',   href: `${BASE}/quotation` },
   ] : []
 
@@ -116,30 +129,44 @@ export default function IODashboard() {
             total: r.items?.reduce((s: number, it: any) => s + it.price * it.quantity, 0) ?? 0,
           }))}
         />
-        {/* Recent Domestic */}
+        {ioFeatures.domestic && (
+          <RecentTable
+            title="Recent Domestic"
+            icon={<Home size={14} style={{ color: 'var(--color-chemist)' }} />}
+            href={`${BASE}/domestic`}
+            loading={loading}
+            rows={recentDomestics.map(r => ({
+              number: r.tax_invoice_number || r.invoice_number || '—',
+              party: r.customer?.company_name ?? '—',
+              date: fmtDate(r.invoice_date),
+              total: r.items?.reduce((s: number, it: any) => s + it.price * it.quantity, 0) ?? 0,
+            }))}
+          />
+        )}
+        {ioFeatures.international && (
+          <RecentTable
+            title="Recent International"
+            icon={<Globe size={14} style={{ color: 'var(--color-owner)' }} />}
+            href={`${BASE}/international`}
+            loading={loading}
+            rows={recentInternationals.map(r => ({
+              number: r.tax_invoice_number || r.invoice_number || '—',
+              party: r.customer?.company_name ?? '—',
+              date: fmtDate(r.invoice_date),
+              total: r.items?.reduce((s: number, it: any) => s + it.price * it.quantity, 0) ?? 0,
+            }))}
+          />
+        )}
         <RecentTable
-          title="Recent Domestic"
-          icon={<Home size={14} style={{ color: 'var(--color-chemist)' }} />}
-          href={`${BASE}/domestic`}
+          title="Recent Quotation"
+          icon={<FileText size={14} className="text-muted" />}
+          href={`${BASE}/quotation`}
           loading={loading}
-          rows={recentDomestics.map(r => ({
-            number: r.tax_invoice_number || r.invoice_number || '—',
+          rows={recentQuotations.map(r => ({
+            number: r.quotation_number,
             party: r.customer?.company_name ?? '—',
-            date: fmtDate(r.invoice_date),
-            total: r.items?.reduce((s: number, it: any) => s + it.price * it.quantity, 0) ?? 0,
-          }))}
-        />
-        {/* Recent International */}
-        <RecentTable
-          title="Recent International"
-          icon={<Globe size={14} style={{ color: 'var(--color-owner)' }} />}
-          href={`${BASE}/international`}
-          loading={loading}
-          rows={recentInternationals.map(r => ({
-            number: r.tax_invoice_number || r.invoice_number || '—',
-            party: r.customer?.company_name ?? '—',
-            date: fmtDate(r.invoice_date),
-            total: r.items?.reduce((s: number, it: any) => s + it.price * it.quantity, 0) ?? 0,
+            date: fmtDate(r.quotation_date),
+            total: r.items?.reduce((s: number, it: any) => s + (Number(it.price) || 0), 0) ?? 0,
           }))}
         />
       </div>

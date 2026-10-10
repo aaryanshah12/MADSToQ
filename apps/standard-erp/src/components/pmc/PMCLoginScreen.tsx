@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
 import { usePMC } from '@/contexts/PMCContext'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
-import DemoCredentials from '@/components/auth/DemoCredentials'
-import { DEMO_PORTALS } from '@/lib/demo-portals'
+
+const THEME_KEY = 'theme'
 
 export default function PMCLoginScreen() {
   const router = useRouter()
@@ -18,7 +18,11 @@ export default function PMCLoginScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    persistTheme(readStoredTheme())
+    const saved =
+      (localStorage.getItem(THEME_KEY) as 'dark' | 'light' | null) ??
+      (localStorage.getItem('pmc-theme') as 'dark' | 'light' | null) ??
+      'light'
+    document.documentElement.dataset.theme = saved
     setPassword('')
   }, [])
 
@@ -86,7 +90,7 @@ export default function PMCLoginScreen() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="new-password"
-                  className="input w-full pr-14 pmc-focus"
+                  className="input w-full pr-10 pmc-focus"
                 />
                 <button
                   type="button"
@@ -123,10 +127,17 @@ export default function PMCLoginScreen() {
                 </>
               )}
             </button>
+
+            <p className="text-center text-xs text-muted pt-1">
+              <Link href="/pmc/forgot-password" className="text-pmc hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
-          <DemoCredentials accounts={DEMO_PORTALS.pmc.accounts} />
-          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted text-center">Software is managed by MADSToQ</p>
+          </div>
         </div>
       </div>
     </div>

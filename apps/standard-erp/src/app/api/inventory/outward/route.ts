@@ -1,4 +1,4 @@
-import { db } from '@madstoq/database'
+import { loadPage, parsePageParams, prisma, serializeOutwardEntry } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type OutwardInput = {
@@ -28,19 +28,35 @@ export async function GET(request: Request) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
 
-  let query = db
-    .from('outward_entries')
-    .select('*')
-    .order('entry_date', { ascending: false })
-    .order('updated_at', { ascending: false })
+  const where = {
+    ...(factoryIds?.length ? { factoryId: { in: factoryIds } } : {}),
+    ...(from || to
+      ? {
+          entryDate: {
+            ...(from ? { gte: new Date(from) } : {}),
+            ...(to ? { lte: new Date(to) } : {}),
+          },
+        }
+      : {}),
+  }
+  const page = parsePageParams(searchParams)
+  const listed = await loadPage(
+    page,
+    () => prisma.outwardEntry.count({ where }),
+    (skip, take) => prisma.outwardEntry.findMany({
+      where,
+      orderBy: [{ entryDate: 'desc' }, { updatedAt: 'desc' }],
+      skip,
+      take,
+    }),
+  )
 
-  if (factoryIds && factoryIds.length > 0) query = query.in('factory_id', factoryIds)
-  if (from) query = query.gte('entry_date', from)
-  if (to) query = query.lte('entry_date', to)
-
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ entries: data ?? [] })
+  return NextResponse.json({
+    entries: listed.rows.map(serializeOutwardEntry),
+    total: listed.total,
+    page: listed.page,
+    pageSize: listed.pageSize,
+  })
 }
 
 export async function POST(request: Request) {
@@ -58,39 +74,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'factory_id, product_id, entry_date, batch_no, no_of_bags, as_is, purity, created_by are required' }, { status: 400 })
     }
 
-    const { data: productRow, error: productErr } = await db
-      .from('factory_inout_products')
-      .select('id, factory_id, kind, name, is_active')
-      .eq('id', payload.product_id)
-      .single()
-
-    if (productErr || !productRow) return NextResponse.json({ error: 'Invalid product' }, { status: 400 })
-    if (!productRow.is_active) return NextResponse.json({ error: 'Product is inactive' }, { status: 400 })
-    if (productRow.factory_id !== payload.factory_id || productRow.kind !== 'outward') {
+    const productRow = await prisma.factoryInoutProduct.findUnique({ where: { id: payload.product_id } })
+    if (!productRow) return NextResponse.json({ error: 'Invalid product' }, { status: 400 })
+    if (!productRow.isActive) return NextResponse.json({ error: 'Product is inactive' }, { status: 400 })
+    if (productRow.factoryId !== payload.factory_id || productRow.kind !== 'outward') {
       return NextResponse.json({ error: 'Product does not belong to factory/kind' }, { status: 400 })
     }
 
     const real = computeReal(payload)
-
-    const { data, error } = await db
-      .from('outward_entries')
-      .insert({
-        factory_id: payload.factory_id,
-        product_id: payload.product_id,
-        product_name: productRow.name,
-        entry_date: payload.entry_date ?? new Date().toISOString().split('T')[0],
-        batch_no: String(payload.batch_no).trim(),
-        no_of_bags: Number(payload.no_of_bags),
-        as_is: Number(payload.as_is),
+    const entry = await prisma.outwardEntry.create({
+      data: {
+        factoryId: payload.factory_id,
+        productId: payload.product_id,
+        productName: productRow.name,
+        entryDate: new Date(payload.entry_date ?? new Date().toISOString().split('T')[0]),
+        batchNo: String(payload.batch_no).trim(),
+        noOfBags: Number(payload.no_of_bags),
+        asIs: Number(payload.as_is),
         purity: Number(payload.purity),
         real,
-        created_by: payload.created_by,
-      })
-      .select()
-      .single()
+        createdBy: payload.created_by,
+      },
+    })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ success: true, entry: data })
+    return NextResponse.json({ success: true, entry: serializeOutwardEntry(entry) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -101,15 +108,9 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await db
-      .from('outward_entries')
-      .delete()
-      .eq('id', id)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    await prisma.outwardEntry.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-

@@ -6,18 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 import { useRouter } from 'next/navigation'
-import { authClient } from '@/lib/auth-client'
-import { setCachedAccessToken } from '@madstoq/core'
-import { clearPmcCache } from '@madstoq/pmc-system/lib/cache'
-import { createPmcApi } from '@madstoq/pmc-system/api'
-import { usePMCFactory } from '@/contexts/PMCFactoryContext'
-import { setPmcCache } from '@madstoq/pmc-system/lib/cache'
+import { signIn as nextAuthSignIn, signOut as nextAuthSignOut, useSession } from 'next-auth/react'
+import { clearPmcCache } from '@madstoq/pmc-system'
+import { pmcApi } from '@madstoq/pmc-system/api'
 import {
-  bootstrapPmc,
+  assertPmcPortalAccess,
   migrateLocalStorageToSupabaseIfNeeded,
   reloadPmcCache,
 } from '@madstoq/pmc-system/rpc'
@@ -38,98 +34,65 @@ const PMCContext = createContext<PMCContextValue | null>(null)
 
 export function PMCProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [loading, setLoading] = useState(true)
   const [dataReady, setDataReady] = useState(false)
   const [dataError, setDataError] = useState<string | null>(null)
-  const [email, setEmail] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
-  const reloadPromiseRef = useRef<Promise<void> | null>(null)
 
   const refresh = useCallback(() => setTick((t) => t + 1), [])
 
-  const reloadData = useCallback(async (skipMigrate = false) => {
-    if (reloadPromiseRef.current) return reloadPromiseRef.current
+  const email = session?.user?.email ?? null
 
-    const run = async () => {
-      setDataError(null)
-      try {
-        const { data: { session } } = await authClient.auth.getSession()
-        const user = session?.user
-        if (session?.access_token) setCachedAccessToken(session.access_token)
-        if (!user) {
-          clearPmcCache()
-          setDataReady(true)
-          refresh()
-          return
-        }
-        const { store, isEmpty } = await bootstrapPmc()
-        setPmcCache(store)
-        const migrated =
-          !skipMigrate && isEmpty ? await migrateLocalStorageToSupabaseIfNeeded(true) : false
-        if (migrated) await reloadPmcCache()
+  const reloadData = useCallback(async () => {
+    setDataError(null)
+    try {
+      if (!session?.user?.id) {
+        clearPmcCache()
         setDataReady(true)
         refresh()
-      } catch (e) {
-        setDataError(e instanceof Error ? e.message : 'Failed to load PMC data')
-        setDataReady(true)
+        return
       }
+      await assertPmcPortalAccess()
+      await migrateLocalStorageToSupabaseIfNeeded()
+      await reloadPmcCache()
+      setDataReady(true)
+      refresh()
+    } catch (e) {
+      setDataError(e instanceof Error ? e.message : 'Failed to load PMC data')
+      setDataReady(true)
     }
-
-    reloadPromiseRef.current = run().finally(() => {
-      reloadPromiseRef.current = null
-    })
-    return reloadPromiseRef.current
-  }, [refresh])
+  }, [refresh, session?.user?.id])
 
   useEffect(() => {
-    authClient.auth.getSession().then(async ({ data }) => {
-      const user = data.session?.user
-      if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
-      setEmail(user?.email ?? null)
-      if (user) await reloadData(false)
-      else {
-        clearPmcCache()
-        setDataReady(true)
-      }
-      setLoading(false)
-    })
-    const { data: sub } = authClient.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'INITIAL_SESSION') return
-      if (session?.access_token) setCachedAccessToken(session.access_token)
-      setEmail(session?.user?.email ?? null)
-      if (session?.user) {
-        // signIn already kicks off bootstrap; avoid duplicate slow loads on SIGNED_IN
-        if (event !== 'SIGNED_IN') void reloadData(true)
-      } else {
-        clearPmcCache()
-        setDataReady(true)
-        refresh()
-      }
-      setLoading(false)
-    })
-    return () => sub.subscription.unsubscribe()
-  }, [reloadData, refresh])
+    if (status === 'loading') return
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      const { data, error } = await authClient.auth.signInWithPassword({ email, password })
-      if (error) return { error: error.message }
-      if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
-      setEmail(email)
-      setDataReady(false)
+    if (status === 'authenticated' && session?.user?.id) {
+      setLoading(true)
+      void reloadData().finally(() => setLoading(false))
+    } else {
+      clearPmcCache()
+      setDataReady(true)
       setLoading(false)
-      void reloadData(true)
-      return {}
-    },
-    [reloadData]
-  )
+    }
+  }, [status, session?.user?.id, reloadData])
+
+  const signIn = useCallback(async (emailIn: string, password: string) => {
+    const res = await nextAuthSignIn('credentials', {
+      email: emailIn.trim(),
+      password,
+      redirect: false,
+    })
+    if (res?.error) return { error: res.error }
+    setDataReady(false)
+    return {}
+  }, [])
 
   const signOut = useCallback(async () => {
-    await authClient.auth.signOut()
-    setEmail(null)
-    clearPmcCache()
+    await nextAuthSignOut({ redirect: false })
     setDataReady(false)
-    router.push('/portals/demo/pmc')
+    clearPmcCache()
+    router.push('/pmc')
   }, [router])
 
   const value = useMemo(
@@ -158,6 +121,5 @@ export function usePMC() {
 
 export function usePMCData() {
   const { tick } = usePMC()
-  const { factoryId } = usePMCFactory()
-  return useMemo(() => ({ api: createPmcApi(factoryId), tick, factoryId }), [tick, factoryId])
+  return useMemo(() => ({ api: pmcApi, tick }), [tick])
 }

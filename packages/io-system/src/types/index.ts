@@ -37,6 +37,7 @@ export interface IOCompany {
   factory_id?: string | null
   company_type: CompanyType
   company_name: string
+  person_title?: string | null
   person_name?: string | null
   country_id?: number | null
   state_id?: number | null
@@ -137,6 +138,8 @@ export interface IOInternational {
   factory?: { id: string; name: string } | null
 }
 
+export type QuotationPriceUnit = 'INR/KG' | 'USD/KG'
+
 export interface IOQuotationItem {
   id?: string
   quotation_id?: string
@@ -144,6 +147,7 @@ export interface IOQuotationItem {
   product_id?: string | null
   product_name_override?: string | null
   price: number
+  price_unit?: QuotationPriceUnit | null
   sort_order?: number
   product?: IOProduct | null
 }

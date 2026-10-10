@@ -2,16 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/components/providers/ToastProvider'
+import { EmptyState, Spinner, useConfirm } from '@/components/ui'
 import { monthOptions, getCurrentFiscalYear, getFiscalYears, fetchMonthlyEntries, saveMonthlyEntry, deleteMonthlyEntry, totalsFor, computeDerived, toCsv, MonthlyEntry } from '@/lib/monthlyMaterial'
-import { Download, PackagePlus, Save, Trash2 } from 'lucide-react'
+import { CalendarRange, Download, PackagePlus, Save, Trash2 } from 'lucide-react'
 import SimpleModal from '@madstoq/ui/simple-modal'
 
 const DEFAULT_USED_PNT = 5000
 
 export default function ChemistMonthlyEntryPage() {
   const { profile } = useAuth()
+  const toast = useToast()
+  const confirm = useConfirm()
   const [fiscalYear, setFiscalYear] = useState(getCurrentFiscalYear())
   const [month, setMonth] = useState<number>(monthOptions[0].value)
   const [entries, setEntries] = useState<MonthlyEntry[]>([])
@@ -82,11 +86,11 @@ export default function ChemistMonthlyEntryPage() {
   const handleSave = async () => {
     if (!profile) return
     if (!form.factory_id) {
-      alert('Select a factory')
+      toast.error('Select a factory')
       return
     }
     if (!form.batch_id) {
-      alert('Batch ID is required')
+      toast.error('Batch ID is required')
       return
     }
     setSaving(true)
@@ -97,7 +101,7 @@ export default function ChemistMonthlyEntryPage() {
         used_pnt: DEFAULT_USED_PNT,
       }
     if (!hasPurity) {
-      alert('Please complete all fields in order')
+      toast.error('Please complete all fields in order')
       return
     }
       await saveMonthlyEntry(payload)
@@ -105,7 +109,7 @@ export default function ChemistMonthlyEntryPage() {
       await load()
       setModalOpen(false)
     } catch (err: any) {
-      alert(err.message)
+      toast.error(err?.message ?? 'Could not save the monthly entry.')
     } finally {
       setSaving(false)
     }
@@ -113,7 +117,13 @@ export default function ChemistMonthlyEntryPage() {
 
   const handleDelete = async (id?: string) => {
     if (!id) return
-    if (!confirm('Delete this entry?')) return
+    const ok = await confirm({
+      title: 'Delete monthly entry?',
+      body: 'This removes the batch from this month\u2019s material record. This cannot be undone.',
+      confirmLabel: 'Delete entry',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteMonthlyEntry(id)
     await load()
   }
@@ -151,7 +161,7 @@ export default function ChemistMonthlyEntryPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="Monthly Material Entry"
           subtitle="Chemist · Enter batch values and track yields"
@@ -171,8 +181,8 @@ export default function ChemistMonthlyEntryPage() {
 
         <div className="card p-4 md:p-6 mb-4 grid gap-4 md:grid-cols-4 items-end">
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Financial Year</label>
-            <select
+            <label htmlFor="financial-year" className="text-xs text-muted font-mono">Financial Year</label>
+            <select id="financial-year"
               value={fiscalYear}
               onChange={e => setFiscalYear(e.target.value)}
               className="input"
@@ -181,8 +191,8 @@ export default function ChemistMonthlyEntryPage() {
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Month</label>
-            <select
+            <label htmlFor="month" className="text-xs text-muted font-mono">Month</label>
+            <select id="month"
               value={month}
               onChange={e => setMonth(Number(e.target.value))}
               className="input"
@@ -191,8 +201,8 @@ export default function ChemistMonthlyEntryPage() {
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Factory</label>
-            <select
+            <label htmlFor="factory" className="text-xs text-muted font-mono">Factory</label>
+            <select id="factory"
               value={form.factory_id}
               onChange={e => setForm(f => ({ ...f, factory_id: e.target.value }))}
               className="input"
@@ -213,7 +223,7 @@ export default function ChemistMonthlyEntryPage() {
         <div className="card">
           <div className="px-4 md:px-6 py-4 border-b border-border flex items-center justify-between">
             <div className="font-mono text-xs text-muted uppercase tracking-widest">Entries</div>
-            {loading && <div className="text-xs text-muted">Loading…</div>}
+            {loading && <Spinner size="xs" accent="chemist" label="Loading entries" />}
           </div>
 
           <div className="hidden md:block overflow-x-auto">
@@ -248,7 +258,15 @@ export default function ChemistMonthlyEntryPage() {
                   </tr>
                 ))}
                 {entriesWithDerived.length === 0 && (
-                  <tr><td colSpan={8} className="text-center text-muted py-8">No entries yet</td></tr>
+                  <tr>
+                    <td colSpan={8} className="p-0">
+                      <EmptyState
+                        icon={<CalendarRange size={28} strokeWidth={1.5} />}
+                        title="No entries for this month"
+                        description="Add a batch to record monthly material figures for the selected period."
+                      />
+                    </td>
+                  </tr>
                 )}
               </tbody>
               {entriesWithDerived.length > 0 && (
@@ -303,7 +321,10 @@ export default function ChemistMonthlyEntryPage() {
                 </div>
               ))}
               {entriesWithDerived.length === 0 && (
-                <div className="text-center text-muted py-8">No entries yet</div>
+                <EmptyState
+                  icon={<CalendarRange size={28} strokeWidth={1.5} />}
+                  title="No entries for this month"
+                />
               )}
             </div>
             {entriesWithDerived.length > 0 && (
@@ -339,8 +360,8 @@ export default function ChemistMonthlyEntryPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">Factory</label>
-            <select
+            <label htmlFor="factory-2" className="text-xs text-muted font-mono">Factory</label>
+            <select id="factory-2"
               className="input-field input-dark chemist-focus"
               value={form.factory_id}
               onChange={e => setForm(f => ({ ...f, factory_id: e.target.value }))}
@@ -351,8 +372,8 @@ export default function ChemistMonthlyEntryPage() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">Batch ID</label>
-            <input
+            <label htmlFor="batch-id" className="text-xs text-muted font-mono">Batch ID</label>
+            <input id="batch-id"
               className="input-field input-dark chemist-focus"
               value={form.batch_id}
               onChange={e => setForm(f => ({ ...f, batch_id: e.target.value }))}
@@ -360,8 +381,8 @@ export default function ChemistMonthlyEntryPage() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">Oleum 23%</label>
-            <input
+            <label htmlFor="oleum-23" className="text-xs text-muted font-mono">Oleum 23%</label>
+            <input id="oleum-23"
               className="input-field input-dark chemist-focus"
               type="number"
               value={form.oleum_23 ?? ''}
@@ -370,8 +391,8 @@ export default function ChemistMonthlyEntryPage() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">AS IS (Kg)</label>
-            <input
+            <label htmlFor="as-is-kg" className="text-xs text-muted font-mono">AS IS (Kg)</label>
+            <input id="as-is-kg"
               className="input-field input-dark chemist-focus"
               type="number"
               value={form.as_is_kg ?? ''}
@@ -380,8 +401,8 @@ export default function ChemistMonthlyEntryPage() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">Purity (NV)</label>
-            <input
+            <label htmlFor="purity-nv" className="text-xs text-muted font-mono">Purity (NV)</label>
+            <input id="purity-nv"
               className="input-field input-dark chemist-focus"
               type="number"
               value={form.purity_nv ?? ''}

@@ -1,11 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, Send, FileText } from 'lucide-react'
-import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
+import { Plus, Search, Trash2, Send, FileText } from 'lucide-react'
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import { fetchDocuments, deleteDocument, fmtDate } from '@madstoq/sales-system/api'
 import type { SalesDocument, SalesDocType } from '@madstoq/sales-system/types'
+import { ListPager } from '@/components/ui/ListPager'
+import { LIST_PAGE_SIZE } from '@/lib/list-page'
 
 const BASE_BY_TYPE: Record<SalesDocType, string> = {
   quotation: '/personal/sales/quotations',
@@ -22,17 +23,33 @@ const TITLE: Record<SalesDocType, string> = {
 export default function DocList({ docType }: { docType: SalesDocType }) {
   const { org } = useSalesUser()
   const [rows, setRows] = useState<SalesDocument[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [visibleCount, setVisibleCount] = useState(60)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const base = BASE_BY_TYPE[docType]
 
-  useEffect(() => { if (org) load() }, [org?.id, docType])
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(handle)
+  }, [search])
 
-  async function load() {
+  useEffect(() => { if (org) void load(1) }, [org?.id, docType, debouncedSearch])
+
+  async function load(next = 1) {
     if (!org) return
+    setPage(next)
     setLoading(true)
-    try { setRows(await fetchDocuments(org.id, docType)) }
+    try {
+      const data = await fetchDocuments(org.id, docType, {
+        page: next,
+        page_size: LIST_PAGE_SIZE,
+        q: debouncedSearch || undefined,
+      })
+      setRows(data.rows)
+      setTotal(data.total)
+    }
     catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
@@ -42,15 +59,8 @@ export default function DocList({ docType }: { docType: SalesDocType }) {
     await deleteDocument(id); load()
   }
 
-  const filtered = rows.filter(r => !search ||
-    r.doc_number.toLowerCase().includes(search.toLowerCase()) ||
-    (r.to_company ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.subject ?? '').toLowerCase().includes(search.toLowerCase()))
-  const visibleRows = filtered.slice(0, visibleCount)
-
-  useEffect(() => {
-    setVisibleCount(60)
-  }, [search, docType])
+  const filtered = rows
+  const visibleRows = rows
 
   const statusClass = (s: string) => (
     s === 'sent'      ? 'border-inputer/40 text-inputer' :
@@ -69,21 +79,17 @@ export default function DocList({ docType }: { docType: SalesDocType }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl font-bold text-primary">{TITLE[docType]}</h1>
-          <p className="text-sm text-muted mt-0.5">{filtered.length} of {rows.length}</p>
+          <p className="text-sm text-muted mt-0.5">{rows.length} of {total}</p>
         </div>
+        <Link href={`${base}/new`} className="btn btn-owner"><Plus size={15}/> New {docType === 'quotation' ? 'Quotation' : 'PO'}</Link>
       </div>
 
-      <ListSearchToolbar className="mb-4">
-        <ListSearchField
-          value={search}
-          onChange={setSearch}
-          placeholder="Search number, company, subject…"
-          inputClassName="owner-focus"
-        />
-        <Link href={`${base}/new`} className={listSearchBtnClass('btn-owner')}>
-          <Plus size={15} /> New {docType === 'quotation' ? 'Quotation' : 'PO'}
-        </Link>
-      </ListSearchToolbar>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="input flex items-center gap-2 w-full md:w-[320px]">
+          <Search size={14} className="text-muted flex-shrink-0"/>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search number, company, subject…" className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
+        </div>
+      </div>
 
       <div className="card overflow-hidden">
         {/* Mobile cards */}
@@ -148,11 +154,9 @@ export default function DocList({ docType }: { docType: SalesDocType }) {
           </table>
         </div>
       </div>
-      {!loading && visibleRows.length < filtered.length && (
-        <div className="mt-3 flex justify-center">
-          <button className="btn btn-ghost" onClick={() => setVisibleCount(v => v + 60)}>
-            Load More ({filtered.length - visibleRows.length} remaining)
-          </button>
+      {!loading && (
+        <div className="mt-4 flex justify-center">
+          <ListPager page={page} total={total} onPage={(next) => void load(next)} />
         </div>
       )}
     </div>

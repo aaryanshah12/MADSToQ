@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import SimpleModal from '@madstoq/ui/simple-modal'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/components/providers/ToastProvider'
+import { CardListSkeleton, EmptyState, Spinner, TableSkeleton, useConfirm } from '@/components/ui'
+import { ArrowUpToLine } from 'lucide-react'
 import { computeReal, deleteOutwardEntry, fetchOutwardEntries, OutwardEntry, saveOutwardEntry, toOutwardCsv, totalsForOutward } from '@/lib/outward'
 import { Download, Save, Trash2 } from 'lucide-react'
 import { fetchInOutProducts, InOutProduct } from '@/lib/inoutProducts'
@@ -12,6 +15,8 @@ import { calendarYearForFy, currentFinancialYear, financialYearOptions, fyLabel,
 
 export default function ChemistOutwardPage() {
   const { profile } = useAuth()
+  const toast = useToast()
+  const confirm = useConfirm()
   const factories = useMemo(() => profile?.factories ?? [], [profile])
   const factoryIds = useMemo(() => factories.map((f: any) => f.id).filter(Boolean), [factories])
   const { fyStart: defaultFyStart, month: defaultMonth } = useMemo(() => currentFinancialYear(), [])
@@ -68,13 +73,12 @@ export default function ChemistOutwardPage() {
 
   useEffect(() => {
     if (factories.length > 0 && !form.factory_id) {
-      setForm(f => ({ ...f, factory_id: factories[0].id }))
+      setForm(f => ({ ...f, factory_id: factories[0]?.id ?? '' }))
     }
   }, [factories])
 
   useEffect(() => {
-    const firstProduct = productOptions[0] ?? ''
-    const firstId = firstProduct?.id ?? ''
+    const firstId = productOptions[0]?.id ?? ''
     setForm(f => ({ ...f, product_id: f.product_id && productOptions.some(p => p.id === f.product_id) ? f.product_id : firstId }))
   }, [form.factory_id, productOptions.map(p => p.id).join('|')])
 
@@ -111,7 +115,7 @@ export default function ChemistOutwardPage() {
   const handleSave = async () => {
     if (!profile) return
     if (!hasPurity) {
-      alert('Please complete all fields in order')
+      toast.error('Please complete all fields in order')
       return
     }
     setSaving(true)
@@ -129,7 +133,7 @@ export default function ChemistOutwardPage() {
       setModalOpen(false)
       await load()
     } catch (err: any) {
-      alert(err.message)
+      toast.error(err?.message ?? 'Could not save the outward entry.')
     } finally {
       setSaving(false)
     }
@@ -137,7 +141,13 @@ export default function ChemistOutwardPage() {
 
   const handleDelete = async (id?: string) => {
     if (!id) return
-    if (!confirm('Delete this entry?')) return
+    const ok = await confirm({
+      title: 'Delete outward entry?',
+      body: 'This removes the entry from the outward register. This cannot be undone.',
+      confirmLabel: 'Delete entry',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteOutwardEntry(id)
     await load()
   }
@@ -159,7 +169,7 @@ export default function ChemistOutwardPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="Outward"
           subtitle="Chemist · Log outward batches"
@@ -178,14 +188,14 @@ export default function ChemistOutwardPage() {
 
         <div className="card p-4 md:p-6 mb-4 grid gap-4 md:grid-cols-3 items-end">
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Financial Year</label>
-            <select value={fyStart} onChange={e => setFyStart(Number(e.target.value))} className="input">
+            <label htmlFor="financial-year" className="text-xs text-muted font-mono">Financial Year</label>
+            <select id="financial-year" value={fyStart} onChange={e => setFyStart(Number(e.target.value))} className="input">
               {fyOptions.map(y => <option key={y} value={y}>{fyLabel(y)}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Month</label>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input">
+            <label htmlFor="month" className="text-xs text-muted font-mono">Month</label>
+            <select id="month" value={month} onChange={e => setMonth(Number(e.target.value))} className="input">
               {monthOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
@@ -197,7 +207,7 @@ export default function ChemistOutwardPage() {
         <div className="card overflow-hidden">
           <div className="px-4 md:px-6 py-4 border-b border-border flex items-center justify-between">
             <div className="font-mono text-xs text-muted uppercase tracking-widest">Entries</div>
-            {loading && <div className="w-4 h-4 border-2 border-chemist border-t-transparent rounded-full animate-spin" />}
+            {loading && <Spinner size="sm" accent="chemist" label="Loading entries" />}
           </div>
 
           <div className="hidden md:block overflow-x-auto">
@@ -217,11 +227,7 @@ export default function ChemistOutwardPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} className="py-12">
-                    <div className="flex justify-center">
-                      <div className="w-6 h-6 border-2 border-chemist border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  </td></tr>
+                  <TableSkeleton columns={9} />
                 ) : (
                   <>
                     {entries.map(e => (
@@ -242,7 +248,15 @@ export default function ChemistOutwardPage() {
                       </tr>
                     ))}
                     {entries.length === 0 && (
-                      <tr><td colSpan={9} className="text-center text-muted py-8">No entries yet</td></tr>
+                      <tr>
+                        <td colSpan={9} className="p-0">
+                          <EmptyState
+                            icon={<ArrowUpToLine size={28} strokeWidth={1.5} />}
+                            title="No outward entries this month"
+                            description="Add an entry to record material dispatched for the selected month."
+                          />
+                        </td>
+                      </tr>
                     )}
                   </>
                 )}
@@ -264,9 +278,7 @@ export default function ChemistOutwardPage() {
 
           <div className="md:hidden p-4">
             {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-6 h-6 border-2 border-chemist border-t-transparent rounded-full animate-spin" />
-              </div>
+              <CardListSkeleton count={3} />
             ) : (
               <div className="data-card-list">
                 {entries.map(e => (
@@ -297,7 +309,10 @@ export default function ChemistOutwardPage() {
                   </div>
                 ))}
                 {entries.length === 0 && (
-                  <div className="text-center text-muted py-8">No entries yet</div>
+                  <EmptyState
+                    icon={<ArrowUpToLine size={28} strokeWidth={1.5} />}
+                    title="No outward entries this month"
+                  />
                 )}
               </div>
             )}
@@ -331,16 +346,16 @@ export default function ChemistOutwardPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">Factory</label>
-            <select className="input-field input-dark chemist-focus" value={form.factory_id} onChange={e => setForm(f => ({ ...f, factory_id: e.target.value }))}>
+            <label htmlFor="factory" className="text-xs text-muted font-mono">Factory</label>
+            <select id="factory" className="input-field input-dark chemist-focus" value={form.factory_id} onChange={e => setForm(f => ({ ...f, factory_id: e.target.value }))}>
               {factories.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
 
           {hasFactory && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Product</label>
-              <select className="input-field input-dark chemist-focus" value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))}>
+              <label htmlFor="product" className="text-xs text-muted font-mono">Product</label>
+              <select id="product" className="input-field input-dark chemist-focus" value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))}>
                 {productOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
@@ -348,43 +363,43 @@ export default function ChemistOutwardPage() {
 
           {hasProduct && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Date</label>
-              <input className="input-field input-dark chemist-focus" type="date" value={String(form.entry_date ?? '')} onChange={e => setForm(f => ({ ...f, entry_date: e.target.value }))} />
+              <label htmlFor="date" className="text-xs text-muted font-mono">Date</label>
+              <input id="date" className="input-field input-dark chemist-focus" type="date" value={String(form.entry_date ?? '')} onChange={e => setForm(f => ({ ...f, entry_date: e.target.value }))} />
             </div>
           )}
 
           {hasDate && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Batch No</label>
-              <input className="input-field input-dark chemist-focus" value={form.batch_no} onChange={e => setForm(f => ({ ...f, batch_no: e.target.value }))} />
+              <label htmlFor="batch-no" className="text-xs text-muted font-mono">Batch No</label>
+              <input id="batch-no" className="input-field input-dark chemist-focus" value={form.batch_no} onChange={e => setForm(f => ({ ...f, batch_no: e.target.value }))} />
             </div>
           )}
 
           {hasBatch && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">No. of Bags</label>
-              <input className="input-field input-dark chemist-focus" type="number" placeholder="0" value={form.no_of_bags || ''} onChange={e => setForm(f => ({ ...f, no_of_bags: parseNumber(e.target.value) }))} />
+              <label htmlFor="no-of-bags" className="text-xs text-muted font-mono">No. of Bags</label>
+              <input id="no-of-bags" className="input-field input-dark chemist-focus" type="number" placeholder="0" value={form.no_of_bags || ''} onChange={e => setForm(f => ({ ...f, no_of_bags: parseNumber(e.target.value) }))} />
             </div>
           )}
 
           {hasBags && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">As is (Kg)</label>
-              <input className="input-field input-dark chemist-focus" type="number" step="0.01" placeholder="0" value={form.as_is || ''} onChange={e => setForm(f => ({ ...f, as_is: parseNumber(e.target.value) }))} />
+              <label htmlFor="as-is-kg" className="text-xs text-muted font-mono">As is (Kg)</label>
+              <input id="as-is-kg" className="input-field input-dark chemist-focus" type="number" step="0.01" placeholder="0" value={form.as_is || ''} onChange={e => setForm(f => ({ ...f, as_is: parseNumber(e.target.value) }))} />
             </div>
           )}
 
           {hasAsIs && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Purity (%)</label>
-              <input className="input-field input-dark chemist-focus" type="number" step="0.01" placeholder="0" value={form.purity || ''} onChange={e => setForm(f => ({ ...f, purity: parseNumber(e.target.value) }))} />
+              <label htmlFor="purity" className="text-xs text-muted font-mono">Purity (%)</label>
+              <input id="purity" className="input-field input-dark chemist-focus" type="number" step="0.01" placeholder="0" value={form.purity || ''} onChange={e => setForm(f => ({ ...f, purity: parseNumber(e.target.value) }))} />
             </div>
           )}
 
           {hasPurity && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Real (Kg) (auto)</label>
-              <input className="input-field input-dark chemist-focus" disabled value={Number(form.real ?? 0).toFixed(2)} />
+              <label htmlFor="real-kg-auto" className="text-xs text-muted font-mono">Real (Kg) (auto)</label>
+              <input id="real-kg-auto" className="input-field input-dark chemist-focus" disabled value={Number(form.real ?? 0).toFixed(2)} />
             </div>
           )}
         </div>

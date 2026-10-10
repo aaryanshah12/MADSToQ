@@ -5,12 +5,10 @@ import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Users, FileText, ClipboardList,
-  Wallet, Bell, LogOut, Menu, X, Sun, Moon, ChevronRight, BookOpen,
+  Wallet, Bell, LogOut, Menu, X, Sun, Moon, ChevronRight,
 } from 'lucide-react'
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import NotificationBell from '@/components/sales/NotificationBell'
-import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 
 const BASE = '/personal/sales'
 
@@ -30,15 +28,16 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
   const [themeMounted, setThemeMounted] = useState(false)
 
   useEffect(() => {
-    const saved = readStoredTheme()
+    const saved = (localStorage.getItem('sales-theme') as 'dark' | 'light' | null) ?? 'light'
     setTheme(saved)
-    persistTheme(saved)
+    document.documentElement.dataset.theme = saved
     setThemeMounted(true)
   }, [])
 
   useEffect(() => {
     if (!themeMounted) return
-    persistTheme(theme)
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('sales-theme', theme)
   }, [theme, themeMounted])
 
   useEffect(() => { setSidebarOpen(false) }, [pathname])
@@ -103,28 +102,17 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
             <Link
               key={href}
               href={href}
-              className={clsx(
-                'w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all duration-150 group min-h-[44px]',
-                active
-                  ? 'text-primary font-medium bg-owner/15 border border-owner/30'
-                  : 'text-muted hover:text-primary hover:bg-layer-sm'
-              )}
+              className={clsx('nav-item group', active && 'nav-item-active')}
             >
-              <Icon size={17} className={active ? 'text-owner' : 'text-muted group-hover:text-primary'} />
+              <Icon size={17} className={active ? 'text-current' : 'text-muted group-hover:text-primary'} />
               {label}
-              {active && <ChevronRight size={13} className="ml-auto opacity-50" />}
+              {!active && <ChevronRight size={13} className="ml-auto text-muted opacity-60" />}
             </Link>
           )
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-border space-y-1">
-        <a
-          href="/personal/sales/manual"
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
-        >
-          <BookOpen size={16} /> User manual
-        </a>
+      <div className="px-4 py-4 border-t border-border">
         <button
           onClick={signOut}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-red-400 hover:bg-red-500/10 transition-all"
@@ -147,7 +135,7 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-[min(20rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] z-50 shadow-2xl overflow-y-auto"
+          <aside className="absolute left-0 top-0 h-full w-64 z-50 shadow-2xl"
             style={{ background: 'var(--color-panel)', borderRight: '1px solid var(--color-border)' }}>
             <SidebarInner />
           </aside>
@@ -158,7 +146,7 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
         {/* Mobile topbar */}
         <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-border"
           style={{ background: 'var(--color-panel)' }}>
-          <button onClick={() => setSidebarOpen(true)} className="text-muted hover:text-primary min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Open menu">
+          <button onClick={() => setSidebarOpen(true)} className="text-muted hover:text-primary">
             <Menu size={20}/>
           </button>
           <div className="text-sm font-bold text-primary flex-1">Sales</div>
@@ -173,8 +161,6 @@ export default function SalesShell({ children }: { children: React.ReactNode }) 
 
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
-
-      <PortalWhatsAppHelp portalName="Personal Sales Portal" />
     </div>
   )
 }

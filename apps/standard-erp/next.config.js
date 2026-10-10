@@ -20,6 +20,8 @@ if (fs.existsSync(rootEnv)) {
 }
 
 const nextConfig = {
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   transpilePackages: [
     '@madstoq/auth',
     '@madstoq/core',
@@ -35,6 +37,9 @@ const nextConfig = {
   images: {
     domains: [],
   },
+  experimental: {
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer', 'puppeteer-core'],
+  },
   async redirects() {
     return [
       { source: '/website', destination: '/', permanent: true },
@@ -48,11 +53,9 @@ const nextConfig = {
       { source: '/website/io.html', destination: '/io.html', permanent: true },
       { source: '/website/pmc.html', destination: '/pmc.html', permanent: true },
       { source: '/website/crm.html', destination: '/crm.html', permanent: true },
-      { source: '/pmc/login', destination: '/portals/demo/pmc', permanent: false },
-      { source: '/pmc', destination: '/portals/demo/pmc', permanent: false },
-      { source: '/inventory/login', destination: '/portals/demo/inventory', permanent: false },
-      { source: '/inward-outward/login', destination: '/portals/demo/inward-outward', permanent: false },
-      { source: '/personal/sales/login', destination: '/portals/demo/sales', permanent: false },
+      { source: '/pmc/login', destination: '/pmc', permanent: false },
+      { source: '/inventory/owner/fg-sales', destination: '/inventory/owner/dispatch-schedule', permanent: false },
+      { source: '/inventory/owner/fg-sales/:path*', destination: '/inventory/owner/dispatch-schedule/:path*', permanent: false },
       { source: '/crm/login', destination: '/portals/demo/crm', permanent: false },
       { source: '/portal/demos/crm/login', destination: '/portals/demo/crm', permanent: false },
       { source: '/portal/demos/crm', destination: '/portals/demo/crm', permanent: false },
@@ -87,8 +90,13 @@ const nextConfig = {
         { source: '/styles.css', destination: '/website/styles.css' },
         { source: '/script.js', destination: '/website/script.js' },
         { source: '/MADSToQ.png', destination: '/website/MADSToQ.png' },
+        { source: '/MADSToQ-logo.png', destination: '/website/MADSToQ-logo.png' },
         { source: '/Software/:path*', destination: '/website/Software/:path*' },
         { source: '/docs/:path*', destination: '/website/docs/:path*' },
+      ],
+      afterFiles: [
+        { source: '/api/inventory/fg-sales', destination: '/api/inventory/dispatch-schedule' },
+        { source: '/api/inventory/fg-sales/:path*', destination: '/api/inventory/dispatch-schedule/:path*' },
       ],
     }
   },

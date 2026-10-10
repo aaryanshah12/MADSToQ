@@ -1,6 +1,6 @@
 ﻿import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 const SITE_URL = "https://madstoq.com";
 const SITE_NAME = "MADSToQ IT Solutions";
@@ -169,7 +169,7 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

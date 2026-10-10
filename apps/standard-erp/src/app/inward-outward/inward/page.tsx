@@ -1,19 +1,23 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
 import {
   fetchInwards, saveInward, deleteInward,
   fetchCompanies, fetchProducts,
-  fmtDate, today,
+  fmtDate, today, type IoDocListQuery,
 } from '@madstoq/io-system/api'
 import { getCurrentFiscalYear, getFiscalYears, monthOptions } from '@/lib/monthlyMaterial'
 import type { IOInward, IOLineItem, IOCompany, IOProduct } from '@madstoq/io-system/types'
 import ProductModal from '@/components/io/ProductModal'
 import CompanyModal from '@/components/io/CompanyModal'
-import ProductComboSearch from '@/components/io/ProductComboSearch'
-import { Plus, Pencil, Trash2, X, Save, Download, Upload, Printer, Eye } from 'lucide-react'
-import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
+import CompanyComboSearch from '@/components/io/CompanyComboSearch'
+import IoFormModalShell from '@/components/io/IoFormModalShell'
+import IoOutwardStyleLineItems from '@/components/io/IoOutwardStyleLineItems'
+import { IO_FIELD_LABEL, ioInputClass } from '@/components/io/io-form-styles'
+import { Plus, Pencil, Trash2, X, Save, Download, Search, Upload, Printer, Eye, SlidersHorizontal, ChevronDown, ChevronUp, RotateCcw, MoreVertical } from 'lucide-react'
 import { printLabelForInward } from '@madstoq/io-system/print'
+import { ListPager } from '@/components/ui/ListPager'
+import { LIST_PAGE_SIZE } from '@/lib/list-page'
 
 const EMPTY_ITEM = (): IOLineItem => ({ product_id: '', quantity: 1, price: 0, remarks: '' })
 
@@ -23,7 +27,7 @@ export default function InwardPage() {
   const [companies, setCompanies] = useState<IOCompany[]>([])
   const [products, setProducts] = useState<IOProduct[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingAction, setSavingAction] = useState<'save' | 'savePrint' | null>(null)
   const [search, setSearch] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [fiscalYear, setFiscalYear] = useState(() => getCurrentFiscalYear())
@@ -34,46 +38,113 @@ export default function InwardPage() {
   const [form, setForm] = useState({ inward_date: today(), supplier_id: '', supplier_ref_no: '', remarks: '', factory_id: '' })
   const [items, setItems] = useState<IOLineItem[]>([EMPTY_ITEM()])
   const [showProductModal, setShowProductModal] = useState(false)
+  const [productModalTargetIndex, setProductModalTargetIndex] = useState<number | null>(null)
   const [showCompanyModal, setShowCompanyModal] = useState(false)
+  const [expandedItemIndex, setExpandedItemIndex] = useState(0)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [showValidation, setShowValidation] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importGroups, setImportGroups] = useState<any[]>([])
   const [importing, setImporting] = useState(false)
   const [viewRow, setViewRow] = useState<IOInward | null>(null)
-  const [visibleCount, setVisibleCount] = useState(60)
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [openMobileRowMenuId, setOpenMobileRowMenuId] = useState<string | null>(null)
 
-  useEffect(() => { loadData() }, [factoryId])
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
-  async function loadData() {
+  const listQuery = useCallback((pageNum: number, all = false): IoDocListQuery => {
+    const fyStart = Number(String(fiscalYear).replace('FY', '').split('-')[0])
+    return {
+      factory_id: factoryId || undefined,
+      q: debouncedSearch.trim() || undefined,
+      party_id: supplierFilter !== 'all' ? supplierFilter : undefined,
+      fy_start: Number.isFinite(fyStart) ? fyStart : undefined,
+      month: selectedMonth ? Number(selectedMonth) : undefined,
+      date: selectedDate || undefined,
+      page: pageNum,
+      page_size: LIST_PAGE_SIZE,
+      all,
+    }
+  }, [factoryId, debouncedSearch, supplierFilter, fiscalYear, selectedMonth, selectedDate])
+
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setPage(1)
     try {
-      const [r, c, p] = await Promise.all([fetchInwards(factoryId || undefined), fetchCompanies('supplier', factoryId || undefined), fetchProducts(factoryId || undefined)])
-      setRows(r); setCompanies(c); setProducts(p)
+      const [r, c, p] = await Promise.all([
+        fetchInwards(listQuery(1)),
+        fetchCompanies('supplier', factoryId || undefined),
+        fetchProducts(factoryId || undefined),
+      ])
+      setRows(r.rows)
+      setTotal(r.total)
+      setCompanies(c)
+      setProducts(p)
     } catch (e) { console.error(e) } finally { setLoading(false) }
+  }, [factoryId, listQuery])
+
+  useEffect(() => { void loadData() }, [loadData])
+
+  async function goToPage(next: number) {
+    if (next < 1 || next === page || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const r = await fetchInwards(listQuery(next))
+      setRows(r.rows)
+      setTotal(r.total)
+      setPage(next)
+    } catch (e) { console.error(e) } finally { setLoadingMore(false) }
   }
 
   function openNew() {
-    setEditing(null); setForm({ inward_date: today(), supplier_id: '', supplier_ref_no: '', remarks: '', factory_id: factoryId })
-    setItems([EMPTY_ITEM()]); setShowForm(true)
+    setFormError(null)
+    setShowValidation(false)
+    setProductModalTargetIndex(null)
+    setExpandedItemIndex(0)
+    setEditing(null)
+    setForm({ inward_date: today(), supplier_id: '', supplier_ref_no: '', remarks: '', factory_id: factoryId })
+    setItems([EMPTY_ITEM()])
+    setShowForm(true)
   }
   function openEdit(row: IOInward) {
-    setEditing(row); setForm({ inward_date: row.inward_date, supplier_id: row.supplier_id ?? '', supplier_ref_no: row.supplier_ref_no ?? '', remarks: row.remarks ?? '', factory_id: row.factory_id ?? factoryId })
-    setItems(row.items?.length ? row.items.map(it => ({ ...it })) : [EMPTY_ITEM()]); setShowForm(true)
+    setFormError(null)
+    setShowValidation(false)
+    setProductModalTargetIndex(null)
+    setExpandedItemIndex(0)
+    setEditing(row)
+    setForm({ inward_date: row.inward_date, supplier_id: row.supplier_id ?? '', supplier_ref_no: row.supplier_ref_no ?? '', remarks: row.remarks ?? '', factory_id: row.factory_id ?? factoryId })
+    setItems(row.items?.length ? row.items.map(it => ({ ...it })) : [EMPTY_ITEM()])
+    setShowForm(true)
   }
   async function handleSave(doPrint = false) {
     const validItems = items.filter(it => it.product_id)
-    if (!validItems.length) { alert('Add at least one product.'); return }
-    setSaving(true)
+    setShowValidation(true)
+    if (!form.inward_date) { setFormError('Select an inward date before saving.'); return }
+    if (!form.supplier_id) { setFormError('Select a supplier before saving.'); return }
+    if (!validItems.length) { setFormError('Add at least one product before saving.'); return }
+    if (validItems.some(it => Number(it.price) < 0)) { setFormError('Price cannot be negative.'); return }
+    setFormError(null)
+    setSavingAction(doPrint ? 'savePrint' : 'save')
     try {
       const saved = await saveInward({ id: editing?.id, inward_date: form.inward_date, supplier_id: form.supplier_id || null, supplier_ref_no: form.supplier_ref_no || null, remarks: form.remarks || null, factory_id: form.factory_id || factoryId || null, items: validItems })
       setShowForm(false)
-      const next = await fetchInwards(factoryId || undefined)
-      setRows(next)
+      const next = await fetchInwards(listQuery(1))
+      setRows(next.rows)
+      setTotal(next.total)
+      setPage(1)
       if (doPrint) {
-        const full = next.find(r => r.id === saved.id) ?? (editing ?? null)
+        const full = next.rows.find(r => r.id === saved.id) ?? saved
         if (full) await printLabelForInward(full, products)
       }
-    } catch (e: any) { alert(e.message) } finally { setSaving(false) }
+    } catch (e: any) { alert(e.message) } finally { setSavingAction(null) }
   }
 
   async function handlePrint(row: IOInward) {
@@ -87,8 +158,45 @@ export default function InwardPage() {
     if (!confirm('Delete this inward entry?')) return
     await deleteInward(id); loadData()
   }
+  function setFormField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
+    if (formError) setFormError(null)
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+  function updateItems(updater: (prev: IOLineItem[]) => IOLineItem[]) {
+    if (formError) setFormError(null)
+    setItems(updater)
+  }
   function setItem(i: number, field: keyof IOLineItem, value: any) {
-    setItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: value } : it))
+    updateItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: value } : it))
+  }
+  function resetFilters() {
+    setSearch('')
+    setSupplierFilter('all')
+    setFiscalYear(getCurrentFiscalYear())
+    setSelectedMonth('')
+    setSelectedDate('')
+    setShowMobileFilters(false)
+  }
+  function getProductPreview(its: IOLineItem[] | null | undefined) {
+    return (its ?? [])
+      .map(it => it.product?.product_name ?? products.find(p => p.id === it.product_id)?.product_name)
+      .filter(Boolean)
+      .join(', ')
+  }
+  function getRemarksPreview(its: IOLineItem[] | null | undefined) {
+    return (its ?? [])
+      .map(it => it.remarks?.trim())
+      .filter(Boolean)
+      .join(' · ')
+  }
+  function addItemRow() {
+    const incompleteIndex = items.findIndex(it => !it.product_id)
+    if (incompleteIndex !== -1) {
+      setExpandedItemIndex(incompleteIndex)
+      return
+    }
+    setExpandedItemIndex(items.length)
+    updateItems(prev => [...prev, EMPTY_ITEM()])
   }
 
   function downloadTemplate() {
@@ -151,6 +259,8 @@ export default function InwardPage() {
   }
 
   async function handleExport() {
+    const exported = await fetchInwards(listQuery(1, true))
+    const filtered = exported.rows
     if (!filtered.length) return
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
@@ -176,105 +286,153 @@ export default function InwardPage() {
 
   const rowTotal = (its: IOLineItem[]) => its.reduce((s, it) => s + it.price * it.quantity, 0)
   const fiscalYears = getFiscalYears(5)
-  const filtered = rows.filter(r => {
-    const matchSearch = r.inward_number.toLowerCase().includes(search.toLowerCase()) || (r.supplier?.company_name ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchSupplier = supplierFilter === 'all' || r.supplier_id === supplierFilter
-    const rowDate = new Date(r.inward_date)
-    const fyStart = Number(fiscalYear.replace('FY', '').split('-')[0])
-    const matchFiscalYear = rowDate >= new Date(fyStart, 3, 1) && rowDate < new Date(fyStart + 1, 3, 1)
-    const matchMonth = !selectedMonth || (rowDate.getMonth() + 1) === Number(selectedMonth)
-    const matchDate = !selectedDate || r.inward_date === selectedDate
-    return matchSearch && matchSupplier && matchFiscalYear && matchMonth && matchDate
-  })
-  const visibleRows = filtered.slice(0, visibleCount)
+  const canAddItemRow = items.every(it => !!it.product_id)
+  const filtered = rows
+  const visibleRows = rows
+  const selectedMonthLabel = monthOptions.find(m => String(m.value) === selectedMonth)?.label
+  const activeSupplierLabel = supplierFilter === 'all'
+    ? 'All Suppliers'
+    : companies.find(c => c.id === supplierFilter)?.company_name ?? 'Selected Supplier'
+  const currentFiscalYear = getCurrentFiscalYear()
+  const hasAdvancedFilters = !!search.trim() || supplierFilter !== 'all' || fiscalYear !== currentFiscalYear || !!selectedMonth || !!selectedDate
+  const activeFilterCount = [!!search.trim(), supplierFilter !== 'all', fiscalYear !== currentFiscalYear, !!selectedMonth, !!selectedDate].filter(Boolean).length
 
-  useEffect(() => {
-    setVisibleCount(60)
-  }, [search, supplierFilter, fiscalYear, selectedMonth, selectedDate])
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div><h1 className="text-xl font-bold text-primary">Inward</h1><p className="text-sm text-muted mt-0.5">{filtered.length} records</p></div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <input ref={importRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImportFile}/>
-          <button onClick={() => importRef.current?.click()} className="btn btn-ghost"><Upload size={14}/> Import</button>
-          <button onClick={handleExport} className="btn btn-ghost"><Download size={14}/> Export</button>
+      <input ref={importRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImportFile}/>
+
+      <div className="sm:hidden mb-3">
+        <div className="card overflow-hidden">
+          <div className="h-1 w-full bg-inputer/60" />
+          <div className="p-3 space-y-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold text-primary">Inward</h1>
+                <p className="mt-1 text-sm text-muted">{total} records</p>
+              </div>
+              <div className="badge badge-inputer whitespace-nowrap">{fiscalYear}</div>
+            </div>
+
+            <div className="flex items-center justify-between gap-1.5">
+              <button onClick={openNew} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition-colors" style={{ color: 'var(--color-inputer)', borderColor: 'color-mix(in srgb, var(--color-inputer) 32%, var(--color-border))', background: 'color-mix(in srgb, var(--color-inputer) 12%, var(--color-panel))' }}>
+                <Plus size={15}/> New Inward
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => importRef.current?.click()} className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-panel text-primary transition-colors hover:bg-layer" aria-label="Import inward records" title="Import"><Download size={16}/></button>
+                <button onClick={handleExport} className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-panel text-primary transition-colors hover:bg-layer" aria-label="Export inward records" title="Export"><Upload size={16}/></button>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-2.5">
+              <div className="input flex items-center gap-2">
+                <Search size={14} className="text-muted flex-shrink-0"/>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice or supplier..." className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
+              </div>
+              <div className="mt-2.5 flex items-start justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <span className="badge badge-inputer text-[10px] font-sans">{fiscalYear}</span>
+                  {supplierFilter !== 'all' && <span className="badge badge-muted text-[10px] font-sans">{activeSupplierLabel}</span>}
+                  {selectedMonth && <span className="badge badge-muted text-[10px] font-sans">{selectedMonthLabel}</span>}
+                  {selectedDate && <span className="badge badge-muted text-[10px] font-sans">{fmtDate(selectedDate)}</span>}
+                </div>
+                <button onClick={() => setShowMobileFilters(v => !v)} className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-layer">
+                  <span className="flex items-center gap-1.5"><SlidersHorizontal size={13}/> Filters {showMobileFilters ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}</span>
+                </button>
+              </div>
+              {showMobileFilters && (
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="input w-full text-sm">
+                    <option value="all">All Suppliers</option>
+                    {companies.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+                  </select>
+                  <select value={fiscalYear} onChange={e => setFiscalYear(e.target.value)} className="input w-full text-sm">
+                    {fiscalYears.map(fy => <option key={fy} value={fy}>{fy}</option>)}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="input w-full text-sm">
+                      <option value="">All Months</option>
+                      {monthOptions.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
+                    </select>
+                    <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="input w-full text-sm" aria-label="Filter by date"/>
+                  </div>
+                  {hasAdvancedFilters && (
+                    <button onClick={resetFilters} className="mt-1 inline-flex items-center gap-1 self-start rounded-lg px-1 py-1 text-xs font-medium text-muted transition-colors hover:text-primary">
+                      <RotateCcw size={13}/> Reset filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-      <ListSearchToolbar className="mb-4 flex-wrap">
-        <ListSearchField
-          value={search}
-          onChange={setSearch}
-          placeholder="Search invoice or supplier..."
-        />
-        <select
-          value={supplierFilter}
-          onChange={(e) => setSupplierFilter(e.target.value)}
-          className="input list-search-side w-full sm:w-[220px] text-sm"
-        >
+
+      <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div><h1 className="text-xl font-bold text-primary">Inward</h1><p className="text-sm text-muted mt-0.5">{total} records</p></div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => importRef.current?.click()} className="btn btn-ghost"><Download size={14}/> Import</button>
+          <button onClick={handleExport} className="btn btn-ghost"><Upload size={14}/> Export</button>
+          <button onClick={openNew} className="btn btn-inputer"><Plus size={15}/> New Inward</button>
+        </div>
+      </div>
+      <div className="hidden sm:flex flex-wrap lg:flex-nowrap items-center gap-2 mb-4">
+        <div className="input flex items-center gap-2 w-full md:w-[320px]">
+          <Search size={14} className="text-muted flex-shrink-0"/>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice or supplier..." className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
+        </div>
+        <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="input w-full md:w-[220px] text-sm">
           <option value="all">All Suppliers</option>
-          {companies.map((c) => (
-            <option key={c.id} value={c.id}>{c.company_name}</option>
-          ))}
+          {companies.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
         </select>
-        <select
-          value={fiscalYear}
-          onChange={(e) => setFiscalYear(e.target.value)}
-          className="input list-search-side w-full sm:w-[170px] text-sm"
-        >
-          {fiscalYears.map((fy) => (
-            <option key={fy} value={fy}>{fy}</option>
-          ))}
+        <select value={fiscalYear} onChange={e => setFiscalYear(e.target.value)} className="input w-full md:w-[170px] text-sm">
+          {fiscalYears.map(fy => <option key={fy} value={fy}>{fy}</option>)}
         </select>
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="input list-search-side w-full sm:w-[160px] text-sm"
-          aria-label="Filter by month"
-        >
+        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="input w-full md:w-[150px] text-sm">
           <option value="">All Months</option>
-          {monthOptions.map((m) => (
-            <option key={m.value} value={String(m.value)}>{m.label}</option>
-          ))}
+          {monthOptions.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
         </select>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="input list-search-side w-full sm:w-[160px] text-sm"
-          aria-label="Filter by date"
-        />
-        <button type="button" onClick={openNew} className={listSearchBtnClass('btn-inputer')}>
-          <Plus size={15} /> New Inward
-        </button>
-      </ListSearchToolbar>
-      <div className="card overflow-visible">
+        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="input w-full md:w-[170px] text-sm" aria-label="Filter by date"/>
+      </div>
+      <div className="card overflow-visible border-transparent bg-transparent shadow-none sm:border-border sm:bg-panel sm:shadow-sm">
         {/* Mobile cards */}
-        <div className="sm:hidden divide-y" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="sm:hidden p-3 space-y-3" style={{ background: 'color-mix(in srgb, var(--color-text) 2%, transparent)' }}>
+          <div className="flex items-center justify-between gap-3 px-1">
+            <div>
+              <div className="text-sm font-semibold text-primary">Records</div>
+              <div className="text-xs text-muted">Showing {visibleRows.length} of {total} results · Tap a card to view</div>
+            </div>
+            {activeFilterCount > 0 && <div className="text-xs text-muted whitespace-nowrap">{activeFilterCount} filters active</div>}
+          </div>
           {loading ? <div className="py-12 text-center"><div className="inline-block w-6 h-6 border-2 border-inputer border-t-transparent rounded-full animate-spin"/></div>
-          : filtered.length === 0 ? <div className="py-12 text-center text-muted text-sm">No inward records</div>
+          : filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-panel p-8 text-center text-muted text-sm">No inward records found for the current search and filters.</div>
           : visibleRows.map(row => (
-            <div key={row.id} className="p-4 space-y-2">
+            <div key={row.id} className="rounded-2xl border border-border bg-panel p-4 shadow-sm transition-colors hover:bg-layer-sm" onClick={() => { setOpenMobileRowMenuId(null); setViewRow(row) }} role="button" tabIndex={0}>
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-mono font-semibold text-xs text-inputer">{row.inward_number}</div>
-                  <div className="text-xs text-muted mt-0.5">{fmtDate(row.inward_date)}</div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-mono font-semibold text-inputer">{row.inward_number}</span>
+                    <span className="text-xs text-muted">{fmtDate(row.inward_date)}</span>
+                  </div>
+                  <div className="mt-2 text-lg font-semibold text-primary">{row.supplier?.company_name ?? '—'}</div>
+                  {row.supplier_ref_no && <div className="mt-1 text-sm text-muted">Ref: {row.supplier_ref_no}</div>}
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => setViewRow(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="View"><Eye size={14}/></button>
-                  <button onClick={() => handlePrint(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="Print"><Printer size={14}/></button>
-                  <button onClick={() => openEdit(row)} className="p-2 rounded hover:bg-layer text-muted hover:text-inputer transition-colors"><Pencil size={14}/></button>
-                  <button onClick={() => handleDelete(row.id)} className="p-2 rounded hover:bg-layer text-muted hover:text-red-400 transition-colors"><Trash2 size={14}/></button>
+                <div className="relative flex shrink-0 items-start">
+                  <button onClick={(e) => { e.stopPropagation(); setOpenMobileRowMenuId(current => current === row.id ? null : row.id) }} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-layer hover:text-primary" aria-label={`More actions for ${row.inward_number}`}><MoreVertical size={15}/></button>
+                  {openMobileRowMenuId === row.id && (
+                    <div className="absolute right-0 top-10 z-10 min-w-[140px] rounded-xl border border-border bg-panel p-1 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => { setOpenMobileRowMenuId(null); openEdit(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-layer hover:text-primary"><Pencil size={14}/> Edit</button>
+                      <button onClick={() => { setOpenMobileRowMenuId(null); handlePrint(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-layer hover:text-primary"><Printer size={14}/> Print</button>
+                      <button onClick={() => { setOpenMobileRowMenuId(null); handleDelete(row.id) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"><Trash2 size={14}/> Delete</button>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="text-sm font-medium text-primary">{row.supplier?.company_name ?? '—'}</div>
-              {row.supplier_ref_no && <div className="text-xs text-muted">Ref: {row.supplier_ref_no}</div>}
-              {(row.items ?? []).length > 0 && (
-                <div className="text-xs text-muted truncate">{(row.items ?? []).map(it => it.product?.product_name ?? products.find(p => p.id === it.product_id)?.product_name).filter(Boolean).join(', ')}</div>
-              )}
-              {(row.items ?? []).some(it => it.remarks?.trim()) && (
-                <div className="text-xs text-muted truncate">{(row.items ?? []).map(it => it.remarks?.trim()).filter(Boolean).join(' · ')}</div>
+              {(getProductPreview(row.items) || getRemarksPreview(row.items)) && (
+                <div className="mt-3">
+                  {getProductPreview(row.items) && <div className="min-w-0 text-sm font-medium text-primary">{getProductPreview(row.items)}</div>}
+                  {getRemarksPreview(row.items) && <div className={`${getProductPreview(row.items) ? 'mt-1.5' : ''} min-w-0 text-xs text-muted`}><span className="font-medium">Remark:</span> {getRemarksPreview(row.items)}</div>}
+                </div>
               )}
             </div>
           ))}
@@ -306,63 +464,113 @@ export default function InwardPage() {
           </table>
         </div>
       </div>
-      {!loading && visibleRows.length < filtered.length && (
-        <div className="mt-3 flex justify-center">
-          <button className="btn btn-ghost" onClick={() => setVisibleCount(v => v + 60)}>
-            Load More ({filtered.length - visibleRows.length} remaining)
-          </button>
+      {!loading && (
+        <div className="mt-4 flex justify-center">
+          <ListPager page={page} total={total} disabled={loadingMore} onPage={(next) => void goToPage(next)} />
         </div>
       )}
 
-      {/* Entry Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-3 sm:p-4 overflow-y-auto">
-          <div className="rounded-2xl shadow-2xl w-full max-w-3xl min-w-0 my-4 sm:my-6 border border-border" style={{ background: 'var(--color-panel)' }}>
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border gap-2">
-              <h2 className="text-base font-bold text-primary">{editing ? 'Edit Inward' : 'New Inward'}</h2>
-              <button onClick={() => setShowForm(false)} className="text-muted hover:text-primary"><X size={18}/></button>
-            </div>
-            <div className="p-6 space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><label className="block text-xs font-medium text-muted mb-1.5 uppercase tracking-wider">Date</label><input type="date" value={form.inward_date} onChange={e => setForm(f => ({ ...f, inward_date: e.target.value }))} className="input w-full"/></div>
-                {factories.length > 1 && <div><label className="block text-xs font-medium text-muted mb-1.5 uppercase tracking-wider">Factory</label><select value={form.factory_id} onChange={e => setForm(f => ({ ...f, factory_id: e.target.value }))} className="input w-full"><option value="">— Select —</option>{factories.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></div>}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5"><label className="text-xs font-medium text-muted uppercase tracking-wider">Supplier</label><button onClick={() => setShowCompanyModal(true)} className="text-[11px] text-inputer hover:underline">+ Add New</button></div>
-                  <select value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value }))} className="input w-full"><option value="">— Select Supplier —</option>{companies.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}</select>
+      <IoFormModalShell
+        show={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? 'Edit Inward' : 'New Inward'}
+        closeAriaLabel="Close inward form"
+        formError={formError}
+        savingAction={savingAction}
+        editing={!!editing}
+        onSave={() => handleSave(false)}
+        onSavePrint={() => handleSave(true)}
+      >
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-primary">Order Details</h3>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="order-2 md:order-1">
+                <div className="mb-1 flex h-7 items-center">
+                  <label className={IO_FIELD_LABEL}>
+                    Date <span className="text-red-400">*</span>
+                  </label>
                 </div>
-                <div><label className="block text-xs font-medium text-muted mb-1.5 uppercase tracking-wider">Supplier Ref No</label><input value={form.supplier_ref_no} onChange={e => setForm(f => ({ ...f, supplier_ref_no: e.target.value }))} placeholder="e.g. INV-001" className="input w-full"/></div>
-                <div className="sm:col-span-2"><label className="block text-xs font-medium text-muted mb-1.5 uppercase tracking-wider">Remarks</label><input value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} placeholder="Optional notes" className="input w-full"/></div>
+                <input
+                  type="date"
+                  value={form.inward_date}
+                  onChange={e => setFormField('inward_date', e.target.value)}
+                  className={ioInputClass(showValidation && !form.inward_date)}
+                />
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-2"><h3 className="text-sm font-semibold text-primary">Line Items</h3><button onClick={() => setItems(p => [...p, EMPTY_ITEM()])} className="text-xs text-inputer hover:underline flex items-center gap-1"><Plus size={12}/> Add Row</button></div>
-                <div className="border border-border rounded-xl overflow-visible -mx-1 px-1 sm:mx-0 sm:px-0">
-                  <table className="w-full text-xs min-w-[520px] sm:min-w-0">
-                    <thead style={{ background: 'var(--color-surface)' }}><tr className="border-b border-border"><th className="text-left px-3 py-2 font-semibold text-muted">Product</th><th className="text-right px-3 py-2 font-semibold text-muted">QTY (KGs)</th><th className="text-right px-3 py-2 font-semibold text-muted">Price</th><th className="text-right px-3 py-2 font-semibold text-muted">Total</th><th className="text-left px-3 py-2 font-semibold text-muted">Remarks</th><th className="px-2"/></tr></thead>
-                    <tbody>
-                      {items.map((it, i) => (
-                        <tr key={i} className="border-b border-border last:border-0">
-                          <td className="px-2 py-2 min-w-[180px]"><div className="flex gap-1"><ProductComboSearch products={products} value={it.product_id} onChange={v => setItem(i, 'product_id', v)} className="flex-1"/><button onClick={() => setShowProductModal(true)} className="btn btn-inputer px-2 py-1.5 text-xs">+</button></div></td>
-                          <td className="px-2 py-2"><input type="number" min={0} value={it.quantity || ''} placeholder="0" onChange={e => setItem(i, 'quantity', parseFloat(e.target.value) || 0)} className="input w-20 text-right py-1.5 text-xs"/></td>
-                          <td className="px-2 py-2"><input type="number" min={0} value={it.price || ''} placeholder="0" onChange={e => setItem(i, 'price', parseFloat(e.target.value) || 0)} className="input w-24 text-right py-1.5 text-xs"/></td>
-                          <td className="px-2 py-2 text-right font-semibold text-primary whitespace-nowrap">₹{(it.price * it.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                          <td className="px-2 py-2"><input value={it.remarks ?? ''} onChange={e => setItem(i, 'remarks', e.target.value)} placeholder="optional" className="input w-28 py-1.5 text-xs"/></td>
-                          <td className="px-2 py-2">{items.length > 1 && <button onClick={() => setItems(p => p.filter((_, j) => j !== i))} className="text-muted hover:text-red-400"><X size={13}/></button>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot style={{ background: 'var(--color-surface)' }}><tr className="border-t border-border"><td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold text-muted">Total</td><td className="px-3 py-2 text-right text-sm font-bold text-primary">₹{items.reduce((s, it) => s + it.price * it.quantity, 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td><td colSpan={2}/></tr></tfoot>
-                  </table>
+              <div className="order-1 md:order-2">
+                <div className="mb-1 flex h-7 items-center justify-between gap-3">
+                  <label className={IO_FIELD_LABEL}>
+                    Supplier <span className="text-red-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCompanyModal(true)}
+                    className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-inputer transition-colors hover:bg-layer hover:text-primary"
+                  >
+                    <Plus size={12} /> Add Supplier
+                  </button>
                 </div>
+                <CompanyComboSearch
+                  companies={companies}
+                  value={form.supplier_id}
+                  onChange={v => setFormField('supplier_id', v)}
+                  placeholder="— Select Supplier —"
+                  inputClassName={ioInputClass(showValidation && !form.supplier_id)}
+                />
               </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 flex-wrap px-4 sm:px-6 py-4 border-t border-border">
-              <button onClick={() => setShowForm(false)} className="btn btn-ghost">Cancel</button>
-              <button onClick={() => handleSave(true)} disabled={saving} className="btn btn-ghost">{saving ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> : <Printer size={14}/>}{editing ? 'Update & Print' : 'Save & Print'}</button>
-              <button onClick={() => handleSave(false)} disabled={saving} className="btn btn-inputer">{saving ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> : <Save size={14}/>}{editing ? 'Update' : 'Save'}</button>
+              {factories.length > 1 && (
+                <div className="order-3">
+                  <label className={`mb-1 block ${IO_FIELD_LABEL}`}>Factory</label>
+                  <select
+                    value={form.factory_id}
+                    onChange={e => setFormField('factory_id', e.target.value)}
+                    className={ioInputClass()}
+                  >
+                    <option value="">— Select —</option>
+                    {factories.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="order-4">
+                <label className={`mb-1 block ${IO_FIELD_LABEL}`}>Supplier Ref No</label>
+                <input
+                  value={form.supplier_ref_no}
+                  onChange={e => setFormField('supplier_ref_no', e.target.value)}
+                  placeholder="e.g. INV-001"
+                  className={ioInputClass()}
+                />
+              </div>
+              <div className="order-5 md:col-span-2">
+                <label className={`mb-1 block ${IO_FIELD_LABEL}`}>Supplier Remarks</label>
+                <input
+                  value={form.remarks}
+                  onChange={e => setFormField('remarks', e.target.value)}
+                  placeholder="Remarks for supplier"
+                  className={ioInputClass()}
+                />
+              </div>
             </div>
           </div>
+
+          <IoOutwardStyleLineItems
+            items={items}
+            products={products}
+            showQuantity
+            expandedItemIndex={expandedItemIndex}
+            onExpandedItemIndexChange={setExpandedItemIndex}
+            onItemsChange={updateItems}
+            onAddRow={addItemRow}
+            canAddRow={canAddItemRow}
+            onOpenProductModal={i => {
+              setProductModalTargetIndex(i)
+              setShowProductModal(true)
+            }}
+          />
         </div>
-      )}
+      </IoFormModalShell>
 
       {/* View Modal */}
       {viewRow && (
@@ -468,8 +676,38 @@ export default function InwardPage() {
         </div>
       )}
 
-      {showProductModal && <ProductModal factoryId={factoryId} onClose={() => setShowProductModal(false)} onSaved={async (p) => { const updated = await fetchProducts(factoryId || undefined); setProducts(updated); setItems(prev => { const last = prev[prev.length-1]; return last && !last.product_id ? [...prev.slice(0,-1), {...last, product_id: p.id}] : prev }); setShowProductModal(false) }}/>}
-      {showCompanyModal && <CompanyModal factoryId={factoryId} defaultType="supplier" onClose={() => setShowCompanyModal(false)} onSaved={async (c) => { const updated = await fetchCompanies('supplier', factoryId || undefined); setCompanies(updated); setForm(f => ({ ...f, supplier_id: c.id })); setShowCompanyModal(false) }}/>}
+      {showProductModal && (
+        <ProductModal
+          factoryId={factoryId}
+          onClose={() => { setShowProductModal(false); setProductModalTargetIndex(null) }}
+          onSaved={async p => {
+            const upd = await fetchProducts(factoryId || undefined)
+            setProducts(upd)
+            updateItems(prev =>
+              prev.map((item, idx) =>
+                idx === (productModalTargetIndex ?? prev.findIndex(entry => !entry.product_id))
+                  ? { ...item, product_id: p.id }
+                  : item,
+              ),
+            )
+            setShowProductModal(false)
+            setProductModalTargetIndex(null)
+          }}
+        />
+      )}
+      {showCompanyModal && (
+        <CompanyModal
+          factoryId={factoryId}
+          defaultType="supplier"
+          onClose={() => setShowCompanyModal(false)}
+          onSaved={async c => {
+            const upd = await fetchCompanies('supplier', factoryId || undefined)
+            setCompanies(upd)
+            setFormField('supplier_id', c.id)
+            setShowCompanyModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }

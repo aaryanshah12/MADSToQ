@@ -7,7 +7,10 @@ import SalesShell from '@/components/sales/SalesShell'
 export default function PersonalSalesShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   // Login page is full-bleed and doesn't require an active membership.
-  const bare = pathname === '/personal/sales/login'
+  const bare =
+    pathname === '/personal/sales/login' ||
+    pathname === '/personal/sales/forgot-password' ||
+    pathname === '/personal/sales/reset-password'
 
   if (bare) {
     return (

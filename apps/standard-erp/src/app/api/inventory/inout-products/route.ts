@@ -1,30 +1,20 @@
-import { db } from '@madstoq/database'
+import { getSessionUserId, prisma, serializeInoutProduct } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 type Kind = 'inward' | 'outward'
 
-async function getUserId(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const bearer = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null
-
-  if (!bearer) return null
-  const { data, error } = await db.auth.getUser(bearer)
-  if (error || !data?.user) return null
-  return data.user.id
-}
-
 async function allowedFactoryIdsFor(userId: string) {
-  const { data } = await db
-    .from('profile_factories')
-    .select('factory_id')
-    .eq('profile_id', userId)
-  return (data ?? []).map((r: any) => r.factory_id).filter(Boolean)
+  const rows = await prisma.profileFactory.findMany({
+    where: { profileId: userId },
+    select: { factoryId: true },
+  })
+  return rows.map((r) => r.factoryId).filter(Boolean)
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId(request)
+    const userId = await getSessionUserId(request)
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
@@ -39,24 +29,27 @@ export async function GET(request: NextRequest) {
     const allowed = await allowedFactoryIdsFor(userId)
     if (allowed.length === 0) return NextResponse.json({ products: [] })
 
-    let query = db
-      .from('factory_inout_products')
-      .select('*')
-      .eq('kind', kind)
-      .order('name', { ascending: true })
+    const factoryFilter =
+      factoryId
+        ? allowed.includes(factoryId)
+          ? [factoryId]
+          : null
+        : allowed
 
-    if (!includeInactive) query = query.eq('is_active', true)
-
-    if (factoryId) {
-      if (!allowed.includes(factoryId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      query = query.eq('factory_id', factoryId)
-    } else {
-      query = query.in('factory_id', allowed)
+    if (factoryFilter === null) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ products: data ?? [] })
+    const products = await prisma.factoryInoutProduct.findMany({
+      where: {
+        kind,
+        factoryId: { in: factoryFilter },
+        ...(includeInactive ? {} : { isActive: true }),
+      },
+      orderBy: { name: 'asc' },
+    })
+
+    return NextResponse.json({ products: products.map(serializeInoutProduct) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -64,10 +57,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserId(request)
+    const userId = await getSessionUserId(request)
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await db.from('profiles').select('id, role').eq('id', userId).single()
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    })
     if (!profile || profile.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { factory_id, kind, name } = await request.json()
@@ -81,20 +77,17 @@ export async function POST(request: NextRequest) {
     const allowed = await allowedFactoryIdsFor(userId)
     if (!allowed.includes(factory_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { data, error } = await db
-      .from('factory_inout_products')
-      .insert({
-        factory_id,
+    const product = await prisma.factoryInoutProduct.create({
+      data: {
+        factoryId: factory_id,
         kind,
         name: String(name).trim(),
-        is_active: true,
-        created_by: userId,
-      })
-      .select()
-      .single()
+        isActive: true,
+        createdBy: userId,
+      },
+    })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ success: true, product: data })
+    return NextResponse.json({ success: true, product: serializeInoutProduct(product) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -102,35 +95,38 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const userId = await getUserId(request)
+    const userId = await getSessionUserId(request)
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await db.from('profiles').select('id, role').eq('id', userId).single()
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    })
     if (!profile || profile.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { id, is_active, name } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const updates: any = {}
-    if (is_active !== undefined) updates.is_active = Boolean(is_active)
-    if (name !== undefined) updates.name = String(name).trim()
+    const existing = await prisma.factoryInoutProduct.findUnique({
+      where: { id },
+      select: { id: true, factoryId: true },
+    })
 
-    const { data: existing, error: existingErr } = await db
-      .from('factory_inout_products')
-      .select('id, factory_id')
-      .eq('id', id)
-      .single()
-
-    if (existingErr || !existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const allowed = await allowedFactoryIdsFor(userId)
-    if (!allowed.includes(existing.factory_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!allowed.includes(existing.factoryId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { error } = await db.from('factory_inout_products').update(updates).eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    await prisma.factoryInoutProduct.update({
+      where: { id },
+      data: {
+        ...(is_active !== undefined ? { isActive: Boolean(is_active) } : {}),
+        ...(name !== undefined ? { name: String(name).trim() } : {}),
+      },
+    })
+
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-

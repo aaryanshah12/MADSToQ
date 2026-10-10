@@ -1,4 +1,4 @@
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import { inventoryApi } from '@/lib/client/inventory-api'
 
 export type DrilldownRow = {
   supplier: string

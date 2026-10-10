@@ -1,315 +1,383 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import { ListSearchField, ListSearchToolbar } from '@/components/layout/ListSearchToolbar'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import { SpinnerBlock, EmptyState, useSmartFilter } from '@/components/ui'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { useAuth } from '@/hooks/useAuth'
 import { useInventoryFactory } from '@/contexts/InventoryFactoryContext'
-import { getCurrentFiscalYear, getFiscalYears, monthOptions } from '@/lib/monthlyMaterial'
+import { getCurrentFiscalYear, getFiscalYears } from '@/lib/monthlyMaterial'
+import { LedgerKindTabs } from '@/components/inventory/LedgerKindTabs'
+import { DateRangeChip, inDateRange } from '@/components/inventory/DateRangeChip'
+import { SortTh } from '@/components/inventory/SortTh'
+import { MobileCard, MobileListToolbar, MobileTabs } from '@/components/inventory/MobileList'
+import {
+  isPlantBatchUsage,
+  isWarehouseReleaseUsage,
+  parseStockKind,
+  plantUsageTabOf,
+  PLANT_USAGE_TABS,
+  type PlantUsageTab,
+} from '@/lib/ledger-kind'
+
+type UsageSort = 'batch' | 'product' | 'lot' | 'material' | 'qty' | 'remaining' | 'chemist' | 'shift' | 'date'
+
+function cmpText(a: string | null | undefined, b: string | null | undefined) {
+  return (a ?? '').localeCompare(b ?? '', undefined, { numeric: true, sensitivity: 'base' })
+}
+
 
 export default function OwnerUsagePage() {
   const { profile, loading: authLoading } = useAuth()
   const { factoryId: ctxFactoryId } = useInventoryFactory()
-  const [entries, setEntries]     = useState<any[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
-  const [factories, setFactories] = useState<any[]>([])
-  const [rateMin, setRateMin]     = useState('')
-  const [rateMax, setRateMax]     = useState('')
-  const [rateOpen, setRateOpen]   = useState(false)
+  const [entries, setEntries] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [fiscalYear, setFiscalYear] = useState(() => getCurrentFiscalYear())
-  const [selectedMonth, setSelectedMonth] = useState('')
-  const [selectedDate, setSelectedDate] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [tab, setTab] = useState<PlantUsageTab>('rm_sfg')
+  const [sortCol, setSortCol] = useState<UsageSort>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const fiscalYears = getFiscalYears(5)
 
   useEffect(() => {
     async function load() {
       if (authLoading) return
-      const factoryIds = (profile?.factories ?? []).map((f: any) => f.id).filter(Boolean)
-      if (factoryIds.length === 0) {
-        setEntries([]); setFactories([]); setLoading(false); return
+      if (!profile) {
+        setEntries([])
+        setLoading(false)
+        return
       }
-      const page = await inventoryApi.getUsagePage(factoryIds)
-      const entryList = page.usage ?? []
-      const balMap = page.balMap ?? {}
-      const stockMap = page.stockMap ?? {}
-      setFactories(page.factories ?? [])
+      if (!ctxFactoryId) {
+        setEntries([])
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      try {
+        const page = await inventoryApi.getUsagePage([ctxFactoryId])
+        const entryList = page.usage ?? []
+        const stockMap = page.stockMap ?? {}
 
-      // Compute remaining after each usage entry (per invoice)
-      const grouped: Record<string, any[]> = {}
-      entryList.forEach((entry: any) => {
-        if (!grouped[entry.invoice_number]) grouped[entry.invoice_number] = []
-        grouped[entry.invoice_number].push(entry)
-      })
-
-      const remainingById: Record<string, number | null> = {}
-      Object.entries(grouped).forEach(([inv, list]) => {
-        list.sort((a, b) => {
-          const aDate = new Date(a.usage_date).getTime()
-          const bDate = new Date(b.usage_date).getTime()
-          if (aDate !== bDate) return aDate - bDate
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        const releasedByLot: Record<string, number> = {}
+        entryList.forEach((entry: any) => {
+          if (!isWarehouseReleaseUsage(entry)) return
+          const inv = entry.invoice_number
+          releasedByLot[inv] = (releasedByLot[inv] ?? 0) + Number(entry.tons_used || 0)
         })
 
-        const totalLoaded =
-          Number(stockMap[inv]?.tons_loaded) ||
-          Number(balMap[inv]?.tons_loaded) ||
-          (balMap[inv]?.tons_remaining !== undefined && balMap[inv]?.tons_remaining !== null
-            ? Number(balMap[inv]?.tons_remaining) + list.reduce((s, x) => s + Number(x.tons_used || 0), 0)
-            : 0)
-
-        let remaining = totalLoaded
-        list.forEach((entry: any) => {
-          remaining -= Number(entry.tons_used || 0)
-          remainingById[entry.id] = remaining
+        const plantRows = entryList.filter((e: any) => isPlantBatchUsage(e))
+        const grouped: Record<string, any[]> = {}
+        plantRows.forEach((entry: any) => {
+          if (!grouped[entry.invoice_number]) grouped[entry.invoice_number] = []
+          grouped[entry.invoice_number].push(entry)
         })
-      })
 
-      setEntries(entryList.map((e: any) => ({
-        ...e,
-        stock_entries: stockMap[e.invoice_number] ?? null,
-        kgs_remaining: remainingById[e.id] ?? balMap[e.invoice_number]?.tons_remaining ?? null,
-      })))
-      setLoading(false)
+        const remainingById: Record<string, number> = {}
+        Object.entries(grouped).forEach(([inv, list]) => {
+          list.sort((a, b) => {
+            const aDate = new Date(a.usage_date).getTime()
+            const bDate = new Date(b.usage_date).getTime()
+            if (aDate !== bDate) return aDate - bDate
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          })
+          let remaining = releasedByLot[inv] ?? 0
+          list.forEach((entry: any) => {
+            remaining -= Number(entry.tons_used || 0)
+            remainingById[entry.id] = remaining
+          })
+        })
+
+        setEntries(
+          plantRows.map((e: any) => ({
+            ...e,
+            stock_entries: stockMap[e.invoice_number] ?? null,
+            plant_remaining: remainingById[e.id] ?? null,
+            stock_kind: parseStockKind(stockMap[e.invoice_number]?.stock_kind ?? e.stock_kind),
+            stock_grade: stockMap[e.invoice_number]?.stock_grade ?? e.stock_grade,
+          })),
+        )
+      } catch (err) {
+        console.error(err)
+        setEntries([])
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [])
+  }, [authLoading, profile, ctxFactoryId])
 
-  const filtered = entries.filter(e => {
-    const matchSearch  = !search  || e.invoice_number?.toLowerCase().includes(search.toLowerCase()) || e.stock_entries?.supplier_name?.toLowerCase().includes(search.toLowerCase())
-    const matchFactory = !ctxFactoryId || e.factory_id === ctxFactoryId
-    const rate = Number(e.stock_entries?.rate_per_ton ?? 0)
-    const matchRateMin = !rateMin || rate >= Number(rateMin)
-    const matchRateMax = !rateMax || rate <= Number(rateMax)
-    const usageDate = new Date(e.usage_date)
-    const fyStart = Number(fiscalYear.replace('FY', '').split('-')[0])
-    const matchFiscalYear = usageDate >= new Date(fyStart, 3, 1) && usageDate < new Date(fyStart + 1, 3, 1)
-    const matchMonth = !selectedMonth || (usageDate.getMonth() + 1) === Number(selectedMonth)
-    const matchDate = !selectedDate || (e.usage_date ? String(e.usage_date).slice(0, 10) === selectedDate : false)
-    return matchSearch && matchFactory && matchRateMin && matchRateMax && matchFiscalYear && matchMonth && matchDate
+  const tabEntries = useMemo(
+    () => entries.filter((e) => plantUsageTabOf(e) === tab),
+    [entries, tab],
+  )
+  const filter = useSmartFilter(tabEntries, {
+    getSearchText: (e) => [
+      e.invoice_number,
+      e.batch_no,
+      e.product_name,
+      e.product_code,
+      e.stock_entries?.supplier_name,
+      e.stock_entries?.material_type,
+      e.profiles?.full_name,
+    ],
+    facets: [
+      { key: 'material', label: 'Material', getValue: (e) => e.stock_entries?.material_type || '—' },
+      { key: 'product', label: 'Product', getValue: (e) => e.product_name || e.product_code || '—' },
+      { key: 'chemist', label: 'Chemist', getValue: (e) => e.profiles?.full_name || '—' },
+    ],
   })
+  const filtered = useMemo(() => {
+    return filter.filtered.filter((e) => {
+      const usageDate = new Date(e.usage_date)
+      const rangeActive = Boolean(dateFrom || dateTo)
+      const matchRange = inDateRange(e.usage_date, dateFrom, dateTo)
+      const fyStart = Number(fiscalYear.replace('FY', '').split('-')[0])
+      const matchFiscalYear =
+        rangeActive ||
+        (usageDate >= new Date(fyStart, 3, 1) && usageDate < new Date(fyStart + 1, 3, 1))
+      return matchRange && matchFiscalYear
+    })
+  }, [filter.filtered, dateFrom, dateTo, fiscalYear])
 
-  const rateSliderMax = entries.length > 0
-    ? Math.max(1000, Math.ceil(Math.max(...entries.map((e: any) => Number(e.stock_entries?.rate_per_ton ?? 0))) / 500) * 500)
-    : 5000
-  const minVal = rateMin ? Number(rateMin) : 0
-  const maxVal = rateMax ? Number(rateMax) : rateSliderMax
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      switch (sortCol) {
+        case 'batch':
+          cmp = cmpText(a.batch_no, b.batch_no)
+          break
+        case 'product':
+          cmp = cmpText(a.product_name ?? a.product_code, b.product_name ?? b.product_code)
+          break
+        case 'lot':
+          cmp = cmpText(a.invoice_number, b.invoice_number)
+          break
+        case 'material':
+          cmp = cmpText(a.stock_entries?.material_type, b.stock_entries?.material_type)
+          break
+        case 'qty':
+          cmp = Number(a.tons_used || 0) - Number(b.tons_used || 0)
+          break
+        case 'remaining':
+          cmp = Number(a.plant_remaining ?? -1) - Number(b.plant_remaining ?? -1)
+          break
+        case 'chemist':
+          cmp = cmpText(a.profiles?.full_name, b.profiles?.full_name)
+          break
+        case 'shift':
+          cmp = cmpText(a.shift, b.shift)
+          break
+        case 'date':
+        default:
+          cmp = cmpText(a.usage_date, b.usage_date)
+          break
+      }
+      return cmp * dir || cmpText(a.id, b.id)
+    })
+  }, [filtered, sortCol, sortDir])
+
+  function handleSort(col: UsageSort) {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortCol(col)
+      setSortDir(col === 'date' || col === 'qty' || col === 'remaining' ? 'desc' : 'asc')
+    }
+  }
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
-        <PageHeader title="Usage Log" subtitle="Owner · All Consumption Records" accent="owner" />
+      <div className="w-full p-4 md:p-8">
+        <div className="mb-8 hidden lg:block">
+        <PageHeader
+          title="Plant Usage"
+          subtitle="Owner · Lot consume into production batches (released-to-plant remaining)"
+          accent="owner"
+        />
+        </div>
 
-        <ListSearchToolbar className="mb-6 flex-wrap">
-          <ListSearchField
-            value={search}
-            onChange={setSearch}
-            placeholder="Search invoice or supplier..."
-            inputClassName="owner-focus"
+        <div className="md:hidden">
+          <MobileTabs
+            ariaLabel="Plant usage"
+            active={tab}
+            onChange={setTab}
+            tabs={[
+              { key: 'rm_sfg', label: 'RM used', sublabel: 'in SFG' },
+              { key: 'rm_fg', label: 'RM used', sublabel: 'in FG' },
+              { key: 'sfg', label: 'SFG used', sublabel: 'in FG' },
+            ]}
           />
-          <select
-            className="input list-search-side owner-focus w-full sm:w-[170px] text-sm"
-            value={fiscalYear}
-            onChange={(e) => setFiscalYear(e.target.value)}
-          >
-            {fiscalYears.map((fy) => (
-              <option key={fy} value={fy}>{fy}</option>
-            ))}
-          </select>
-          <div className="relative w-full sm:w-[170px] flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setRateOpen((v) => !v)}
-              className={`input list-search-side owner-focus w-full flex items-center justify-between gap-2 whitespace-nowrap cursor-pointer ${rateMin || rateMax ? 'border-owner' : ''}`}
-            >
-              <span className="text-xs font-mono text-muted">₹ Rate</span>
-              {(rateMin || rateMax) && (
-                <span className="text-xs font-mono text-owner">{rateMin || '0'} – {rateMax || '∞'}</span>
+          {loading ? (
+            <SpinnerBlock accent="owner" label="Loading plant usage" />
+          ) : (
+            <>
+              <MobileListToolbar
+                filter={filter}
+                placeholder="Search batch, lot, material, or chemist…"
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateChange={(from, to) => {
+                  setDateFrom(from)
+                  setDateTo(to)
+                }}
+                resultCount={sorted.length}
+                noun={{ one: 'usage', many: 'usages' }}
+                sortOptions={[
+                  { col: 'batch', label: 'Batch', kind: 'text' },
+                  { col: 'product', label: 'Product', kind: 'text' },
+                  { col: 'lot', label: 'Lot', kind: 'text' },
+                  { col: 'material', label: 'Material', kind: 'text' },
+                  { col: 'qty', label: 'Used', kind: 'number' },
+                  { col: 'remaining', label: 'Remaining', kind: 'number' },
+                  { col: 'chemist', label: 'Chemist', kind: 'text' },
+                  { col: 'date', label: 'Date', kind: 'date' },
+                ]}
+                sortCol={sortCol}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              {sorted.length === 0 ? (
+                <EmptyState className="rounded-xl bg-panel" title="No plant batch usage found" />
+              ) : (
+                <div className="space-y-3">
+                  {sorted.map((e) => {
+                    const remaining = e.plant_remaining
+                    return (
+                      <MobileCard
+                        key={e.id}
+                        id={e.invoice_number}
+                        title={e.batch_no ?? '—'}
+                        subtitle={e.product_name ?? e.product_code ?? '—'}
+                        aside={
+                          <>
+                            <span className="block text-base font-medium tabular-nums text-owner">
+                              {e.tons_used} KGS
+                            </span>
+                            <span className="block text-[10px] uppercase tracking-wider text-muted">Used</span>
+                          </>
+                        }
+                        rows={[
+                          { label: 'Material', value: e.stock_entries?.material_type ?? '—' },
+                          { label: 'Chemist', value: e.profiles?.full_name ?? '—' },
+                          {
+                            label: 'Plant remaining',
+                            value: remaining !== null ? `${Number(remaining).toFixed(3)} KGS` : '—',
+                          },
+                          { label: 'Shift', value: e.shift ? String(e.shift) : '—' },
+                          { label: 'Date', value: new Date(e.usage_date).toLocaleDateString('en-IN') },
+                        ]}
+                      />
+                    )
+                  })}
+                </div>
               )}
-              <span className="text-muted text-[10px] ml-1">▾</span>
-            </button>
-            {rateOpen && (
+            </>
+          )}
+        </div>
+
+        <div className="hidden md:block">
+        <LedgerKindTabs tab={tab} onChange={setTab} tabs={PLANT_USAGE_TABS}>
+          <div>
+            <div className="relative z-10 flex flex-wrap items-center gap-2 border-b border-border bg-panel px-4 py-3">
+              <input
+                className="input-field owner-focus w-full md:w-[320px]"
+                placeholder="Search batch, lot, material, or chemist…"
+                value={filter.search}
+                onChange={(e) => filter.setSearch(e.target.value)}
+              />
+              <select
+                className="input-field owner-focus w-full md:w-[170px]"
+                value={fiscalYear}
+                onChange={(e) => setFiscalYear(e.target.value)}
+                disabled={Boolean(dateFrom || dateTo)}
+                title={dateFrom || dateTo ? 'FY is skipped while a date range is set' : undefined}
+              >
+                {fiscalYears.map((fy) => (
+                  <option key={fy} value={fy}>
+                    {fy}
+                  </option>
+                ))}
+              </select>
+              <DateRangeChip
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => {
+                  setDateFrom(from)
+                  setDateTo(to)
+                }}
+              />
+            </div>
+
+            {loading ? (
+              <SpinnerBlock accent="owner" label="Loading plant usage" />
+            ) : (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setRateOpen(false)} />
-                <div className="absolute top-full mt-1 left-0 z-20 card p-4 min-w-[300px] shadow-xl border border-border rounded-xl">
-                  <div className="text-[10px] text-muted font-mono tracking-wider mb-3">Filter by Rate (₹)</div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number" min={0} max={rateSliderMax}
-                      value={minVal}
-                      onChange={e => { const v = Number(e.target.value); setRateMin(v <= 0 ? '' : String(v)) }}
-                      className="w-16 text-center text-xs font-mono bg-layer-sm border border-border rounded-md px-1 py-1.5 text-primary outline-none focus:border-owner transition-colors"
-                    />
-                    <div className="relative flex-1 h-5 flex items-center">
-                      <div className="absolute w-full h-[3px] bg-border rounded-full" />
-                      <div
-                        className="absolute h-[3px] bg-owner rounded-full pointer-events-none"
-                        style={{ left: `${(minVal / rateSliderMax) * 100}%`, right: `${100 - (maxVal / rateSliderMax) * 100}%` }}
-                      />
-                      <input
-                        type="range" min={0} max={rateSliderMax} step={100}
-                        value={minVal}
-                        onChange={e => { const v = Number(e.target.value); if (v <= maxVal) setRateMin(v === 0 ? '' : String(v)) }}
-                        className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-owner [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-runnable-track]:bg-transparent"
-                        style={{ zIndex: minVal >= rateSliderMax ? 5 : 3 }}
-                      />
-                      <input
-                        type="range" min={0} max={rateSliderMax} step={100}
-                        value={maxVal}
-                        onChange={e => { const v = Number(e.target.value); if (v >= minVal) setRateMax(v >= rateSliderMax ? '' : String(v)) }}
-                        className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-owner [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-runnable-track]:bg-transparent"
-                        style={{ zIndex: 4 }}
-                      />
-                    </div>
-                    <input
-                      type="number" min={0} max={rateSliderMax}
-                      value={maxVal}
-                      onChange={e => { const v = Number(e.target.value); setRateMax(!v || v >= rateSliderMax ? '' : String(v)) }}
-                      className="w-16 text-center text-xs font-mono bg-layer-sm border border-border rounded-md px-1 py-1.5 text-primary outline-none focus:border-owner transition-colors"
-                    />
-                  </div>
-                  {(rateMin || rateMax) && (
-                    <button
-                      type="button"
-                      onClick={() => { setRateMin(''); setRateMax('') }}
-                      className="mt-3 text-[10px] font-mono text-muted hover:text-red-400 transition-colors"
-                    >
-                      Clear filter
-                    </button>
-                  )}
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <SortTh label="Batch" col="batch" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Product" col="product" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Lot" col="lot" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Material" col="material" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="KGS used" col="qty" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Plant remaining" col="remaining" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Chemist" col="chemist" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Shift" col="shift" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        <SortTh label="Date" col="date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sorted.map((e) => {
+                        const remaining = e.plant_remaining
+                        return (
+                          <tr key={e.id}>
+                            <td className="font-mono text-xs text-primary">{e.batch_no ?? '—'}</td>
+                            <td className="text-sm text-primary">
+                              {e.product_name ?? e.product_code ?? '—'}
+                            </td>
+                            <td className="font-mono text-chemist text-xs">{e.invoice_number}</td>
+                            <td className="text-muted">{e.stock_entries?.material_type ?? '—'}</td>
+                            <td className="font-mono text-chemist">{e.tons_used} KGS</td>
+                            <td
+                              className={`font-mono ${
+                                remaining !== null && Number(remaining) < 5
+                                  ? 'text-red-400'
+                                  : 'text-chemist'
+                              }`}
+                            >
+                              {remaining !== null ? `${Number(remaining).toFixed(3)} KGS` : '—'}
+                            </td>
+                            <td className="text-primary">{e.profiles?.full_name ?? '—'}</td>
+                            <td>
+                              {e.shift ? (
+                                <span className="badge badge-muted capitalize">{e.shift}</span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="text-muted text-xs">
+                              {new Date(e.usage_date).toLocaleDateString('en-IN')}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {sorted.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="py-12 text-center text-muted">
+                            No plant batch usage found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
           </div>
-          <select
-            className="input list-search-side owner-focus w-full sm:w-[160px] text-sm"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            aria-label="Filter by month"
-          >
-            <option value="">All Months</option>
-            {monthOptions.map((m) => (
-              <option key={m.value} value={String(m.value)}>{m.label}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="input list-search-side owner-focus w-full sm:w-[160px] text-sm"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            aria-label="Filter by date"
-          />
-        </ListSearchToolbar>
-
-        <div className="card overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Supplier / Product</th>
-                      <th>Invoice</th>
-                      <th>Batch ID</th>
-                      <th>Batch Month</th>
-                      <th>Factory</th>
-                      <th>Chemist</th>
-                      <th>Material</th>
-                      <th>KGS Used</th>
-                      <th>Remaining KGS</th>
-                      <th>Shift</th>
-                      <th>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(e => {
-                      const remaining = e.kgs_remaining
-                      return (
-                        <tr key={e.id}>
-                          <td>
-                            <div className="text-chemist font-semibold text-sm">{e.stock_entries?.supplier_name ?? '—'}</div>
-                            <div className="text-primary text-xs">{e.stock_entries?.material_type ?? '—'}</div>
-                          </td>
-                          <td className="font-mono text-chemist text-xs">{e.invoice_number}</td>
-                          <td className="text-xs text-primary">{e.batch_id ?? '—'}</td>
-                          <td className="text-xs text-primary">{e.batch_month ?? '—'}</td>
-                          <td className="text-primary text-xs">{e.factories?.name}</td>
-                          <td className="text-primary">{e.profiles?.full_name}</td>
-                          <td className="text-muted">{e.stock_entries?.material_type}</td>
-                          <td className="font-mono text-chemist">{e.tons_used} KGS</td>
-                          <td className={`font-mono ${remaining !== null && Number(remaining) < 5 ? 'text-red-400' : 'text-chemist'}`}>
-                            {remaining !== null ? `${Number(remaining).toFixed(3)} KGS` : '—'}
-                          </td>
-                          <td>{e.shift ? <span className="badge badge-muted capitalize">{e.shift}</span> : '—'}</td>
-                          <td className="text-muted text-xs">{new Date(e.usage_date).toLocaleDateString('en-IN')}</td>
-                        </tr>
-                      )
-                    })}
-                    {filtered.length === 0 && (
-                      <tr><td colSpan={8} className="text-center text-muted py-12">No usage records found</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="md:hidden data-card-list p-4">
-                {filtered.length === 0 && (
-                  <div className="text-center text-muted py-6 border border-dashed border-[color-mix(in srgb, var(--color-border) 80%, transparent)] rounded-lg">
-                    No usage records found
-                  </div>
-                )}
-                {filtered.map(e => {
-                  const remaining = e.kgs_remaining
-                  return (
-                    <div key={e.id} className="data-card">
-                      <div className="data-card-header">
-                        <div>
-                          <div className="text-chemist font-semibold text-sm">{e.stock_entries?.supplier_name ?? '—'}</div>
-                          <div className="text-primary text-xs">{e.stock_entries?.material_type ?? '—'}</div>
-                          <div className="data-card-title font-mono text-[11px] text-muted">{e.invoice_number}</div>
-                        </div>
-                        <span className="data-card-meta">{new Date(e.usage_date).toLocaleDateString('en-IN')}</span>
-                      </div>
-                      <div className="data-card-grid">
-                        <span className="data-card-label">Factory</span>
-                        <span className="data-card-value">{e.factories?.name ?? '—'}</span>
-
-                        <span className="data-card-label">Chemist</span>
-                        <span className="data-card-value">{e.profiles?.full_name ?? '—'}</span>
-
-                        <span className="data-card-label">Material</span>
-                        <span className="text-muted text-right">{e.stock_entries?.material_type ?? '—'}</span>
-
-                        <span className="data-card-label">Batch ID</span>
-                        <span className="text-primary text-right">{e.batch_id ?? '—'}</span>
-
-                        <span className="data-card-label">Batch Month</span>
-                        <span className="text-primary text-right">{e.batch_month ?? '—'}</span>
-
-                        <span className="data-card-label">Used</span>
-                        <span className="font-mono text-chemist text-right">{e.tons_used} KGS</span>
-
-                        <span className="data-card-label">Remaining</span>
-                        <span className={`font-mono text-right ${remaining !== null && Number(remaining) < 5 ? 'text-red-400' : 'text-chemist'}`}>
-                          {remaining !== null ? `${Number(remaining).toFixed(3)} KGS` : '—'}
-                        </span>
-
-                        <span className="data-card-label">Shift</span>
-                        <span className="text-right">
-                          {e.shift ? <span className="badge badge-muted capitalize">{e.shift}</span> : <span className="text-muted">—</span>}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
+        </LedgerKindTabs>
         </div>
       </div>
     </AppLayout>

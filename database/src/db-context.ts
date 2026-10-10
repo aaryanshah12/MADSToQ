@@ -1,28 +1,18 @@
 import { AsyncLocalStorage } from 'async_hooks'
-import type { DbClient } from './client'
-import type { SessionUser } from './session'
+import { prisma, type PrismaClient } from './prisma'
+import { createPostgrestClient, type PostgrestClient } from './postgrest-client'
 
-export type AuthUser = SessionUser
+const storage = new AsyncLocalStorage<PrismaClient>()
 
-type DbStore = {
-  db: DbClient
-  user: AuthUser
+export function runWithDb<T>(db: PrismaClient, fn: () => Promise<T>): Promise<T> {
+  return storage.run(db, fn)
 }
 
-const storage = new AsyncLocalStorage<DbStore>()
-
-export function runWithDb<T>(db: DbClient, user: AuthUser, fn: () => Promise<T>): Promise<T> {
-  return storage.run({ db, user }, fn)
+export function getPrisma(): PrismaClient {
+  return storage.getStore() ?? prisma
 }
 
-export function getServerDb(): DbClient {
-  const store = storage.getStore()
-  if (!store) throw new Error('Database context not initialized')
-  return store.db
-}
-
-export function getAuthenticatedUser(): AuthUser {
-  const store = storage.getStore()
-  if (!store) throw new Error('Database context not initialized')
-  return store.user
+/** @deprecated PostgREST shim — IO now uses Prisma; kept for reference only. */
+export function getServerDb(): PostgrestClient {
+  return createPostgrestClient(getPrisma())
 }

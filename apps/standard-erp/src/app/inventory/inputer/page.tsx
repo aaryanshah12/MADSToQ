@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
+import { SpinnerBlock } from '@/components/ui'
 import StatCard from '@madstoq/ui/stat-card'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { useAuth } from '@/hooks/useAuth'
 import DrilldownModal from '@madstoq/ui/drilldown-modal'
 import { DrilldownRow, fetchLoadedDrilldown } from '@/lib/drilldown'
@@ -57,7 +58,7 @@ export default function InputerDashboard() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title={`Welcome, ${profile?.full_name?.split(' ')[0]}`}
           subtitle="Inputer · Stock Entry Dashboard"
@@ -80,12 +81,10 @@ export default function InputerDashboard() {
         <div className="card overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <div className="font-mono text-xs text-muted uppercase tracking-widest">Recent Stock Entries</div>
-            <Link href="/inventory/inputer/history" className="text-xs text-inputer hover:underline font-mono">View All →</Link>
+            <Link href="/inventory/inputer/history" className="text-xs text-primary hover:underline font-mono">View All →</Link>
           </div>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-inputer border-t-transparent rounded-full animate-spin" />
-            </div>
+            <SpinnerBlock accent="inputer" label="Loading entries" className="py-12" />
           ) : (
             <>
               <div className="hidden md:block overflow-x-auto">
@@ -103,17 +102,17 @@ export default function InputerDashboard() {
                   <tbody>
                     {recentEntries.map(e => (
                       <tr key={e.id}>
-                        <td className="font-mono text-inputer text-xs">{e.invoice_number}</td>
+                        <td className="font-mono text-primary text-xs">{e.invoice_number}</td>
                         <td className="text-primary text-xs">{e.factories?.name}</td>
                         <td className="text-primary">{e.supplier_name}</td>
                         <td className="text-muted">{e.material_type}</td>
-                        <td className="font-mono text-inputer">{e.tons_loaded} KGS</td>
+                        <td className="font-mono text-primary">{e.tons_loaded} KGS</td>
                         <td className="text-muted text-xs">{new Date(e.entry_date).toLocaleDateString('en-IN')}</td>
                       </tr>
                     ))}
                     {recentEntries.length === 0 && (
                       <tr><td colSpan={6} className="text-center text-muted py-10">
-                        No entries yet. <Link href="/inventory/inputer/new" className="text-inputer">Create your first →</Link>
+                        No entries yet. <Link href="/inventory/inputer/new" className="text-primary hover:underline">Create your first →</Link>
                       </td></tr>
                     )}
                   </tbody>
@@ -123,13 +122,13 @@ export default function InputerDashboard() {
               <div className="md:hidden data-card-list p-4">
                 {recentEntries.length === 0 && (
                   <div className="text-center text-muted py-6 border border-dashed border-[color-mix(in srgb, var(--color-border) 80%, transparent)] rounded-lg">
-                    No entries yet. <Link href="/inventory/inputer/new" className="text-inputer">Create your first →</Link>
+                    No entries yet. <Link href="/inventory/inputer/new" className="text-primary hover:underline">Create your first →</Link>
                   </div>
                 )}
                 {recentEntries.map(e => (
                   <div key={e.id} className="data-card">
                     <div className="data-card-header">
-                      <span className="data-card-title text-inputer">{e.invoice_number}</span>
+                      <span className="data-card-title text-primary">{e.invoice_number}</span>
                       <span className="data-card-meta">{new Date(e.entry_date).toLocaleDateString('en-IN')}</span>
                     </div>
                     <div className="data-card-grid">
@@ -143,7 +142,7 @@ export default function InputerDashboard() {
                       <span className="text-muted text-right">{e.material_type}</span>
 
                       <span className="data-card-label">KGS</span>
-                      <span className="font-mono text-inputer text-right">{e.tons_loaded} KGS</span>
+                      <span className="font-mono text-primary text-right">{e.tons_loaded} KGS</span>
                     </div>
                   </div>
                 ))}

@@ -1,48 +1,26 @@
 import { readFile } from 'fs/promises'
+import path from 'path'
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuthenticatedDb } from '@madstoq/database'
-import * as io from '@madstoq/io-system/services'
-import { pdfExistsOnDisk, resolvePdfDiskPath, resolvePdfWebPath } from '@/lib/io-pdf-path'
 
-const PUBLIC_DEFAULTS = ['/Label.pdf', '/letter-head.pdf']
+const IO_PDF_DIR = path.join(process.cwd(), 'public', 'io-pdfs')
 
+/** Serve uploaded IO PDFs (runtime files under public/io-pdfs are not always reachable as static assets on Render). */
 export async function GET(req: NextRequest) {
-  const webPath = req.nextUrl.searchParams.get('path') || ''
-  const factoryId = req.nextUrl.searchParams.get('factoryId') || ''
-
-  if (!webPath.startsWith('/') || webPath.includes('..')) {
-    return NextResponse.json({ error: 'Invalid PDF path' }, { status: 400 })
+  const raw = req.nextUrl.searchParams.get('path') ?? ''
+  if (!raw.startsWith('/io-pdfs/') || raw.includes('..')) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 })
   }
-
-  return withAuthenticatedDb(req, async () => {
-    if (factoryId) {
-      await io.assertFactoryAccess(factoryId)
-      const cfg = await io.fetchPdfConfig(factoryId)
-      const allowed = new Set([
-        cfg.selected.label,
-        cfg.selected['letter-head'],
-        cfg.selected['customer-print'],
-        ...cfg.files,
-        ...PUBLIC_DEFAULTS,
-      ].filter(Boolean))
-      if (!allowed.has(webPath)) {
-        return NextResponse.json({ error: 'PDF not configured for this factory' }, { status: 403 })
-      }
-    } else if (!PUBLIC_DEFAULTS.includes(webPath)) {
-      return NextResponse.json({ error: 'factoryId is required for custom PDF paths' }, { status: 400 })
-    }
-
-    const resolvedPath = (await resolvePdfWebPath(webPath)) || webPath
-    const disk = resolvePdfDiskPath(resolvedPath)
-    if (!disk || !(await pdfExistsOnDisk(resolvedPath))) {
-      return NextResponse.json({ error: `PDF not found: ${webPath}` }, { status: 404 })
-    }
-    const bytes = await readFile(disk)
-    return new NextResponse(bytes, {
+  const name = path.basename(raw)
+  const filePath = path.join(IO_PDF_DIR, name)
+  try {
+    const buf = await readFile(filePath)
+    return new NextResponse(buf, {
       headers: {
         'Content-Type': 'application/pdf',
         'Cache-Control': 'private, max-age=60',
       },
     })
-  })
+  } catch {
+    return NextResponse.json({ error: 'PDF not found' }, { status: 404 })
+  }
 }

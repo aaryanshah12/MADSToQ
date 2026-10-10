@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { getSalesContext } from '@madstoq/sales-system/server'
+import { fetchSalesDocument, markSalesDocumentSent, insertLeadActivity } from '@madstoq/sales-system/db-queries'
 import { renderDocumentPdf } from '@madstoq/sales-system/pdf'
 import type { SalesDocument } from '@madstoq/sales-system/types'
 
@@ -24,27 +25,21 @@ export async function POST(req: NextRequest) {
   const { document_id } = await req.json()
   if (!document_id) return NextResponse.json({ error: 'document_id required' }, { status: 400 })
 
-  const { data: doc, error } = await ctx.db
-    .from('sales_documents')
-    .select('*')
-    .eq('id', document_id)
-    .eq('org_id', ctx.org.id)
-    .single()
-  if (error || !doc) return NextResponse.json({ error: error?.message ?? 'Not found' }, { status: 404 })
+  const doc = await fetchSalesDocument(ctx.db, ctx.org.id, document_id)
+  if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const recipient = (doc.to_email ?? '').trim()
   if (!recipient) return NextResponse.json({ error: 'Recipient email is required' }, { status: 400 })
 
-  // Build PDF
   let pdfBytes: Buffer
   try {
     pdfBytes = await renderDocumentPdf(doc as SalesDocument, ctx.org)
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : ''
     console.error('PDF build failed:', e)
-    return NextResponse.json({ error: 'Failed to build PDF: ' + (e.message ?? '') }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to build PDF: ' + message }, { status: 500 })
   }
 
-  // Compose email
   const transporter = nodemailer.createTransport({
     host: process.env.SALES_SMTP_HOST ?? process.env.SMTP_HOST,
     port: Number(process.env.SALES_SMTP_PORT ?? process.env.SMTP_PORT ?? 587),
@@ -83,22 +78,14 @@ export async function POST(req: NextRequest) {
       attachments: [{ filename, content: pdfBytes, contentType: 'application/pdf' }],
     })
 
-    // Mark sent + record metadata.
-    const sentAt = new Date().toISOString()
-    await ctx.db
-      .from('sales_documents')
-      .update({
-        status: 'sent',
-        sent_at: sentAt,
-        sent_to: recipient,
-        sent_cc: ccEmail,
-        email_message_id: info.messageId ?? null,
-      })
-      .eq('id', doc.id)
+    await markSalesDocumentSent(ctx.db, doc.id, {
+      sent_to: recipient,
+      sent_cc: ccEmail,
+      email_message_id: info.messageId ?? null,
+    })
 
-    // Log a lead activity if attached to a lead.
     if (doc.lead_id) {
-      await ctx.db.from('sales_lead_activities').insert({
+      await insertLeadActivity(ctx.db, {
         lead_id: doc.lead_id,
         activity_type: doc.doc_type === 'purchase_order' ? 'po' : 'quotation',
         title: `${docTypeLabel} ${doc.doc_number} sent`,
@@ -109,8 +96,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, messageId: info.messageId })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Email send failed'
     console.error('Email send failed:', e)
-    return NextResponse.json({ error: 'Email send failed: ' + (e.message ?? '') }, { status: 500 })
+    return NextResponse.json({ error: 'Email send failed: ' + message }, { status: 500 })
   }
 }

@@ -6,7 +6,7 @@ import type {
   PMCReference,
   PMCReferencePrice,
   PMCRawMaterial,
-} from '../lib/types'
+} from '../types'
 
 export function calculateProductPricing(
   reference: PMCReference,

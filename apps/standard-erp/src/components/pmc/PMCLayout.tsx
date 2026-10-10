@@ -6,89 +6,66 @@ import { usePathname, useRouter } from 'next/navigation'
 import clsx from 'clsx'
 import {
   LayoutDashboard,
-  ShoppingCart,
+  Hash,
   Package,
-  Layers,
-  GitCompare,
+  Database,
   LogOut,
   Menu,
   X,
   Sun,
   Moon,
   ChevronRight,
-  BookOpen,
 } from 'lucide-react'
 import { usePMC } from '@/contexts/PMCContext'
-import { usePMCFactory } from '@/contexts/PMCFactoryContext'
-import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 
 const BASE = '/pmc'
+const THEME_KEY = 'theme'
 
 const NAV = [
   { href: `${BASE}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
-  { href: `${BASE}/procurement`, label: 'Procurement', icon: ShoppingCart },
+  { href: `${BASE}/references`, label: 'Reference Number', icon: Hash },
   { href: `${BASE}/products`, label: 'Products', icon: Package },
-  { href: `${BASE}/batches`, label: 'Batches', icon: Layers },
-  { href: `${BASE}/compare`, label: 'Compare', icon: GitCompare },
+  { href: `${BASE}/master`, label: 'Master', icon: Database },
 ]
+
+function readTheme(): 'dark' | 'light' {
+  if (typeof window === 'undefined') return 'light'
+  return (
+    (localStorage.getItem(THEME_KEY) as 'dark' | 'light' | null) ??
+    (localStorage.getItem('pmc-theme') as 'dark' | 'light' | null) ??
+    'light'
+  )
+}
 
 export default function PMCLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { loading, dataReady, dataError, email, signOut, reloadData } = usePMC()
-  const { factoryId, setFactoryId, factories, factoriesLoading } = usePMCFactory()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [themeMounted, setThemeMounted] = useState(false)
 
   useEffect(() => {
-    const saved = readStoredTheme()
+    const saved = readTheme()
     setTheme(saved)
-    persistTheme(saved)
+    document.documentElement.dataset.theme = saved
     setThemeMounted(true)
   }, [])
 
   useEffect(() => {
     if (!themeMounted) return
-    persistTheme(theme)
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem(THEME_KEY, theme)
+    localStorage.removeItem('pmc-theme')
   }, [theme, themeMounted])
 
   useEffect(() => {
-    if (!loading && !email) router.replace('/portals/demo/pmc')
+    if (!loading && !email) router.replace('/pmc')
   }, [loading, email, router])
 
   useEffect(() => setSidebarOpen(false), [pathname])
 
-  if (loading || !email || !dataReady || factoriesLoading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center grid-bg"
-        style={{ background: 'var(--color-bg)' }}
-      >
-        <div className="w-8 h-8 border-2 border-pmc border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (factories.length === 0) {
-    return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 grid-bg"
-        style={{ background: 'var(--color-bg)' }}
-      >
-        <p className="text-sm text-muted text-center max-w-md">
-          No factory is assigned to your account. Ask an administrator to add you in Inventory → Users
-          and assign factories, then sign in again.
-        </p>
-        <button type="button" onClick={() => signOut()} className="btn btn-pmc">
-          Sign out
-        </button>
-      </div>
-    )
-  }
-
-  if (!factoryId) {
+  if (loading || !email || !dataReady) {
     return (
       <div
         className="min-h-screen flex items-center justify-center grid-bg"
@@ -113,9 +90,8 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const isActive = (href: string) => {
-    return pathname === href || pathname.startsWith(`${href}/`)
-  }
+  const isActive = (href: string) =>
+    pathname === href || (href !== `${BASE}/master` && pathname.startsWith(href + '/'))
 
   const SidebarInner = () => (
     <div className="flex flex-col h-full min-h-0">
@@ -151,30 +127,7 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="px-4 py-4 border-b border-border shrink-0 space-y-3">
-        {factories.length > 1 && (
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-widest text-muted block mb-1.5">
-              Factory
-            </label>
-            <select
-              value={factoryId}
-              onChange={(e) => setFactoryId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-layer-sm text-sm text-primary px-3 py-2.5 min-h-[44px]"
-            >
-              {factories.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {factories.length === 1 && (
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
-            Factory: <span className="text-primary normal-case">{factories[0].name}</span>
-          </div>
-        )}
+      <div className="px-4 py-4 border-b border-border shrink-0">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 border text-pmc border-pmc-30 bg-pmc-10">
           <div className="w-8 h-8 rounded-lg bg-pmc-20 flex items-center justify-center text-sm font-bold flex-shrink-0 text-pmc">
             {email?.charAt(0).toUpperCase() ?? '?'}
@@ -195,29 +148,20 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={href}
               href={href}
-              className={clsx(
-                'w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all duration-150 group min-h-[44px]',
-                active ? 'pmc-nav-active' : 'text-muted hover:text-primary hover:bg-layer-sm'
-              )}
+              className={clsx('nav-item group', active && 'nav-item-active')}
             >
               <Icon
                 size={17}
-                className={active ? 'text-pmc' : 'text-muted group-hover:text-primary'}
+                className={active ? 'text-current' : 'text-muted group-hover:text-primary'}
               />
               <span className="truncate">{label}</span>
-              {active && <ChevronRight size={13} className="ml-auto opacity-50 shrink-0" />}
+              {!active && <ChevronRight size={13} className="ml-auto shrink-0 text-muted opacity-60" />}
             </Link>
           )
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-border shrink-0 space-y-1">
-        <a
-          href="/pmc/manual"
-          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all min-h-[44px]"
-        >
-          <BookOpen size={16} /> User manual
-        </a>
+      <div className="px-4 py-4 border-t border-border shrink-0">
         <button
           type="button"
           onClick={() => signOut()}
@@ -287,8 +231,6 @@ export default function PMCLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
-
-      <PortalWhatsAppHelp portalName="PMC Portal" />
     </div>
   )
 }

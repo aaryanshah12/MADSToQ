@@ -1,13 +1,37 @@
-import { rpcPost } from '@madstoq/core'
+import { rpcPost } from "@madstoq/core";
 import type {
   IOUnit, IOCountry, IOState, IOCity,
   IOCompany, IOProduct,
   IOInward, IOOutward, IODomestic, IOInternational,
   IOQuotation, IOLineItem, IOQuotationItem,
   CompanyType, DocType,
-} from '../types/index'
+} from './types'
 
 const RPC = '/api/rpc/io'
+
+export type IoPage<T> = { rows: T[]; total: number; page: number; pageSize: number }
+
+export type IoDocListQuery = {
+  factory_id?: string | null
+  q?: string | null
+  party_id?: string | null
+  fy_start?: number | null
+  month?: number | null
+  date?: string | null
+  page?: number | null
+  page_size?: number | null
+  all?: boolean | null
+}
+
+function ioQuery(factoryOrQuery?: string | IoDocListQuery): IoDocListQuery {
+  if (typeof factoryOrQuery === 'string' || factoryOrQuery == null) return { factory_id: factoryOrQuery }
+  return factoryOrQuery
+}
+
+/** Latest document numbers first (e.g. VIB/010/26 before VIB/009/26). */
+export function compareIoDocNumbersDesc(a: string, b: string): number {
+  return b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' })
+}
 
 export async function getNextNumber(type: DocType, date?: string, factoryId?: string | null): Promise<string> {
   return rpcPost<string>(RPC, 'getNextNumber', { type, date, factoryId })
@@ -85,11 +109,11 @@ export async function deleteCompany(id: string): Promise<void> {
   return rpcPost(RPC, 'deleteCompany', { id })
 }
 
-export async function fetchNumberingConfig(factory_id: string): Promise<Record<DocType, { prefix: string; suffix: string }>> {
+export async function fetchNumberingConfig(factory_id: string): Promise<Record<DocType, { prefix: string; suffix: string; numberFormat: 'standard' | 'slash_pad3' }>> {
   return rpcPost(RPC, 'fetchNumberingConfig', { factory_id })
 }
 
-export async function saveNumberingConfig(factory_id: string, config: Record<DocType, { prefix: string; suffix: string }>): Promise<void> {
+export async function saveNumberingConfig(factory_id: string, config: Record<DocType, { prefix: string; suffix: string; numberFormat?: 'standard' | 'slash_pad3' }>): Promise<void> {
   return rpcPost(RPC, 'saveNumberingConfig', { factory_id, config })
 }
 
@@ -105,8 +129,8 @@ export async function deleteProduct(id: string): Promise<void> {
   return rpcPost(RPC, 'deleteProduct', { id })
 }
 
-export async function fetchInwards(factory_id?: string): Promise<IOInward[]> {
-  return rpcPost<IOInward[]>(RPC, 'fetchInwards', { factory_id })
+export async function fetchInwards(factoryOrQuery?: string | IoDocListQuery): Promise<IoPage<IOInward>> {
+  return rpcPost<IoPage<IOInward>>(RPC, 'fetchInwards', ioQuery(factoryOrQuery))
 }
 
 export async function saveInward(inward: Partial<IOInward> & { items: IOLineItem[] }): Promise<IOInward> {
@@ -117,8 +141,8 @@ export async function deleteInward(id: string): Promise<void> {
   return rpcPost(RPC, 'deleteInward', { id })
 }
 
-export async function fetchOutwards(factory_id?: string): Promise<IOOutward[]> {
-  return rpcPost<IOOutward[]>(RPC, 'fetchOutwards', { factory_id })
+export async function fetchOutwards(factoryOrQuery?: string | IoDocListQuery): Promise<IoPage<IOOutward>> {
+  return rpcPost<IoPage<IOOutward>>(RPC, 'fetchOutwards', ioQuery(factoryOrQuery))
 }
 
 export async function fetchOutwardByRefNo(refNo: string, factory_id?: string): Promise<IOOutward | null> {
@@ -137,8 +161,8 @@ export async function deleteOutward(id: string): Promise<void> {
   return rpcPost(RPC, 'deleteOutward', { id })
 }
 
-export async function fetchDomestics(factory_id?: string): Promise<IODomestic[]> {
-  return rpcPost<IODomestic[]>(RPC, 'fetchDomestics', { factory_id })
+export async function fetchDomestics(factoryOrQuery?: string | IoDocListQuery): Promise<IoPage<IODomestic>> {
+  return rpcPost<IoPage<IODomestic>>(RPC, 'fetchDomestics', ioQuery(factoryOrQuery))
 }
 
 export async function saveDomestic(doc: Partial<IODomestic> & { items: IOLineItem[] }): Promise<IODomestic> {
@@ -149,8 +173,8 @@ export async function deleteDomestic(id: string): Promise<void> {
   return rpcPost(RPC, 'deleteDomestic', { id })
 }
 
-export async function fetchInternationals(factory_id?: string): Promise<IOInternational[]> {
-  return rpcPost<IOInternational[]>(RPC, 'fetchInternationals', { factory_id })
+export async function fetchInternationals(factoryOrQuery?: string | IoDocListQuery): Promise<IoPage<IOInternational>> {
+  return rpcPost<IoPage<IOInternational>>(RPC, 'fetchInternationals', ioQuery(factoryOrQuery))
 }
 
 export async function saveInternational(doc: Partial<IOInternational> & { items: IOLineItem[] }): Promise<IOInternational> {
@@ -161,8 +185,8 @@ export async function deleteInternational(id: string): Promise<void> {
   return rpcPost(RPC, 'deleteInternational', { id })
 }
 
-export async function fetchQuotations(factory_id?: string): Promise<IOQuotation[]> {
-  return rpcPost<IOQuotation[]>(RPC, 'fetchQuotations', { factory_id })
+export async function fetchQuotations(factoryOrQuery?: string | IoDocListQuery): Promise<IoPage<IOQuotation>> {
+  return rpcPost<IoPage<IOQuotation>>(RPC, 'fetchQuotations', ioQuery(factoryOrQuery))
 }
 
 export async function saveQuotation(doc: Partial<IOQuotation> & { items: IOQuotationItem[] }): Promise<IOQuotation> {
@@ -175,16 +199,6 @@ export async function deleteQuotation(id: string): Promise<void> {
 
 export async function fetchIOStats(factory_id?: string): Promise<{ inward: number; outward: number; domestic: number; international: number; quotations: number }> {
   return rpcPost(RPC, 'fetchIOStats', { factory_id })
-}
-
-export async function fetchIODashboard(factory_id?: string): Promise<{
-  stats: { inward: number; outward: number; domestic: number; international: number; quotations: number }
-  recentInwards: IOInward[]
-  recentOutwards: IOOutward[]
-  recentDomestics: IODomestic[]
-  recentInternationals: IOInternational[]
-}> {
-  return rpcPost(RPC, 'fetchIODashboard', { factory_id })
 }
 
 export const fmtDate = (d?: string | null) =>

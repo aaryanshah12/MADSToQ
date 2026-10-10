@@ -1,4 +1,4 @@
-import { getAuthHeaders } from '@madstoq/core'
+import { getAuthHeaders } from '@madstoq/core/api-fetch'
 
 export type OutwardEntry = {
   id?: string
@@ -20,28 +20,32 @@ type ApiResponse<T> = { error?: string; [key: string]: any } & T
 
 const round2 = (v: number) => Math.round((v ?? 0) * 100) / 100
 
+async function authHeaders(): Promise<Record<string, string>> {
+  return getAuthHeaders()
+}
 
 export const computeReal = (entry: Pick<OutwardEntry, 'as_is' | 'purity'>) =>
   round2((Number(entry.as_is ?? 0) * Number(entry.purity ?? 0)) / 100)
 
 export async function fetchOutwardEntries(params: { factoryIds?: string[]; from?: string; to?: string }) {
-  const headers = await getAuthHeaders()
+  const headers = await authHeaders()
   const qs = new URLSearchParams()
   if (params.factoryIds && params.factoryIds.length > 0) qs.set('factoryIds', params.factoryIds.join(','))
   if (params.from) qs.set('from', params.from)
   if (params.to) qs.set('to', params.to)
   const url = qs.toString().length ? `/api/inventory/outward?${qs.toString()}` : '/api/inventory/outward'
-  const res = await fetch(url, { headers })
+  const res = await fetch(url, { headers, credentials: 'same-origin' })
   const json: ApiResponse<{ entries: OutwardEntry[] }> = await res.json()
   if (!res.ok) throw new Error(json.error || 'Failed to fetch outward entries')
   return json.entries ?? []
 }
 
 export async function saveOutwardEntry(entry: OutwardEntry & { created_by: string }) {
-  const headers = await getAuthHeaders()
+  const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
   const res = await fetch('/api/inventory/outward', {
     method: 'POST',
     headers,
+    credentials: 'same-origin',
     body: JSON.stringify(entry),
   })
   const json: ApiResponse<{ entry: OutwardEntry }> = await res.json()
@@ -50,10 +54,11 @@ export async function saveOutwardEntry(entry: OutwardEntry & { created_by: strin
 }
 
 export async function deleteOutwardEntry(id: string) {
-  const headers = await getAuthHeaders()
+  const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
   const res = await fetch('/api/inventory/outward', {
     method: 'DELETE',
     headers,
+    credentials: 'same-origin',
     body: JSON.stringify({ id }),
   })
   const json: ApiResponse<{}> = await res.json()

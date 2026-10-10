@@ -28,7 +28,6 @@ export default function NotificationBell() {
     finally { setLoading(false) }
   }
 
-  // Initial load + polling.
   useEffect(() => {
     if (!org) return
     load()
@@ -36,7 +35,6 @@ export default function NotificationBell() {
     return () => clearInterval(t)
   }, [org?.id])
 
-  // Close on outside click.
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {

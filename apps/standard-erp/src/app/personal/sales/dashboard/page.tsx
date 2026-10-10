@@ -12,8 +12,11 @@ export default function SalesDashboard() {
   const { org, membership } = useSalesUser()
 
   const [leads, setLeads]         = useState<SalesLead[]>([])
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
   const [quotations, setQuotes]   = useState<SalesDocument[]>([])
+  const [quoteTotal, setQuoteTotal] = useState(0)
   const [pos, setPos]             = useState<SalesDocument[]>([])
+  const [poTotal, setPoTotal]     = useState(0)
   const [expenses, setExpenses]   = useState<SalesExpenseWithSplits[]>([])
   const [loading, setLoading]     = useState(true)
 
@@ -24,19 +27,28 @@ export default function SalesDashboard() {
     setLoading(true)
     try {
       const [ls, qs, ps, es] = await Promise.all([
-        fetchLeads(org.id),
-        fetchDocuments(org.id, 'quotation'),
-        fetchDocuments(org.id, 'purchase_order'),
+        fetchLeads(org.id, { page: 1, page_size: 5 }),
+        fetchDocuments(org.id, 'quotation', { page: 1, page_size: 5 }),
+        fetchDocuments(org.id, 'purchase_order', { page: 1, page_size: 5 }),
         fetchExpenses(org.id),
       ])
-      setLeads(ls); setQuotes(qs); setPos(ps); setExpenses(es)
+      setLeads(ls.rows)
+      setLeadCounts(ls.statusCounts ?? {})
+      setQuotes(qs.rows)
+      setQuoteTotal(qs.total)
+      setPos(ps.rows)
+      setPoTotal(ps.total)
+      setExpenses(es)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
   // KPIs
-  const openLeads = leads.filter(l => !['won', 'lost'].includes(l.status)).length
-  const wonLeads = leads.filter(l => l.status === 'won').length
+  const openLeads = Object.entries(leadCounts).reduce(
+    (sum, [status, count]) => sum + (status === 'won' || status === 'lost' ? 0 : count),
+    0,
+  )
+  const wonLeads = leadCounts.won ?? 0
   const pendingDue = (() => {
     if (!membership) return 0
     return expenses.reduce((sum, e) => {
@@ -58,8 +70,8 @@ export default function SalesDashboard() {
   const kpis = [
     { label: 'Open Leads',  value: openLeads,         icon: Users,         color: 'var(--color-owner)',   href: `${BASE}/leads` },
     { label: 'Won Leads',   value: wonLeads,          icon: TrendingUp,    color: 'var(--color-chemist)', href: `${BASE}/leads` },
-    { label: 'Quotations',  value: quotations.length, icon: FileText,      color: 'var(--color-inputer)', href: `${BASE}/quotations` },
-    { label: 'POs',         value: pos.length,        icon: ClipboardList, color: 'var(--color-owner)',   href: `${BASE}/purchase-orders` },
+    { label: 'Quotations',  value: quoteTotal, icon: FileText,      color: 'var(--color-inputer)', href: `${BASE}/quotations` },
+    { label: 'POs',         value: poTotal,    icon: ClipboardList, color: 'var(--color-owner)',   href: `${BASE}/purchase-orders` },
     { label: 'You owe',     value: `₹${pendingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, icon: Wallet, color: '#dc2626', href: `${BASE}/expenses` },
     { label: 'Owed to you', value: `₹${owedToMe.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,    icon: Wallet, color: '#16a34a', href: `${BASE}/expenses` },
   ]

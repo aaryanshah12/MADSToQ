@@ -1,8 +1,7 @@
 'use client'
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { authClient } from '@/lib/auth-client'
-import { setCachedAccessToken } from '@madstoq/core'
+import { useSession, signOut as nextAuthSignOut } from 'next-auth/react'
 import { clearSalesReadCache, getCurrentSalesUser } from '@madstoq/sales-system/api'
 import type { SalesOrg, SalesUser } from '@madstoq/sales-system/types'
 
@@ -29,6 +28,7 @@ const Ctx = createContext<SalesUserCtx>({
 export function SalesUserProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const { data: session, status } = useSession()
   const [authUserId, setAuthUserId] = useState<string | null>(null)
   const [authEmail, setAuthEmail] = useState<string | null>(null)
   const [membership, setMembership] = useState<SalesUser | null>(null)
@@ -36,7 +36,15 @@ export function SalesUserProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const inFlight = useRef<Promise<void> | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
+    if (status !== 'authenticated' || !session?.user?.id) {
+      setAuthUserId(null)
+      setAuthEmail(null)
+      setMembership(null)
+      setOrg(null)
+      setLoading(false)
+      return
+    }
     if (inFlight.current) return inFlight.current
     setLoading(true)
     inFlight.current = (async () => {
@@ -52,40 +60,29 @@ export function SalesUserProvider({ children }: { children: ReactNode }) {
       }
     })()
     return inFlight.current
-  }
+  }, [status, session?.user?.id])
 
   useEffect(() => {
-    let cancelled = false
-    authClient.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled) return
-      if (session?.access_token) setCachedAccessToken(session.access_token)
-      if (session?.user) void refresh()
-      else setLoading(false)
-    })
-    const { data: sub } = authClient.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION') return
-      if (session?.access_token) setCachedAccessToken(session.access_token)
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') void refresh()
-    })
-    return () => {
-      cancelled = true
-      sub.subscription.unsubscribe()
-    }
-  }, [])
+    if (status === 'loading') return
+    void refresh()
+  }, [status, session?.user?.id, refresh])
 
-  // Redirect to login when not signed in or not provisioned.
   useEffect(() => {
     if (loading) return
-    if (pathname === '/portals/demo/sales' || pathname === '/personal/sales/login') return
+    if (
+      pathname === '/personal/sales/login' ||
+      pathname === '/personal/sales/forgot-password' ||
+      pathname === '/personal/sales/reset-password'
+    ) return
     if (!authUserId || !membership) {
-      router.replace('/portals/demo/sales')
+      router.replace('/personal/sales/login')
     }
   }, [loading, authUserId, membership, pathname, router])
 
   const signOut = async () => {
     clearSalesReadCache()
-    await authClient.auth.signOut()
-    router.replace('/portals/demo/sales')
+    await nextAuthSignOut({ redirect: false })
+    router.replace('/personal/sales/login')
   }
 
   return (

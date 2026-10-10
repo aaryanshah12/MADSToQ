@@ -1,0 +1,7 @@
+{
+  "extends": "@madstoq/typescript-config/base.json",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"]
+}

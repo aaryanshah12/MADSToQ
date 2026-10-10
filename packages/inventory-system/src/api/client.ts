@@ -1,23 +1,17 @@
-import { rpcPost } from '@madstoq/core'
+import { rpcPost } from "@madstoq/core";
+import type { CreateSupplierInput } from '../services/inventory-service'
 
 const RPC = '/api/rpc/inventory'
 
 export const inventoryApi = {
   getOwnerDashboard: (factoryIds: string[]) =>
     rpcPost<{ summary: unknown[]; recentStock: unknown[]; recentUsage: unknown[] }>(RPC, 'getOwnerDashboard', { factoryIds }),
-  getOwnerDashboardBundle: (factoryIds: string[]) =>
-    rpcPost<{
-      summary: unknown[]
-      recentStock: unknown[]
-      recentUsage: unknown[]
-      loadedDrilldown: { rows: { supplier_name: string; material_type: string; tons_loaded: number }[] }
-      remainingDrilldown: {
-        rows: { invoice_number: string; material_type: string; tons_remaining: number }[]
-        stocks: { invoice_number: string; supplier_name: string | null }[]
-      }
-    }>(RPC, 'getOwnerDashboardBundle', { factoryIds }),
-  getStockPage: (factoryIds: string[]) =>
-    rpcPost<{ stock: unknown[]; factories: unknown[] }>(RPC, 'getStockPage', { factoryIds }),
+  getStockPage: (factoryIds: string[], query?: Record<string, unknown>) =>
+    rpcPost<{ stock: unknown[]; factories: unknown[]; total: number; page: number; pageSize: number }>(
+      RPC,
+      'getStockPage',
+      { factoryIds, ...query },
+    ),
   getUsagePage: (factoryIds: string[]) =>
     rpcPost<{
       usage: unknown[]
@@ -26,7 +20,11 @@ export const inventoryApi = {
       stockMap: Record<string, { supplier_name: string | null; material_type: string | null; tons_loaded: number | null; rate_per_ton?: number | null }>
     }>(RPC, 'getUsagePage', { factoryIds }),
   getReportsData: (factoryIds: string[]) =>
-    rpcPost<{ summary: unknown[]; stock: unknown[]; usage: unknown[] }>(RPC, 'getReportsData', { factoryIds }),
+    rpcPost<{
+      summary: unknown[]
+      monthly: { month: string; loaded: number; used: number }[]
+      materials: { name: string; value: number }[]
+    }>(RPC, 'getReportsData', { factoryIds }),
   getChemistDashboard: (factoryIds: string[], userId: string) =>
     rpcPost<{
       balances: unknown[]
@@ -54,8 +52,10 @@ export const inventoryApi = {
   deletePermissionOverride: (id: string) => rpcPost(RPC, 'deletePermissionOverride', { id }),
   setProfileActive: (profileId: string, isActive: boolean) =>
     rpcPost(RPC, 'setProfileActive', { profileId, isActive }),
-  createSupplier: (factoryId: string, name: string) =>
-    rpcPost(RPC, 'createSupplier', { factoryId, name }),
+  createSupplier: (factoryId: string, data: string | CreateSupplierInput) =>
+    typeof data === 'string'
+      ? rpcPost(RPC, 'createSupplier', { factoryId, name: data })
+      : rpcPost(RPC, 'createSupplier', { factoryId, ...data }),
   deleteSupplier: (id: string) => rpcPost(RPC, 'deleteSupplier', { id }),
   lookupInvoiceByNumber: (invoiceNumber: string) =>
     rpcPost<{ entry: Record<string, unknown> | null }>(RPC, 'lookupInvoiceByNumber', { invoiceNumber }),

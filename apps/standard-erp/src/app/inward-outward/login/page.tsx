@@ -1,31 +1,29 @@
 'use client'
+
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { authClient } from '@/lib/auth-client'
-import { setCachedAccessToken } from '@madstoq/core'
+import { signIn as nextAuthSignIn } from 'next-auth/react'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
-import DemoCredentials from '@/components/auth/DemoCredentials'
-import { DEMO_PORTALS } from '@/lib/demo-portals'
 
 const SESSION_KEY = 'io-last-activity'
-const EMAIL_KEY   = 'io-last-email'
+const USERNAME_KEY = 'io-last-username'
 
 export default function IOLoginPage() {
   const router = useRouter()
-  const [email, setEmail]             = useState('')
-  const [password, setPassword]       = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError]             = useState('')
-  const [loading, setLoading]         = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    persistTheme(readStoredTheme())
+    const saved = (localStorage.getItem('io-theme') as 'dark' | 'light' | null) ?? 'light'
+    document.documentElement.dataset.theme = saved
 
-    const lastEmail = localStorage.getItem(EMAIL_KEY)
-    if (lastEmail) setEmail(lastEmail)
+    const lastUsername = localStorage.getItem(USERNAME_KEY)
+    if (lastUsername) setUsername(lastUsername)
 
-    // Never carry a password across mounts (e.g. after logout).
     setPassword('')
   }, [])
 
@@ -33,13 +31,17 @@ export default function IOLoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { data, error } = await authClient.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
+    const normalized = username.trim()
+    const res = await nextAuthSignIn('credentials', {
+      username: normalized,
+      password,
+      redirect: false,
+    })
+    if (res?.error) {
+      setError('Invalid username or password')
       setLoading(false)
     } else {
-      if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
-      localStorage.setItem(EMAIL_KEY, email)
+      localStorage.setItem(USERNAME_KEY, normalized)
       localStorage.removeItem('io-factory-id')
       localStorage.setItem(SESSION_KEY, Date.now().toString())
       router.replace('/inward-outward/dashboard')
@@ -51,7 +53,6 @@ export default function IOLoginPage() {
       style={{ background: 'var(--color-bg)' }}>
       <div className="w-full max-w-sm">
 
-        {/* Brand */}
         <div className="flex flex-col items-center mb-8">
           <div className="text-5xl mb-4">📦</div>
           <div className="font-display text-2xl font-bold text-primary tracking-wider uppercase">
@@ -62,18 +63,17 @@ export default function IOLoginPage() {
           </div>
         </div>
 
-        {/* Card */}
         <div className="card p-6">
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <div>
               <label className="block text-xs font-mono uppercase tracking-widest text-muted mb-2">
-                Email
+                Username
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="your username"
                 required
                 autoComplete="username"
                 className="input w-full"
@@ -95,7 +95,7 @@ export default function IOLoginPage() {
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
-                  className="input w-full pr-14"
+                  className="input w-full pr-10"
                 />
                 <button
                   type="button"
@@ -125,10 +125,19 @@ export default function IOLoginPage() {
                 : <><LogIn size={15}/> Sign In</>
               }
             </button>
+
+            <p className="text-center text-xs text-muted pt-1">
+              <Link href="/inward-outward/forgot-password" className="text-inputer hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
-          <DemoCredentials accounts={DEMO_PORTALS['inward-outward'].accounts} />
-          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted text-center">
+              Software is managed by MADSToQ
+            </p>
+          </div>
         </div>
       </div>
     </div>

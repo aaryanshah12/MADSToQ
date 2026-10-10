@@ -1,8 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
-import { getAuthHeaders } from '@madstoq/core'
-import { invalidatePdfTemplateCache } from '@madstoq/io-system/print'
 import {
   fetchProducts, saveProduct, deleteProduct,
   fetchCompanies, saveCompany, deleteCompany,
@@ -20,8 +18,12 @@ import CompanyModal from '@/components/io/CompanyModal'
 import clsx from 'clsx'
 import {
   Package, Building2, Ruler, MapPin, FileText, Hash,
-  Plus, Pencil, Trash2, Search, Upload, X, Save, CheckCircle, AlertCircle, Printer,
+  Plus, Pencil, Trash2, Search, Download, Upload, X, Save, CheckCircle, AlertCircle, Printer,
 } from 'lucide-react'
+import { useIoFeatures } from '@/contexts/IoFeaturesContext'
+import { IO_NUMBER_FORMAT_OPTIONS } from '@madstoq/io-system/numbering-formats'
+import { printCompanyLabel, invalidatePdfTemplateCache } from '@madstoq/io-system/print'
+import { ioPdfServeUrl } from '@/lib/io-pdf-url'
 
 type Tab = 'products' | 'companies' | 'units' | 'locations' | 'pdfs' | 'numbering'
 type LocTab = 'countries' | 'states' | 'cities'
@@ -56,7 +58,7 @@ function parseCSV(text: string): Record<string, string>[] {
 
 export default function MasterPage() {
   const { factoryId, factories } = useIOFactory()
-  const factoryName = factories.find(f => f.id === factoryId)?.name
+  const ioFeatures = useIoFeatures()
   const [tab, setTab] = useState<Tab>('products')
 
   // ── Products ──────────────────────────────────────────────────────────────
@@ -103,54 +105,42 @@ export default function MasterPage() {
   const [pdfSelected, setPdfSelected] = useState<Record<'label' | 'letter-head' | 'customer-print', string>>({
     label: '/Label.pdf',
     'letter-head': '/letter-head.pdf',
-    'customer-print': '',
+    'customer-print': '/address print.pdf',
   })
   const [pdfUseFor, setPdfUseFor] = useState<'label' | 'letter-head' | 'customer-print'>('label')
   const pdfUploadRef = useRef<HTMLInputElement>(null)
 
-  async function parsePdfApiError(res: Response): Promise<string> {
-    try {
-      const data = await res.json()
-      return data?.error || res.statusText || 'Request failed'
-    } catch {
-      return (await res.text()) || res.statusText || 'Request failed'
-    }
-  }
-
   async function loadPdfConfig() {
-    if (!factoryId) {
-      setPdfStatus('Select a factory in the header to load PDF settings for that factory.')
-      return
-    }
     try {
-      const headers = await getAuthHeaders()
-      const res = await fetch(`/api/io/upload-pdf?factoryId=${encodeURIComponent(factoryId)}`, { cache: 'no-store', headers })
-      if (!res.ok) throw new Error(await parsePdfApiError(res))
+      const res = await fetch('/api/io/upload-pdf', { cache: 'no-store' })
+      if (!res.ok) throw new Error('Failed to load PDF configuration')
       const data = await res.json()
       setPdfFiles(data.files ?? [])
       setPdfSelected(prev => ({ ...prev, ...(data.selected ?? {}) }))
-      setPdfStatus('')
     } catch (e: any) {
       setPdfStatus(`Error: ${e.message}`)
     }
   }
 
   async function handlePdfUpload(file: File) {
-    if (!factoryId) { alert('Select a factory first'); return }
     setPdfUploading(true)
     setPdfStatus('')
     try {
       const fd = new FormData()
       fd.append('action', 'upload')
-      fd.append('factoryId', factoryId)
       fd.append('file', file)
-      const headers = await getAuthHeaders()
-      const res = await fetch('/api/io/upload-pdf', { method: 'POST', headers, body: fd })
-      if (!res.ok) throw new Error(await parsePdfApiError(res))
+      const res = await fetch('/api/io/upload-pdf', { method: 'POST', body: fd })
+      if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setPdfFiles(data.files ?? [])
-      invalidatePdfTemplateCache(factoryId)
-      setPdfStatus('Uploaded successfully')
+      const filePath = data.filePath as string | undefined
+      if (filePath) {
+        const slotLabel =
+          pdfUseFor === 'letter-head' ? 'Letter Head' : pdfUseFor === 'customer-print' ? 'Customer Print' : 'Label'
+        await assignPdf(pdfUseFor, filePath, { statusMessage: `Uploaded and assigned to ${slotLabel}` })
+      } else {
+        setPdfStatus('Uploaded successfully')
+      }
     } catch (e: any) {
       setPdfStatus(`Error: ${e.message}`)
     } finally {
@@ -158,41 +148,44 @@ export default function MasterPage() {
     }
   }
 
-  async function assignPdf(slot: 'label' | 'letter-head' | 'customer-print', filePath: string) {
-    if (!factoryId) { alert('Select a factory first'); return }
+  async function assignPdf(
+    slot: 'label' | 'letter-head' | 'customer-print',
+    filePath: string,
+    opts?: { statusMessage?: string },
+  ) {
     setPdfStatus('')
     try {
       const fd = new FormData()
       fd.append('action', 'assign')
-      fd.append('factoryId', factoryId)
       fd.append('slot', slot)
       fd.append('filePath', filePath)
-      const headers = await getAuthHeaders()
-      const res = await fetch('/api/io/upload-pdf', { method: 'POST', headers, body: fd })
-      if (!res.ok) throw new Error(await parsePdfApiError(res))
+      const res = await fetch('/api/io/upload-pdf', { method: 'POST', body: fd })
+      if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setPdfSelected(prev => ({ ...prev, ...(data.selected ?? {}) }))
-      invalidatePdfTemplateCache(factoryId)
-      setPdfStatus('Template mapping saved for this factory')
+      invalidatePdfTemplateCache()
+      setPdfStatus(opts?.statusMessage ?? 'Template mapping saved')
     } catch (e: any) {
       setPdfStatus(`Error: ${e.message}`)
     }
   }
 
   // ── Numbering ─────────────────────────────────────────────────────────────
-  const [numbering, setNumbering] = useState<Record<string, { prefix: string; suffix: string }>>({
-    inward: { prefix: '', suffix: '' },
-    outward: { prefix: '', suffix: '' },
-    domestic: { prefix: '', suffix: '' },
-    international: { prefix: '', suffix: '' },
-    quotation: { prefix: '', suffix: '' },
+  const [numbering, setNumbering] = useState<Record<string, { prefix: string; suffix: string; numberFormat: 'standard' | 'slash_pad3' }>>({
+    inward: { prefix: '', suffix: '', numberFormat: 'standard' },
+    outward: { prefix: '', suffix: '', numberFormat: 'standard' },
+    domestic: { prefix: '', suffix: '', numberFormat: 'standard' },
+    international: { prefix: '', suffix: '', numberFormat: 'standard' },
+    quotation: { prefix: '', suffix: '', numberFormat: 'standard' },
   })
   const [numberingLoading, setNumberingLoading] = useState(false)
   const [numberingSaved, setNumberingSaved] = useState(false)
   const [numberingError, setNumberingError] = useState('')
 
-  function getNum(key: string) { return numbering[key] ?? { prefix: '', suffix: '' } }
-  function setNum(key: string, field: 'prefix' | 'suffix', val: string) {
+  function getNum(key: string) {
+    return numbering[key] ?? { prefix: '', suffix: '', numberFormat: 'standard' as const }
+  }
+  function setNum(key: string, field: 'prefix' | 'suffix' | 'numberFormat', val: string) {
     setNumbering(n => ({ ...n, [key]: { ...getNum(key), [field]: val } }))
     setNumberingSaved(false)
     setNumberingError('')
@@ -390,56 +383,19 @@ export default function MasterPage() {
 
   const Spinner = () => <div className="py-12 text-center"><div className="inline-block w-6 h-6 border-2 border-inputer border-t-transparent rounded-full animate-spin"/></div>
 
-  function printCompanyDetails(company: IOCompany) {
-    const escapeHtml = (s: string) =>
-      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-
-    const location = [company.city?.name, company.state?.name, company.country?.name, company.pincode].filter(Boolean).join(', ')
-    const fullAddress = [company.address, location].filter(Boolean).join(', ')
-    const contactBits = [company.person_name, company.mobile].filter(Boolean) as string[]
-    const contactLine = contactBits.join('. ')
-
-    const html = `
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>${escapeHtml(company.company_name)}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
-            .to { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
-            .contact { font-size: 14px; margin: 0 0 6px; }
-            .address {
-              font-size: 14px;
-              line-height: 1.4;
-              margin: 0;
-              display: -webkit-box;
-              -webkit-line-clamp: 2;
-              -webkit-box-orient: vertical;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              max-height: calc(1.4em * 2);
-            }
-            @media print { @page { margin: 12mm; } }
-          </style>
-        </head>
-        <body>
-          <p class="to">To ${escapeHtml(company.company_name)}</p>
-          ${contactLine ? `<p class="contact">${escapeHtml(contactLine)}</p>` : ''}
-          ${fullAddress ? `<p class="address">${escapeHtml(fullAddress)}</p>` : '<p class="address">No address available</p>'}
-          <script>window.onload = () => window.print()</script>
-        </body>
-      </html>
-    `
-    const w = window.open('', '_blank')
-    if (!w) return
-    w.document.open()
-    w.document.write(html)
-    w.document.close()
+  async function handlePrintCompany(company: IOCompany) {
+    try {
+      const fresh =
+        (await fetchCompanies('all', factoryId || undefined)).find((c) => c.id === company.id) ?? company
+      await printCompanyLabel(fresh)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to print company label'
+      alert(msg)
+    }
   }
 
   return (
-    <div className="p-4 lg:p-6 max-w-6xl mx-auto">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto w-full min-w-0">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-primary">Master</h1>
         <p className="text-sm text-muted mt-0.5">Manage products, companies, units and locations</p>
@@ -466,7 +422,7 @@ export default function MasterPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-sm text-muted">{filteredProducts.length} products</p>
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => setShowImport(true)} className="btn btn-ghost"><Upload size={14}/> Import CSV</button>
+              <button onClick={() => setShowImport(true)} className="btn btn-ghost"><Download size={14}/> Import CSV</button>
               <button onClick={() => { setEditingProduct(null); setShowProductModal(true) }} className="btn btn-inputer"><Plus size={14}/> New Product</button>
             </div>
           </div>
@@ -474,7 +430,30 @@ export default function MasterPage() {
             <Search size={14} className="text-muted flex-shrink-0"/>
             <input value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Search products, HSN code…" className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
           </div>
-          <div className="card overflow-hidden">
+          <div className="lg:hidden space-y-3">
+            {prodLoading ? <div className="card py-12 text-center"><Spinner/></div>
+            : filteredProducts.length === 0 ? <div className="rounded-2xl border border-dashed border-border bg-panel p-8 text-center text-muted text-sm">No products found</div>
+            : filteredProducts.map(row => (
+              <div key={row.id} className="rounded-2xl border border-border bg-panel p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold text-primary">{row.product_name}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                      <span>HSN: <span className="font-mono">{row.hsn_code ?? '—'}</span></span>
+                      <span>{row.unit ? `${row.unit.name}${row.unit.abbreviation ? ` (${row.unit.abbreviation})` : ''}` : '—'}</span>
+                      <span>{row.rate != null ? `₹${row.rate}` : '—'}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button onClick={() => { setEditingProduct(row); setShowProductModal(true) }} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" aria-label={`Edit ${row.product_name}`}><Pencil size={13}/></button>
+                    <button onClick={async () => { if (!confirm('Delete product?')) return; await deleteProduct(row.id); loadProducts() }} className="p-1.5 rounded hover:bg-layer text-muted hover:text-red-400 transition-colors" aria-label={`Delete ${row.product_name}`}><Trash2 size={13}/></button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card hidden overflow-hidden lg:block">
+            <div className="table-scroll-wrap">
             <table className="data-table">
               <thead><tr><th>Product Name</th><th>HSN Code</th><th>Unit</th><th className="text-right">Rate</th><th/></tr></thead>
               <tbody>
@@ -494,6 +473,7 @@ export default function MasterPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -504,7 +484,7 @@ export default function MasterPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-sm text-muted">{filteredCompanies.length} companies</p>
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => setShowCompImport(true)} className="btn btn-ghost"><Upload size={14}/> Import CSV</button>
+              <button onClick={() => setShowCompImport(true)} className="btn btn-ghost"><Download size={14}/> Import CSV</button>
               <button onClick={() => { setEditingCompany(null); setShowCompanyModal(true) }} className="btn btn-inputer"><Plus size={14}/> New Company</button>
             </div>
           </div>
@@ -519,6 +499,7 @@ export default function MasterPage() {
             </select>
           </div>
           <div className="card overflow-hidden">
+            <div className="table-scroll-wrap">
             <table className="data-table">
               <thead><tr><th>Company</th><th>Contact</th><th>Type</th><th>Location</th><th/></tr></thead>
               <tbody>
@@ -531,13 +512,13 @@ export default function MasterPage() {
                       {row.email && <div className="text-[11px] text-muted">{row.email}</div>}
                     </td>
                     <td className="text-xs text-muted">
-                      <div>{row.person_name ?? '—'}</div>
+                      <div>{[row.person_title, row.person_name].filter(Boolean).join(' ') || '—'}</div>
                       {row.mobile && <div>{row.mobile}</div>}
                     </td>
                     <td><span className={typeBadge(row.company_type)}>{row.company_type}</span></td>
                     <td className="text-xs text-muted">{[row.city?.name, row.state?.name, row.country?.name].filter(Boolean).join(', ') || '—'}</td>
                     <td className="text-right"><div className="flex items-center justify-end gap-1">
-                      <button onClick={() => printCompanyDetails(row)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="Print company"><Printer size={13}/></button>
+                      <button onClick={() => handlePrintCompany(row)} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors" title="Print address label"><Printer size={13}/></button>
                       <button onClick={() => { setEditingCompany(row); setShowCompanyModal(true) }} className="p-1.5 rounded hover:bg-layer text-muted hover:text-inputer transition-colors"><Pencil size={13}/></button>
                       <button onClick={async () => { if (!confirm('Deactivate company?')) return; await deleteCompany(row.id); loadCompanies() }} className="p-1.5 rounded hover:bg-layer text-muted hover:text-red-400 transition-colors"><Trash2 size={13}/></button>
                     </div></td>
@@ -545,6 +526,7 @@ export default function MasterPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -557,6 +539,7 @@ export default function MasterPage() {
             <button onClick={openNewUnit} className="btn btn-inputer"><Plus size={14}/> New Unit</button>
           </div>
           <div className="card overflow-hidden">
+            <div className="table-scroll-wrap">
             <table className="data-table">
               <thead><tr><th>Name</th><th>Abbreviation</th><th/></tr></thead>
               <tbody>
@@ -574,6 +557,7 @@ export default function MasterPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -605,6 +589,7 @@ export default function MasterPage() {
             </select>
           )}
           <div className="card overflow-hidden">
+            <div className="table-scroll-wrap">
             <table className="data-table">
               <thead><tr><th>Name</th><th>Code / Parent</th><th/></tr></thead>
               <tbody>
@@ -651,6 +636,7 @@ export default function MasterPage() {
                 </>}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -658,17 +644,9 @@ export default function MasterPage() {
       {/* ── PDFs TAB ──────────────────────────────────────────────────────── */}
       {tab === 'pdfs' && (
         <div className="space-y-4">
-          {!factoryId && (
-            <p className="text-sm text-amber-500 flex items-center gap-2"><AlertCircle size={14}/> Select a factory in the header — PDF templates are saved per factory for your account.</p>
-          )}
-          {factoryId && (
-            <p className="text-sm text-muted">
-              Settings for <span className="font-medium text-primary">{factoryName ?? 'selected factory'}</span>.
-              Upload PDFs and map slots; printing uses this factory&apos;s templates only.
-            </p>
-          )}
           <p className="text-sm text-muted">
-            Built-in templates: <span className="font-mono">Label.pdf</span>, <span className="font-mono">letter-head.pdf</span>, and <span className="font-mono">address print.pdf</span> in public. Upload here only if this factory needs different layouts.
+            Upload PDF files, then map each usage slot to any uploaded file.
+            Printing will use the selected file for each slot.
           </p>
 
           <div className="card p-4 space-y-3">
@@ -689,7 +667,7 @@ export default function MasterPage() {
                   e.target.value = ''
                 }}
               />
-              <button onClick={() => pdfUploadRef.current?.click()} disabled={pdfUploading || !factoryId} className="btn btn-inputer">
+              <button onClick={() => pdfUploadRef.current?.click()} disabled={pdfUploading} className="btn btn-inputer">
                 {pdfUploading ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> : <Upload size={14}/>}
                 Upload PDF
               </button>
@@ -700,13 +678,26 @@ export default function MasterPage() {
           </div>
 
           <div className="card overflow-hidden">
+            <div className="table-scroll-wrap">
             <table className="data-table">
               <thead><tr><th>Usage</th><th>Selected PDF</th><th className="text-right">Action</th></tr></thead>
               <tbody>
                 {([
-                  { slot: 'label', label: 'Label Print', hint: 'Inward / Outward / Domestic / International labels' },
-                  { slot: 'letter-head', label: 'Letter Head Print', hint: 'Domestic / International invoices + quotation prints' },
-                  { slot: 'customer-print', label: 'Customer Print', hint: 'Customer details print template (optional)' },
+                  {
+                    slot: 'label',
+                    label: 'Label Print',
+                    hint: ioFeatures.domestic && ioFeatures.international
+                      ? 'Inward / Outward / Domestic / International labels'
+                      : 'Inward / Outward labels',
+                  },
+                  {
+                    slot: 'letter-head',
+                    label: 'Letter Head Print',
+                    hint: ioFeatures.domestic || ioFeatures.international
+                      ? 'Domestic / International invoices + quotation prints'
+                      : 'Quotation prints',
+                  },
+                  { slot: 'customer-print', label: 'Customer Print', hint: 'Company address labels from Master → Companies (default: address print.pdf)' },
                 ] as const).map(row => (
                   <tr key={row.slot}>
                     <td>
@@ -725,30 +716,21 @@ export default function MasterPage() {
                           </option>
                         )}
                         {row.slot === 'customer-print' && (
-                          <>
-                            <option value="">Built-in simple print</option>
-                            <option value="/address print.pdf">Default (/address print.pdf)</option>
-                          </>
+                          <option value="/address print.pdf">Default (/address print.pdf)</option>
                         )}
                         {pdfFiles.map(f => <option key={`${row.slot}-${f}`} value={f}>{f}</option>)}
                       </select>
                     </td>
                     <td className="text-right">
                       {pdfSelected[row.slot] ? (
-                        <a
-                          href={`/api/io/pdf?path=${encodeURIComponent(pdfSelected[row.slot])}${factoryId ? `&factoryId=${encodeURIComponent(factoryId)}` : ''}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-inputer hover:underline"
-                        >
-                          Preview
-                        </a>
+                        <a href={ioPdfServeUrl(pdfSelected[row.slot])} target="_blank" rel="noreferrer" className="text-xs text-inputer hover:underline">Preview</a>
                       ) : <span className="text-xs text-muted">—</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -756,49 +738,48 @@ export default function MasterPage() {
       {/* ── NUMBERING TAB ─────────────────────────────────────────────────── */}
       {tab === 'numbering' && (
         <div className="space-y-4">
-          {!factoryId && (
-            <p className="text-sm text-amber-500 flex items-center gap-2"><AlertCircle size={14}/> Select a factory in the header — numbering is saved per factory for your account.</p>
-          )}
-          {factoryId && (
-            <p className="text-sm text-muted mb-1">
-              Numbering for <span className="font-medium text-primary">{factoryName ?? 'selected factory'}</span>.
-            </p>
-          )}
-          <p className="text-sm text-muted">
-            Prefix and suffix wrap the numeric core only (e.g. <span className="font-mono">1/05/26</span>), not a second copy of VH.
-            Inward, Outward, and Quotation default to prefix <span className="font-mono">VH </span>; Domestic and International use no prefix.
-            Example with prefix <span className="font-mono">AB</span>: <span className="font-mono">AB1/05/26</span> — not <span className="font-mono">ABVH1/05/26</span>.
-            Settings are saved per selected factory.
-          </p>
+          <p className="text-sm text-muted">Configure prefix, suffix, and number format per document type. Saved per factory in the database.</p>
           <div className="card overflow-hidden">
+            <div className="table-scroll-wrap">
             <table className="data-table">
-              <thead><tr><th>Document Type</th><th>Prefix</th><th>Suffix</th><th>Preview</th></tr></thead>
+              <thead><tr><th>Document Type</th><th>Prefix</th><th>Suffix</th><th>Format</th></tr></thead>
               <tbody>
                 {numberingLoading ? (
                   <tr><td colSpan={4}><Spinner/></td></tr>
                 ) : ([
                   { key: 'inward',        label: 'Inward Number'         },
                   { key: 'outward',       label: 'Outward Number'        },
-                  { key: 'domestic',      label: 'Domestic Invoice'      },
-                  { key: 'international', label: 'International Invoice'  },
+                  ...(ioFeatures.domestic ? [{ key: 'domestic' as const, label: 'Domestic Invoice' }] : []),
+                  ...(ioFeatures.international ? [{ key: 'international' as const, label: 'International Invoice' }] : []),
                   { key: 'quotation',     label: 'Quotation'             },
                 ] as const).map(({ key, label }) => (
                   <tr key={key}>
                     <td className="font-medium text-primary text-sm">{label}</td>
-                    <td className="w-40"><input value={getNum(key).prefix} onChange={e => setNum(key, 'prefix', e.target.value)} placeholder="e.g. IN/" className="input w-full py-1.5 text-sm font-mono"/></td>
+                    <td className="w-40"><input value={getNum(key).prefix} onChange={e => setNum(key, 'prefix', e.target.value)} placeholder="e.g. dfg" className="input w-full py-1.5 text-sm font-mono"/></td>
                     <td className="w-40"><input value={getNum(key).suffix} onChange={e => setNum(key, 'suffix', e.target.value)} placeholder="e.g. /24-25" className="input w-full py-1.5 text-sm font-mono"/></td>
-                    <td className="text-xs font-mono text-muted whitespace-nowrap">
-                      {(getNum(key).prefix || '') + '1/05/26' + (getNum(key).suffix || '')}
+                    <td className="min-w-[280px]">
+                      <select
+                        value={getNum(key).numberFormat}
+                        onChange={e => setNum(key, 'numberFormat', e.target.value)}
+                        className="input w-full py-1.5 text-sm"
+                      >
+                        {IO_NUMBER_FORMAT_OPTIONS.map(({ value, pattern, example }) => (
+                          <option key={value} value={value}>
+                            {pattern} (e.g. {example})
+                          </option>
+                        ))}
+                      </select>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
           {numberingError && <p className="text-xs text-red-400">{numberingError}</p>}
           <div className="flex items-center justify-end gap-3">
             {numberingSaved && <span className="text-xs text-green-500 flex items-center gap-1"><CheckCircle size={13}/> Saved</span>}
-            <button onClick={saveNumbering} disabled={!factoryId} className="btn btn-inputer"><Save size={14}/> Save Settings</button>
+            <button onClick={saveNumbering} className="btn btn-inputer"><Save size={14}/> Save Settings</button>
           </div>
         </div>
       )}
@@ -892,6 +873,7 @@ export default function MasterPage() {
                 <div>
                   <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Preview ({Math.min(csvRows.length, 5)} of {csvRows.length} rows)</p>
                   <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="table-scroll-wrap">
                     <table className="data-table">
                       <thead><tr><th>Product Name</th><th>HSN Code</th><th className="text-right">Rate</th><th>Description</th></tr></thead>
                       <tbody>
@@ -905,6 +887,7 @@ export default function MasterPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -962,6 +945,7 @@ export default function MasterPage() {
                 <div>
                   <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Preview ({Math.min(compCsvRows.length, 5)} of {compCsvRows.length} rows)</p>
                   <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="table-scroll-wrap">
                     <table className="data-table">
                       <thead><tr><th>Company Name</th><th>Type</th><th>Contact</th><th>Mobile</th><th>Email</th></tr></thead>
                       <tbody>
@@ -976,6 +960,7 @@ export default function MasterPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               )}

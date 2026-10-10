@@ -1,16 +1,20 @@
 'use client'
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import { Skeleton } from '@/components/ui'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import StatCard from '@madstoq/ui/stat-card'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { BarChart3 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { chartColors, chartTick, chartTooltip } from '@/lib/chart-theme'
+import { useInventoryFactory } from '@/contexts/InventoryFactoryContext'
+
+const COLORS = ['#00c2ff', '#00e5a0', '#f0a500', '#ff6060', '#a78bfa']
 
 export default function OwnerReportsPage() {
   const { profile, loading: authLoading } = useAuth()
+  const { factoryId: ctxFactoryId } = useInventoryFactory()
   const [factorySummary, setFactorySummary] = useState<any[]>([])
   const [monthlyData, setMonthlyData]       = useState<any[]>([])
   const [materialBreakdown, setMaterialBreakdown] = useState<any[]>([])
@@ -19,39 +23,19 @@ export default function OwnerReportsPage() {
   useEffect(() => {
     async function load() {
       if (authLoading) return
-      const factoryIds = (profile?.factories ?? []).map((f: any) => f.id).filter(Boolean)
-      if (factoryIds.length === 0) {
+      if (!ctxFactoryId) {
         setFactorySummary([]); setMonthlyData([]); setMaterialBreakdown([]); setLoading(false); return
       }
-      const { summary, stock, usage } = await inventoryApi.getReportsData(factoryIds)
+      const { summary, monthly, materials } = await inventoryApi.getReportsData([ctxFactoryId])
 
       setFactorySummary(summary ?? [])
-
-      // Monthly aggregation
-      const monthMap: Record<string, { loaded: number; used: number }> = {}
-      ;(stock ?? []).forEach((e: any) => {
-        const m = e.entry_date.slice(0, 7)
-        if (!monthMap[m]) monthMap[m] = { loaded: 0, used: 0 }
-        monthMap[m].loaded += Number(e.tons_loaded)
-      })
-      ;(usage ?? []).forEach((e: any) => {
-        const m = e.usage_date.slice(0, 7)
-        if (!monthMap[m]) monthMap[m] = { loaded: 0, used: 0 }
-        monthMap[m].used += Number(e.tons_used)
-      })
-      setMonthlyData(Object.entries(monthMap).sort().slice(-6).map(([m, v]) => ({ month: m, ...v })))
-
-      // Material breakdown
-      const matMap: Record<string, number> = {}
-      ;(stock ?? []).forEach((e: any) => {
-        matMap[e.material_type] = (matMap[e.material_type] ?? 0) + Number(e.tons_loaded)
-      })
-      setMaterialBreakdown(Object.entries(matMap).map(([name, value]) => ({ name, value: Number(value.toFixed(2)) })))
+      setMonthlyData((monthly ?? []).slice(-6))
+      setMaterialBreakdown(materials ?? [])
 
       setLoading(false)
     }
     load()
-  }, [authLoading, profile])
+  }, [authLoading, profile, ctxFactoryId])
 
   const totals = factorySummary.reduce((a, s) => ({
     value:   a.value   + Number(s.total_stock_value),
@@ -62,8 +46,8 @@ export default function OwnerReportsPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
-        <PageHeader title="Reports & Analytics" subtitle="Owner · Consolidated View" accent="owner" />
+      <div className="w-full p-4 md:p-8">
+        <PageHeader title="Reports & Analytics" subtitle="Owner · Current factory" accent="owner" />
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
           <StatCard label="Total Stock Value"  value={`₹${(totals.value/100000).toFixed(1)}L`} color="owner"   />
@@ -77,27 +61,25 @@ export default function OwnerReportsPage() {
           <div className="card p-6">
             <div className="font-mono text-xs text-muted uppercase tracking-widest mb-4">Monthly Load vs Usage (KGS)</div>
             {loading ? (
-              <div className="h-48 flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-              </div>
+              <Skeleton className="h-48 w-full rounded-lg" />
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="gLoaded" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColors[0]} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={chartColors[0]} stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#00c2ff" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#00c2ff" stopOpacity={0}/>
                     </linearGradient>
                     <linearGradient id="gUsed" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColors[1]} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={chartColors[1]} stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#00e5a0" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#00e5a0" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
-                  <YAxis tick={chartTick} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
-                  <Area type="monotone" dataKey="loaded" stroke={chartColors[0]} fill="url(#gLoaded)" strokeWidth={2} name="Loaded" />
-                  <Area type="monotone" dataKey="used"   stroke={chartColors[1]} fill="url(#gUsed)"   strokeWidth={2} name="Used"   />
+                  <XAxis dataKey="month" tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
+                  <Area type="monotone" dataKey="loaded" stroke="#00c2ff" fill="url(#gLoaded)" strokeWidth={2} name="Loaded" />
+                  <Area type="monotone" dataKey="used"   stroke="#00e5a0" fill="url(#gUsed)"   strokeWidth={2} name="Used"   />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -107,9 +89,7 @@ export default function OwnerReportsPage() {
           <div className="card p-6">
             <div className="font-mono text-xs text-muted uppercase tracking-widest mb-4">Material Breakdown</div>
             {loading ? (
-              <div className="h-48 flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-              </div>
+              <Skeleton className="h-48 w-full rounded-lg" />
             ) : materialBreakdown.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-muted text-sm">No data yet</div>
             ) : (
@@ -117,11 +97,11 @@ export default function OwnerReportsPage() {
                 <PieChart>
                   <Pie data={materialBreakdown} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name">
                     {materialBreakdown.map((_: any, i: number) => (
-                      <Cell key={i} fill={chartColors[i % chartColors.length]} />
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--color-muted)' }} />
+                  <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: '#4a6080' }} />
                 </PieChart>
               </ResponsiveContainer>
             )}

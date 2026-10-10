@@ -1,4 +1,4 @@
-import { getAuthHeaders } from '@madstoq/core'
+import { getAuthHeaders } from '@madstoq/core/api-fetch'
 
 export type InwardEntry = {
   id?: string
@@ -16,24 +16,29 @@ type ApiResponse<T> = { error?: string; [key: string]: any } & T
 
 const round3 = (v: number) => Math.round((v ?? 0) * 1000) / 1000
 
+async function authHeaders(): Promise<Record<string, string>> {
+  return getAuthHeaders()
+}
+
 export async function fetchInwardEntries(params: { factoryIds?: string[]; from?: string; to?: string }) {
-  const headers = await getAuthHeaders()
+  const headers = await authHeaders()
   const qs = new URLSearchParams()
   if (params.factoryIds && params.factoryIds.length > 0) qs.set('factoryIds', params.factoryIds.join(','))
   if (params.from) qs.set('from', params.from)
   if (params.to) qs.set('to', params.to)
   const url = qs.toString().length ? `/api/inventory/inward?${qs.toString()}` : '/api/inventory/inward'
-  const res = await fetch(url, { headers })
+  const res = await fetch(url, { headers, credentials: 'same-origin' })
   const json: ApiResponse<{ entries: InwardEntry[] }> = await res.json()
   if (!res.ok) throw new Error(json.error || 'Failed to fetch inward entries')
   return json.entries ?? []
 }
 
 export async function saveInwardEntry(entry: InwardEntry & { created_by: string }) {
-  const headers = await getAuthHeaders()
+  const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
   const res = await fetch('/api/inventory/inward', {
     method: 'POST',
     headers,
+    credentials: 'same-origin',
     body: JSON.stringify(entry),
   })
   const json: ApiResponse<{ entry: InwardEntry }> = await res.json()
@@ -42,10 +47,11 @@ export async function saveInwardEntry(entry: InwardEntry & { created_by: string 
 }
 
 export async function deleteInwardEntry(id: string) {
-  const headers = await getAuthHeaders()
+  const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
   const res = await fetch('/api/inventory/inward', {
     method: 'DELETE',
     headers,
+    credentials: 'same-origin',
     body: JSON.stringify({ id }),
   })
   const json: ApiResponse<{}> = await res.json()

@@ -1,41 +1,56 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Eye, EyeOff } from 'lucide-react'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
-import DemoCredentials from '@/components/auth/DemoCredentials'
-import { DEMO_PORTALS } from '@/lib/demo-portals'
+import { Spinner } from '@/components/ui'
 
 const EMAIL_KEY = 'inv-last-email'
 
 export default function LoginPage() {
-  const { signIn, profile, loading } = useAuth()
+  const { signIn, profile, profileError, loading, user } = useAuth()
   const router = useRouter()
   const [email, setEmail]               = useState('')
   const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError]               = useState('')
   const [signingIn, setSigningIn]       = useState(false)
+  const [awaitingProfile, setAwaitingProfile] = useState(false)
 
   useEffect(() => {
-    persistTheme(readStoredTheme())
     const lastEmail = localStorage.getItem(EMAIL_KEY)
     if (lastEmail) setEmail(lastEmail)
   }, [])
 
-  // Once profile loads after sign in, redirect based on role
+  // Wait until credentials succeed *and* the fresh profile fetch finishes.
   useEffect(() => {
-    if (!loading && profile) {
-      if (profile.role === 'owner')   router.replace('/inventory/owner')
-      if (profile.role === 'inputer') router.replace('/inventory/inputer')
-      if (profile.role === 'chemist') router.replace('/inventory/chemist')
+    if (!awaitingProfile) return
+    if (loading || !user) return
+    if (profile) {
+      if (profile.role === 'owner')              router.replace('/inventory/owner')
+      if (profile.role === 'inputer')            router.replace('/inventory/inputer')
+      if (profile.role === 'chemist')            router.replace('/inventory/chemist')
+      if (profile.role === 'accountant')         router.replace('/inventory/accountant')
+      if (profile.role === 'lab_incharge')       router.replace('/inventory/lab')
+      if (profile.role === 'warehouse_manager')  router.replace('/inventory/warehouse')
+      if (profile.role === 'plant_supervisor')   router.replace('/inventory/chemist')
+      return
     }
-  }, [profile, loading, router])
+    setError(
+      profileError
+        ? 'Could not load your inventory profile. Please try again.'
+        : 'Signed in but could not load your inventory profile. Try again or contact support.',
+    )
+    setAwaitingProfile(false)
+    setSigningIn(false)
+  }, [awaitingProfile, profile, profileError, loading, user, router])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    setSigningIn(true); setError('')
+    setSigningIn(true)
+    setAwaitingProfile(false)
+    setError('')
     localStorage.removeItem('inv-factory-id')
     const { error } = await signIn(email, password)
     if (error) {
@@ -43,12 +58,16 @@ export default function LoginPage() {
       setSigningIn(false)
     } else {
       localStorage.setItem(EMAIL_KEY, email)
-      setSigningIn(false)
+      setAwaitingProfile(true)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen grid-bg flex items-center justify-center px-4">
+      {/* Background blobs */}
+      <div className="fixed top-0 left-1/4 w-96 h-96 bg-inputer/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-owner/5 rounded-full blur-3xl pointer-events-none" />
+
       <div className="w-full max-w-md animate-fade-up">
         {/* Logo */}
         <div className="text-center mb-10">
@@ -69,10 +88,10 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="email-address" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 Email Address
               </label>
-              <input
+              <input id="email-address"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -92,7 +111,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="input-field pr-14"
+                  className="input-field pr-10"
                   placeholder="••••••••"
                   required
                   disabled={signingIn}
@@ -102,6 +121,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={15}/> : <Eye size={15}/>}
                 </button>
@@ -121,23 +141,35 @@ export default function LoginPage() {
             >
               {signingIn ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-inputer border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" accent="inputer" label="Signing in" />
                   Signing In...
                 </>
               ) : 'Sign In →'}
             </button>
+
+            <p className="text-center text-xs text-muted">
+              <Link href="/inventory/forgot-password" className="text-inputer hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
-          <DemoCredentials accounts={DEMO_PORTALS.inventory.accounts} />
-          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted text-center">
+              Software is managed by MADSToQ
+            </p>
+          </div>
         </div>
 
         {/* Role indicators */}
-        <div className="flex justify-center gap-6 mt-6">
+        <div className="flex justify-center gap-4 mt-6 flex-wrap">
           {[
-            { label: 'Owner',   color: 'text-owner'   },
-            { label: 'Inputer', color: 'text-inputer' },
-            { label: 'Chemist', color: 'text-chemist' },
+            { label: 'Owner',      color: 'text-owner'   },
+            { label: 'Inputer',    color: 'text-inputer' },
+            { label: 'Chemist',    color: 'text-chemist' },
+            { label: 'Lab',        color: 'text-chemist' },
+            { label: 'Accountant', color: 'text-pmc'     },
+            { label: 'Warehouse',  color: 'text-pmc'     },
           ].map(r => (
             <div key={r.label} className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full bg-current ${r.color}`} />

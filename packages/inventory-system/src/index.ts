@@ -1,2 +1,3 @@
-export * from './api/client'
-export * from './services/inventory-service'
+export * from "./types/inventory";
+export * from "./services";
+export { inventoryApi } from "./api/client";

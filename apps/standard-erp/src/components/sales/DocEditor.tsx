@@ -10,7 +10,7 @@ import {
   fetchDocument, saveDocument, fetchLead, setDocumentStatus, today, fmtDate,
 } from '@madstoq/sales-system/api'
 import type { SalesDocument, SalesDocType } from '@madstoq/sales-system/types'
-import RichTextEditor from '@/components/sales/RichTextEditor'
+import RichTextEditor from '@madstoq/ui/sales-rich-text-editor'
 
 const BASE_BY_TYPE: Record<SalesDocType, string> = {
   quotation: '/personal/sales/quotations',

@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, Trash2, Eye } from 'lucide-react'
-import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
+import { Plus, Pencil, Trash2, Search, Eye } from 'lucide-react'
 import { useSalesUser } from '@/contexts/SalesUserContext'
 import { fetchLeads, deleteLead, fmtDate } from '@madstoq/sales-system/api'
 import type { SalesLead, LeadStatus } from '@madstoq/sales-system/types'
+import { ListPager } from '@/components/ui/ListPager'
+import { LIST_PAGE_SIZE } from '@/lib/list-page'
 import LeadFormModal from '@/components/sales/LeadFormModal'
 
 const BASE = '/personal/sales'
@@ -16,19 +17,36 @@ export default function LeadsPage() {
   const router = useRouter()
   const { org, membership } = useSalesUser()
   const [rows, setRows] = useState<SalesLead[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
-  const [visibleCount, setVisibleCount] = useState(60)
   const [editing, setEditing] = useState<SalesLead | null>(null)
   const [showForm, setShowForm] = useState(false)
 
-  useEffect(() => { if (org) load() }, [org?.id])
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(handle)
+  }, [search])
 
-  async function load() {
+  useEffect(() => { if (org) void load(1) }, [org?.id, debouncedSearch, statusFilter])
+
+  async function load(next = 1) {
     if (!org) return
+    setPage(next)
     setLoading(true)
-    try { setRows(await fetchLeads(org.id)) }
+    try {
+      const data = await fetchLeads(org.id, {
+        page: next,
+        page_size: LIST_PAGE_SIZE,
+        q: debouncedSearch || undefined,
+        status: statusFilter,
+      })
+      setRows(data.rows)
+      setTotal(data.total)
+    }
     catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
@@ -39,19 +57,8 @@ export default function LeadsPage() {
     load()
   }
 
-  const filtered = rows.filter(r => {
-    const matchSearch = !search ||
-      r.company_name.toLowerCase().includes(search.toLowerCase()) ||
-      (r.contact_person ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (r.email ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === 'all' || r.status === statusFilter
-    return matchSearch && matchStatus
-  })
-  const visibleRows = filtered.slice(0, visibleCount)
-
-  useEffect(() => {
-    setVisibleCount(60)
-  }, [search, statusFilter])
+  const filtered = rows
+  const visibleRows = rows
 
   const statusBadge = (s: LeadStatus) => {
     const map: Record<LeadStatus, string> = {
@@ -77,35 +84,23 @@ export default function LeadsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl font-bold text-primary">Leads</h1>
-          <p className="text-sm text-muted mt-0.5">{filtered.length} of {rows.length} leads</p>
+          <p className="text-sm text-muted mt-0.5">{rows.length} of {total} leads</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn btn-owner"><Plus size={15}/> New Lead</button>
         </div>
       </div>
 
-      <ListSearchToolbar className="mb-4 flex-wrap">
-        <ListSearchField
-          value={search}
-          onChange={setSearch}
-          placeholder="Search company, contact, email…"
-          inputClassName="owner-focus"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as LeadStatus | 'all')}
-          className="input list-search-side w-full sm:w-[200px] text-sm owner-focus"
-        >
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="input flex items-center gap-2 w-full md:w-[320px]">
+          <Search size={14} className="text-muted flex-shrink-0"/>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, contact, email…" className="flex-1 bg-transparent outline-none text-sm text-primary placeholder:text-muted"/>
+        </div>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="input w-full md:w-[200px] text-sm">
           <option value="all">All statuses</option>
-          {ALL_STATUSES.map((s) => (
-            <option key={s} value={s}>{s.replace('_', ' ')}</option>
-          ))}
+          {ALL_STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
         </select>
-        <button
-          type="button"
-          onClick={() => { setEditing(null); setShowForm(true) }}
-          className={listSearchBtnClass('btn-owner')}
-        >
-          <Plus size={15} /> New Lead
-        </button>
-      </ListSearchToolbar>
+      </div>
 
       <div className="card overflow-hidden">
         {/* Mobile cards */}
@@ -215,11 +210,9 @@ export default function LeadsPage() {
           </table>
         </div>
       </div>
-      {!loading && visibleRows.length < filtered.length && (
-        <div className="mt-3 flex justify-center">
-          <button className="btn btn-ghost" onClick={() => setVisibleCount(v => v + 60)}>
-            Load More ({filtered.length - visibleRows.length} remaining)
-          </button>
+      {!loading && (
+        <div className="mt-4 flex justify-center">
+          <ListPager page={page} total={total} onPage={(next) => void load(next)} />
         </div>
       )}
 

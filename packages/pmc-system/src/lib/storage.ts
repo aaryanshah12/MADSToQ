@@ -1,4 +1,4 @@
-import type { PMCStore, PMCRawMaterial } from './types'
+import type { PMCStore } from '../types'
 
 export const STORAGE_KEY = 'pmc-store-v1'
 
@@ -6,31 +6,12 @@ const emptyStore = (): PMCStore => ({
   raw_materials: [],
   products: [],
   product_materials: [],
-  batches: [],
-  batch_lines: [],
   references: [],
   reference_prices: [],
   product_params: [],
 })
 
 export function migrateStore(store: PMCStore): PMCStore {
-  if (!store.batches) store.batches = []
-  if (!store.batch_lines) store.batch_lines = []
-
-  store.raw_materials = (store.raw_materials ?? []).map((m) => ({
-    ...m,
-    code: m.code ?? m.name.slice(0, 12).toUpperCase().replace(/\s+/g, ''),
-    price: Number((m as PMCRawMaterial).price ?? 0),
-    item_type: (m as PMCRawMaterial).item_type === 'service' ? 'service' : 'material',
-    vendor: (m as PMCRawMaterial).vendor ?? null,
-    description: (m as PMCRawMaterial).description ?? null,
-  }))
-
-  store.products = (store.products ?? []).map((p) => ({
-    ...p,
-    unit_price: Number((p as { unit_price?: number }).unit_price ?? 0),
-  }))
-
   store.product_params = store.product_params.map((p) => {
     const legacy = (p as { tons_kg?: number }).tons_kg
     const batch_multiplier =
@@ -49,6 +30,17 @@ export function migrateStore(store: PMCStore): PMCStore {
     ...m,
     is_primary: Boolean(m.is_primary),
   }))
+
+  const byProduct = new Map<string, typeof store.product_materials>()
+  for (const m of store.product_materials) {
+    const list = byProduct.get(m.product_id) ?? []
+    list.push(m)
+    byProduct.set(m.product_id, list)
+  }
+  byProduct.forEach((rows) => {
+    if (rows.some((r) => r.is_primary)) return
+    if (rows.length > 0) rows[0].is_primary = true
+  })
 
   const needsRefMigrate = store.references.some(
     (r) => !/^REF-\d{3}$/.test(r.ref_number)

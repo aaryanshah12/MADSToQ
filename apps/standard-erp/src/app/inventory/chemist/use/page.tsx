@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
+import { parseStockKind } from '@/lib/ledger-kind'
 import { usageApi } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { CheckCircle, Search, Lock, Hash, CalendarDays, Plus, Trash2 } from 'lucide-react'
@@ -67,6 +68,10 @@ export default function ChemistUsagePage() {
       setInvoiceError('Invoice not found. Please check the number.')
       return
     }
+    if (parseStockKind((entry as { stock_kind?: string }).stock_kind) !== 'rm') {
+      setInvoiceError('Log usage is for raw-material lots only. SFG, FG, and byproduct move through production or dispatch.')
+      return
+    }
     setInvoiceInfo(entry)
   }
 
@@ -76,12 +81,15 @@ export default function ChemistUsagePage() {
     setDateLoading(true); setInvoiceError(''); setDateInvoices([]); setInvoiceInfo(null)
 
     const { entries } = await inventoryApi.lookupInvoicesByDate(lookupDate)
-    if (!entries || entries.length === 0) {
-      setInvoiceError(`No invoices found for ${new Date(lookupDate + 'T00:00:00').toLocaleDateString('en-IN')}.`)
+    const rmOnly = ((entries ?? []) as Array<{ stock_kind?: string; invoice_number?: string }>).filter(
+      (e) => parseStockKind(e.stock_kind) === 'rm',
+    )
+    if (rmOnly.length === 0) {
+      setInvoiceError(`No raw-material invoices found for ${new Date(lookupDate + 'T00:00:00').toLocaleDateString('en-IN')}.`)
       setDateLoading(false)
       return
     }
-    setDateInvoices(entries)
+    setDateInvoices(rmOnly)
     setDateLoading(false)
   }
 
@@ -191,7 +199,9 @@ export default function ChemistUsagePage() {
   return (
     <AppLayout>
       <div className="p-4 md:p-8 max-w-2xl mx-auto w-full">
-        <PageHeader title="Log Material Usage" subtitle="Chemist · Consumption Entry" accent="chemist" />
+        <div className="mb-6 hidden lg:block">
+        <PageHeader title="Log raw material usage" subtitle="Chemist · RM consumption only" accent="chemist" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -413,8 +423,8 @@ export default function ChemistUsagePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Shift</label>
-                <select className="input-field chemist-focus" value={form.shift} onChange={e => update('shift', e.target.value)}>
+                <label htmlFor="shift" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Shift</label>
+                <select id="shift" className="input-field chemist-focus" value={form.shift} onChange={e => update('shift', e.target.value)}>
                   <option value="">Select shift</option>
                   <option value="morning">Morning</option>
                   <option value="afternoon">Afternoon</option>
@@ -422,12 +432,12 @@ export default function ChemistUsagePage() {
                 </select>
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Usage Date *</label>
-                <input type="date" className="input-field chemist-focus" value={form.usage_date} onChange={e => update('usage_date', e.target.value)} required />
+                <label htmlFor="usage-date" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Usage Date *</label>
+                <input id="usage-date" type="date" className="input-field chemist-focus" value={form.usage_date} onChange={e => update('usage_date', e.target.value)} required />
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Batch Month *</label>
-                <select
+                <label htmlFor="batch-month" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Batch Month *</label>
+                <select id="batch-month"
                   className="input-field chemist-focus"
                   value={form.batch_month}
                   onChange={e => update('batch_month', e.target.value)}
@@ -438,8 +448,8 @@ export default function ChemistUsagePage() {
                 </select>
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Batch ID *</label>
-                <input
+                <label htmlFor="batch-id" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Batch ID *</label>
+                <input id="batch-id"
                   className="input-field chemist-focus"
                   value={form.batch_id}
                   onChange={e => update('batch_id', e.target.value)}
@@ -450,13 +460,13 @@ export default function ChemistUsagePage() {
             </div>
 
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Process ID (optional)</label>
-              <input className="input-field chemist-focus" value={form.process_id} onChange={e => update('process_id', e.target.value)} placeholder="PROC-001" />
+              <label htmlFor="process-id-optional" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Process ID (optional)</label>
+              <input id="process-id-optional" className="input-field chemist-focus" value={form.process_id} onChange={e => update('process_id', e.target.value)} placeholder="PROC-001" />
             </div>
 
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Batch Notes (optional)</label>
-              <textarea className="input-field chemist-focus resize-none" rows={2} value={form.batch_notes} onChange={e => update('batch_notes', e.target.value)} placeholder="Any notes about this usage..." />
+              <label htmlFor="batch-notes-optional" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Batch Notes (optional)</label>
+              <textarea id="batch-notes-optional" className="input-field chemist-focus resize-none" rows={2} value={form.batch_notes} onChange={e => update('batch_notes', e.target.value)} placeholder="Any notes about this usage..." />
             </div>
           </div>
 

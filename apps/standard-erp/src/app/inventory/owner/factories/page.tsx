@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import { SpinnerBlock } from '@/components/ui'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import { factoriesApi } from '@/lib/api'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { Factory } from '@/types'
 import { Plus, Pencil, ToggleLeft, ToggleRight, Factory as FactoryIcon, MapPin, CheckCircle, Users } from 'lucide-react'
 import clsx from 'clsx'
@@ -110,7 +111,7 @@ export default function FactoriesPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="Factories"
           subtitle="Owner · Manage Factory Locations & User Access"
@@ -151,12 +152,12 @@ export default function FactoriesPage() {
             </h3>
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Factory Name *</label>
-                <input className="input-field owner-focus" value={form.name} onChange={e => update('name', e.target.value)} required placeholder="e.g. Factory Alpha" />
+                <label htmlFor="factory-name" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Factory Name *</label>
+                <input id="factory-name" className="input-field owner-focus" value={form.name} onChange={e => update('name', e.target.value)} required placeholder="e.g. Factory Alpha" />
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Location</label>
-                <input className="input-field owner-focus" value={form.location} onChange={e => update('location', e.target.value)} placeholder="e.g. Ahmedabad, Gujarat" />
+                <label htmlFor="location" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Location</label>
+                <input id="location" className="input-field owner-focus" value={form.location} onChange={e => update('location', e.target.value)} placeholder="e.g. Ahmedabad, Gujarat" />
               </div>
               <div className="col-span-2">
                 <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Materials (chip list)</label>
@@ -199,9 +200,7 @@ export default function FactoriesPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-          </div>
+          <SpinnerBlock accent="owner" label="Loading factories" className="py-20" />
         ) : factories.length === 0 ? (
           <div className="card flex flex-col items-center justify-center py-20 gap-4">
             <FactoryIcon size={40} className="text-muted" />

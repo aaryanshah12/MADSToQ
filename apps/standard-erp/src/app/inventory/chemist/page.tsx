@@ -1,17 +1,22 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
+import { EmptyState, SpinnerBlock } from '@/components/ui'
 import StatCard from '@madstoq/ui/stat-card'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { useAuth } from '@/hooks/useAuth'
+import { useInventoryFactory } from '@/contexts/InventoryFactoryContext'
 import DrilldownModal from '@madstoq/ui/drilldown-modal'
 import { DrilldownRow, fetchLoadedDrilldown, fetchRemainingDrilldown } from '@/lib/drilldown'
-import { FlaskConical, Package, AlertTriangle, TrendingUp } from 'lucide-react'
+import { FlaskConical, Package, AlertTriangle, TrendingUp, Send } from 'lucide-react'
 import Link from 'next/link'
+import { MobileCard } from '@/components/inventory/MobileList'
 
 export default function ChemistDashboard() {
   const { profile } = useAuth()
+  const { factoryId: ctxFactoryId } = useInventoryFactory()
+  const factoryId = ctxFactoryId || profile?.factories?.[0]?.id || ''
   const [balance, setBalance]         = useState<any[]>([])
   const [recentUsage, setRecentUsage] = useState<any[]>([])
   const [drilldownRows, setDrilldownRows] = useState<DrilldownRow[]>([])
@@ -23,9 +28,18 @@ export default function ChemistDashboard() {
   const [loading, setLoading]         = useState(true)
 
   useEffect(() => {
-    if (!profile?.factories) return
-    const factoryIds = profile.factories.map((f: any) => f.id)
+    if (!profile?.id || !factoryId) {
+      setBalance([])
+      setRecentUsage([])
+      setLoadedRows([])
+      setDrilldownRows([])
+      setTotalLoaded(0)
+      setLoading(false)
+      return
+    }
+    const factoryIds = [factoryId]
     async function load() {
+      setLoading(true)
       const dash = await inventoryApi.getChemistDashboard(factoryIds, profile!.id)
       const usageList = dash.recentUsage ?? []
       const stockMap = dash.stockMap ?? {}
@@ -42,11 +56,25 @@ export default function ChemistDashboard() {
       setDrilldownRows(remainingRows)
       setLoading(false)
     }
-    load()
-  }, [profile])
+    void load()
+  }, [profile, factoryId])
 
-  const totalAvailable = balance.reduce((s, b) => s + Number(b.tons_remaining), 0)
-  const lowStock       = balance.filter(b => Number(b.tons_remaining) < 5)
+  const available = useMemo(
+    () => balance.filter((b) => Number(b.tons_remaining) > 0),
+    [balance],
+  )
+  const totalAvailable = available.reduce((s, b) => s + Number(b.tons_remaining), 0)
+  const lowStock = useMemo(() => {
+    const byMaterial = new Map<string, number>()
+    for (const b of balance) {
+      const name = String(b.material_type || '').trim() || 'Unknown'
+      byMaterial.set(name, (byMaterial.get(name) ?? 0) + Number(b.tons_remaining || 0))
+    }
+    return [...byMaterial.entries()]
+      .map(([material, remaining]) => ({ material, remaining }))
+      .filter((row) => row.remaining > 0 && row.remaining < 5)
+      .sort((a, b) => a.remaining - b.remaining || a.material.localeCompare(b.material))
+  }, [balance])
 
   const openDrilldown = (title: string, rows: DrilldownRow[]) => {
     setDrilldownTitle(title)
@@ -57,13 +85,19 @@ export default function ChemistDashboard() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
+        <div className="mb-4 hidden lg:block">
         <PageHeader
           title={`Hello, ${profile?.full_name?.split(' ')[0]}`}
-          subtitle="Chemist · Stock Usage Dashboard"
+          subtitle="Chemist · plant batches & stock usage"
           accent="chemist"
-          actions={<Link href="/inventory/chemist/use" className="btn btn-chemist gap-2"><FlaskConical size={16}/> Log Usage</Link>}
+          actions={
+            <Link href="/inventory/chemist/requests?new=1" className="btn btn-chemist gap-2">
+              <Send size={16} /> Request material
+            </Link>
+          }
         />
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
           <StatCard
@@ -85,17 +119,19 @@ export default function ChemistDashboard() {
             actionLabel="Drill down"
           />
           <StatCard label="Active Batches"   value={balance.length}                  icon={<FlaskConical size={18}/>}  color="inputer" sub="Invoices with stock"   />
-          <StatCard label="Low Stock Alerts" value={lowStock.length}                 icon={<AlertTriangle size={18}/>} color={lowStock.length > 0 ? 'owner' : 'muted'} sub="< 5 KGS remaining" />
+          <StatCard label="Low Stock Alerts" value={lowStock.length}                 icon={<AlertTriangle size={18}/>} color={lowStock.length > 0 ? 'owner' : 'muted'} sub="Materials under 5 KGS" />
         </div>
 
         {/* Low stock alert banner */}
         {lowStock.length > 0 && (
-          <div className="bg-owner/8 border border-owner/25 rounded-xl p-4 mb-6 flex items-start gap-3">
-            <AlertTriangle size={18} className="text-owner flex-shrink-0 mt-0.5" />
+          <div role="alert" className="alert-warning mb-6 flex items-start gap-3 rounded-xl p-4">
+            <span className="alert-warning-icon mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
+              <AlertTriangle size={18} />
+            </span>
             <div>
-              <div className="text-sm font-semibold text-owner mb-1">Low Stock Warning</div>
-              <div className="text-xs text-muted">
-                {lowStock.map(b => `${b.invoice_number}: ${Number(b.tons_remaining).toFixed(1)} KGS remaining`).join(' · ')}
+              <div className="alert-warning-title mb-1 text-sm font-semibold">Low Stock Warning</div>
+              <div className="alert-warning-body text-xs font-medium">
+                {lowStock.map((row) => `${row.material}: ${row.remaining.toFixed(1)} KGS remaining`).join(' · ')}
               </div>
             </div>
           </div>
@@ -109,9 +145,7 @@ export default function ChemistDashboard() {
               <div className="text-[10px] text-muted mt-0.5">Rates are hidden — quantity only</div>
             </div>
             {loading ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="w-5 h-5 border-2 border-chemist border-t-transparent rounded-full animate-spin" />
-              </div>
+              <SpinnerBlock accent="chemist" size="md" label="Loading recent usage" className="py-10" />
             ) : (
               <>
                 <div className="hidden md:block overflow-x-auto">
@@ -120,13 +154,13 @@ export default function ChemistDashboard() {
                       <tr><th>Invoice No.</th><th>Factory</th><th>Material</th><th>Available</th></tr>
                     </thead>
                     <tbody>
-                      {balance.filter(b => Number(b.tons_remaining) > 0).map(b => (
-                        <tr key={b.invoice_number}>
-                          <td className="font-mono text-inputer text-xs">{b.invoice_number}</td>
+                      {available.map(b => (
+                        <tr key={`${b.invoice_number}-${b.material_type}`}>
+                          <td className="font-mono text-primary text-xs">{b.invoice_number}</td>
                           <td className="text-primary text-xs">{b.factory_name}</td>
                           <td className="text-muted">{b.material_type}</td>
                           <td>
-                            <span className={`font-mono font-bold ${Number(b.tons_remaining) < 5 ? 'text-owner' : 'text-chemist'}`}>
+                            <span className={`font-mono font-bold ${Number(b.tons_remaining) < 5 ? 'badge badge-warning' : 'text-primary'}`}>
                               {Number(b.tons_remaining).toFixed(3)} KGS
                             </span>
                           </td>
@@ -139,28 +173,29 @@ export default function ChemistDashboard() {
                   </table>
                 </div>
 
-                <div className="md:hidden data-card-list p-4">
-                  {balance.length === 0 && (
-                    <div className="text-center text-muted py-6 border border-dashed border-[color-mix(in srgb, var(--color-border) 80%, transparent)] rounded-lg">
-                      No stock available
-                    </div>
+                <div className="md:hidden space-y-3 p-4">
+                  {available.length === 0 && (
+                    <EmptyState className="rounded-xl bg-panel" title="No stock available" />
                   )}
-                  {balance.filter(b => Number(b.tons_remaining) > 0).map(b => (
-                    <div key={b.invoice_number} className="data-card">
-                      <div className="data-card-header">
-                        <span className="data-card-title text-inputer">{b.invoice_number}</span>
-                        <span className="data-card-meta">{b.factory_name}</span>
-                      </div>
-                      <div className="data-card-grid">
-                        <span className="data-card-label">Material</span>
-                        <span className="text-muted text-right">{b.material_type}</span>
-
-                        <span className="data-card-label">Available</span>
-                        <span className={`font-mono font-bold text-right ${Number(b.tons_remaining) < 5 ? 'text-owner' : 'text-chemist'}`}>
-                          {Number(b.tons_remaining).toFixed(3)} KGS
-                        </span>
-                      </div>
-                    </div>
+                  {available.map((b) => (
+                    <MobileCard
+                      key={`${b.invoice_number}-${b.material_type}`}
+                      id={b.invoice_number}
+                      title={b.material_type || '—'}
+                      subtitle={b.factory_name}
+                      aside={
+                        <>
+                          <span
+                            className={`block text-base font-medium tabular-nums ${
+                              Number(b.tons_remaining) < 5 ? 'text-amber-700' : 'text-primary'
+                            }`}
+                          >
+                            {Number(b.tons_remaining).toFixed(3)}
+                          </span>
+                          <span className="block text-[10px] uppercase tracking-wider text-muted">KGS</span>
+                        </>
+                      }
+                    />
                   ))}
                 </div>
               </>
@@ -171,7 +206,7 @@ export default function ChemistDashboard() {
           <div className="card overflow-hidden">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between">
               <div className="font-mono text-xs text-muted uppercase tracking-widest">My Recent Usage</div>
-              <Link href="/inventory/chemist/history" className="text-xs text-chemist hover:underline font-mono">View All →</Link>
+              <Link href="/inventory/chemist/history" className="text-xs text-primary hover:underline font-mono">View All →</Link>
             </div>
             <div className="overflow-x-auto hidden md:block">
               <table className="data-table">
@@ -182,47 +217,54 @@ export default function ChemistDashboard() {
                   {recentUsage.map(u => (
                     <tr key={u.id}>
                       <td className="text-sm">
-                        <div className="text-chemist font-semibold">{u.stock_entries?.supplier_name ?? '—'}</div>
-                        <div className="text-primary text-xs">{u.stock_entries?.material_type ?? '—'}</div>
+                        <div className="text-primary font-semibold">{u.stock_entries?.supplier_name ?? '—'}</div>
+                        <div className="text-muted text-xs">{u.stock_entries?.material_type ?? '—'}</div>
                       </td>
-                      <td className="font-mono text-chemist text-xs">{u.invoice_number}</td>
+                      <td className="font-mono text-primary text-xs">{u.invoice_number}</td>
                       <td className="text-primary text-xs">{u.factories?.name}</td>
-                      <td className="font-mono text-chemist">{u.tons_used} KGS</td>
+                      <td className="font-mono text-primary">{u.tons_used} KGS</td>
                       <td className="text-muted text-xs">{new Date(u.usage_date).toLocaleDateString('en-IN')}</td>
                     </tr>
                   ))}
                   {recentUsage.length === 0 && (
                     <tr><td colSpan={4} className="text-center text-muted py-8">
-                      No usage logged yet. <Link href="/inventory/chemist/use" className="text-chemist">Log now →</Link>
+                      No usage logged yet. <Link href="/inventory/chemist/use" className="text-primary hover:underline">Log now →</Link>
                     </td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="md:hidden data-card-list p-4">
+            <div className="md:hidden space-y-3 p-4">
               {recentUsage.length === 0 && (
-                <div className="text-center text-muted py-6 border border-dashed border-[color-mix(in srgb, var(--color-border) 80%, transparent)] rounded-lg">
-                  No usage logged yet. <Link href="/inventory/chemist/use" className="text-chemist">Log now →</Link>
-                </div>
+                <EmptyState
+                  className="rounded-xl bg-panel"
+                  title="No usage logged yet"
+                  description="Log raw-material consumption from a production batch or the usage form."
+                  action={
+                    <Link href="/inventory/chemist/use" className="btn btn-chemist">
+                      Log usage
+                    </Link>
+                  }
+                />
               )}
-              {recentUsage.map(u => (
-                <div key={u.id} className="data-card">
-                  <div className="data-card-header">
-                    <div>
-                      <div className="text-chemist font-semibold text-sm">{u.stock_entries?.supplier_name ?? '—'}</div>
-                      <div className="text-primary text-xs">{u.stock_entries?.material_type ?? '—'}</div>
-                      <div className="data-card-title font-mono text-[11px] text-muted">{u.invoice_number}</div>
-                    </div>
-                    <span className="data-card-meta">{new Date(u.usage_date).toLocaleDateString('en-IN')}</span>
-                  </div>
-                  <div className="data-card-grid">
-                    <span className="data-card-label">Factory</span>
-                    <span className="data-card-value">{u.factories?.name ?? '—'}</span>
-
-                    <span className="data-card-label">Used</span>
-                    <span className="font-mono text-chemist text-right">{u.tons_used} KGS</span>
-                  </div>
-                </div>
+              {recentUsage.map((u) => (
+                <MobileCard
+                  key={u.id}
+                  id={u.invoice_number}
+                  title={u.stock_entries?.supplier_name ?? '—'}
+                  subtitle={u.stock_entries?.material_type}
+                  aside={
+                    <>
+                      <span className="block text-base font-medium tabular-nums text-primary">
+                        {u.tons_used} KGS
+                      </span>
+                      <span className="block text-[10px] uppercase tracking-wider text-muted">
+                        {new Date(u.usage_date).toLocaleDateString('en-IN')}
+                      </span>
+                    </>
+                  }
+                  rows={[{ label: 'Factory', value: u.factories?.name ?? '—' }]}
+                />
               ))}
             </div>
           </div>
@@ -236,6 +278,13 @@ export default function ChemistDashboard() {
         loading={drilldownLoading}
         onClose={() => setDrilldownOpen(false)}
       />
+      <Link
+        href="/inventory/chemist/requests?new=1"
+        className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 inline-flex h-12 items-center gap-2 rounded-full bg-text px-5 text-sm font-medium text-panel shadow-lg lg:hidden"
+      >
+        <Send size={18} />
+        Request
+      </Link>
     </AppLayout>
   )
 }

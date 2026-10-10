@@ -1,4 +1,12 @@
-export type Role = 'owner' | 'inputer' | 'chemist'
+export type Role =
+  | 'owner'
+  | 'inputer'
+  | 'chemist'
+  | 'accountant'
+  | 'warehouse_manager'
+  | 'lab_incharge'
+  /** @deprecated migrated to chemist — kept for session edge cases */
+  | 'plant_supervisor'
 export type Shift = 'morning' | 'afternoon' | 'night'
 
 export interface Factory {
@@ -7,7 +15,14 @@ export interface Factory {
   location: string | null
   is_active: boolean
   created_at: string
-  materials?: string[] | null
+  materials?: (string | { name: string; hsn?: string; hsnCode?: string })[] | null
+  company_address?: string | null
+  pan_number?: string | null
+  gst_number?: string | null
+  gst_range?: string | null
+  gst_division?: string | null
+  commissionerate?: string | null
+  email?: string | null
 }
 
 export interface Profile {

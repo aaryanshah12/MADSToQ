@@ -1,18 +1,24 @@
 import { createRpcRoute, type RpcHandler } from '@madstoq/database'
-import * as sales from '@madstoq/sales-system/services'
-import type { SalesDocType, DocStatus, ActivityType, SplitMethod } from '@madstoq/sales-system/types'
+import * as sales from "@madstoq/sales-system/services";
+import type { SalesDocType, DocStatus } from "@madstoq/sales-system/types";
 
 const handlers: Record<string, RpcHandler> = {
   getCurrentSalesUser: () => sales.getCurrentSalesUser(),
   fetchOrgUsers: (p) => sales.fetchOrgUsers(p.orgId as string),
-  fetchLeads: (p) => sales.fetchLeads(p.orgId as string),
+  fetchLeads: (p) =>
+    p.page != null || p.page_size != null || p.q || p.status
+      ? sales.fetchLeads(p.orgId as string, p as sales.SalesListQuery)
+      : sales.fetchLeads(p.orgId as string),
   fetchLead: (p) => sales.fetchLead(p.id as string),
   saveLead: (p) => sales.saveLead(p.lead as Parameters<typeof sales.saveLead>[0]),
   deleteLead: (p) => sales.deleteLead(p.id as string),
   fetchLeadActivities: (p) => sales.fetchLeadActivities(p.leadId as string),
   addLeadActivity: (p) => sales.addLeadActivity(p as Parameters<typeof sales.addLeadActivity>[0]),
   nextDocNumber: (p) => sales.nextDocNumber(p.orgId as string, p.docType as SalesDocType),
-  fetchDocuments: (p) => sales.fetchDocuments(p.orgId as string, p.docType as SalesDocType | undefined),
+  fetchDocuments: (p) =>
+    p.page != null || p.page_size != null || p.q
+      ? sales.fetchDocuments(p.orgId as string, p.docType as SalesDocType | undefined, p as sales.SalesListQuery)
+      : sales.fetchDocuments(p.orgId as string, p.docType as SalesDocType | undefined),
   fetchDocument: (p) => sales.fetchDocument(p.id as string),
   saveDocument: (p) => sales.saveDocument(p.doc as Parameters<typeof sales.saveDocument>[0]),
   deleteDocument: (p) => sales.deleteDocument(p.id as string),

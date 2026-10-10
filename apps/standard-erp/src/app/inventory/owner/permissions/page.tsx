@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { usersApi } from '@/lib/api'
 import { Profile, PermissionOverride } from '@/types'
-import { Shield, Plus, Trash2, ToggleLeft, ToggleRight, UserCheck, UserX } from 'lucide-react'
+import { Shield, Plus, Trash2, ToggleLeft, ToggleRight, UserCheck, UserX, Users } from 'lucide-react'
 import clsx from 'clsx'
+import { EmptyState, Skeleton } from '@/components/ui'
 
 const FEATURES = [
   { key: 'view_stock_balance',   label: 'View Stock Balance',   roles: ['inputer','chemist'] },
@@ -97,7 +98,7 @@ export default function PermissionsPage() {
 
   return (
     <AppLayout>
-      <div className="p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="Permission Management"
           subtitle="Owner · User Access Control"
@@ -121,28 +122,28 @@ export default function PermissionsPage() {
             <h3 className="font-display text-lg font-semibold text-owner mb-4 uppercase tracking-wide">Create New User</h3>
             <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Full Name</label>
-                <input className="input-field owner-focus" value={newUser.full_name} onChange={e=>setNewUser({...newUser,full_name:e.target.value})} required placeholder="Ramesh Kumar" />
+                <label htmlFor="full-name" className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Full Name</label>
+                <input id="full-name" className="input-field owner-focus" value={newUser.full_name} onChange={e=>setNewUser({...newUser,full_name:e.target.value})} required placeholder="Ramesh Kumar" />
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Email</label>
-                <input type="email" className="input-field owner-focus" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})} required placeholder="user@factory.com" />
+                <label htmlFor="email" className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Email</label>
+                <input id="email" type="email" className="input-field owner-focus" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})} required placeholder="user@factory.com" />
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Phone</label>
-                <input className="input-field owner-focus" value={newUser.phone} onChange={e=>setNewUser({...newUser,phone:e.target.value})} placeholder="+91 99999 00000" />
+                <label htmlFor="phone" className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Phone</label>
+                <input id="phone" className="input-field owner-focus" value={newUser.phone} onChange={e=>setNewUser({...newUser,phone:e.target.value})} placeholder="+91 99999 00000" />
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Role</label>
-                <select className="input-field owner-focus" value={newUser.role} onChange={e=>setNewUser({...newUser,role:e.target.value})}>
+                <label htmlFor="role" className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Role</label>
+                <select id="role" className="input-field owner-focus" value={newUser.role} onChange={e=>setNewUser({...newUser,role:e.target.value})}>
                   <option value="owner">Owner</option>
                   <option value="inputer">Inputer</option>
                   <option value="chemist">Chemist</option>
                 </select>
               </div>
               <div>
-                <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Temp Password</label>
-                <input type="password" className="input-field owner-focus" value={newUser.password} onChange={e=>setNewUser({...newUser,password:e.target.value})} required placeholder="Min 8 characters" minLength={8} />
+                <label htmlFor="temp-password" className="block font-mono text-xs text-muted uppercase tracking-widest mb-1.5">Temp Password</label>
+                <input id="temp-password" type="password" className="input-field owner-focus" value={newUser.password} onChange={e=>setNewUser({...newUser,password:e.target.value})} required placeholder="Min 8 characters" minLength={8} />
               </div>
               <div className="flex items-end gap-3">
                 <button type="submit" disabled={saving} className="btn btn-owner flex-1 justify-center">
@@ -160,10 +161,25 @@ export default function PermissionsPage() {
           {/* User list */}
           <div className="col-span-1 card overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
-              <div className="font-mono text-xs text-muted uppercase tracking-widest">Users ({users.length})</div>
+            <div className="font-mono text-xs text-muted uppercase tracking-widest">
+              Users{loading ? '' : ` (${users.length})`}
             </div>
-            <div className="divide-y divide-border">
-              {users.map(user => (
+          </div>
+          <div className="divide-y divide-border">
+            {loading && (
+              <div className="space-y-4 px-5 py-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-9 w-9 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-3.5 w-32" />
+                      <Skeleton className="h-2.5 w-16" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!loading && users.map(user => (
                 <button
                   key={user.id}
                   onClick={() => setSelected(user.id)}
@@ -187,8 +203,13 @@ export default function PermissionsPage() {
                   {!user.is_active && <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" title="Inactive" />}
                 </button>
               ))}
-              {users.length === 0 && (
-                <div className="px-5 py-8 text-center text-sm text-muted">No users yet</div>
+              {!loading && users.length === 0 && (
+                <EmptyState
+                  icon={<Users size={24} strokeWidth={1.5} />}
+                  title="No users yet"
+                  description="Users you create will appear here, where you can override their default role permissions."
+                  className="py-8"
+                />
               )}
             </div>
           </div>
@@ -253,6 +274,9 @@ export default function PermissionsPage() {
                             onClick={() => toggleFeature(selectedUser.id, feature.key, isAllowed)}
                             disabled={saving}
                             className={clsx('transition-all', isAllowed ? 'text-chemist' : 'text-muted')}
+                            role="switch"
+                            aria-checked={isAllowed}
+                            aria-label={feature.label}
                           >
                             {isAllowed
                               ? <ToggleRight size={32} />
@@ -286,6 +310,7 @@ export default function PermissionsPage() {
                               await loadData()
                             }}
                             className="text-muted hover:text-red-400 transition-colors"
+                            aria-label={`Remove override for ${o.feature.replace(/_/g, ' ')}`}
                           >
                             <Trash2 size={15} />
                           </button>

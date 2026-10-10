@@ -2,18 +2,20 @@
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import StatCard from '@madstoq/ui/stat-card'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { FactorySummary } from '@/types'
 import DrilldownModal from '@madstoq/ui/drilldown-modal'
-import { DrilldownRow } from '@/lib/drilldown'
+import { DrilldownRow, fetchLoadedDrilldown, fetchRemainingDrilldown } from '@/lib/drilldown'
 import { Package, FlaskConical, Factory, TrendingUp, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useAuth } from '@/hooks/useAuth'
-import { chartColors, chartTick, chartTooltip } from '@/lib/chart-theme'
+import { Skeleton, SkeletonStatCards } from '@/components/ui'
+import { useInventoryFactory } from '@/contexts/InventoryFactoryContext'
 
 export default function OwnerDashboard() {
   const { profile, loading: authLoading } = useAuth()
+  const { factoryId: ctxFactoryId } = useInventoryFactory()
   const [summaries, setSummaries]   = useState<FactorySummary[]>([])
   const [recentStock, setRecentStock] = useState<any[]>([])
   const [recentUsage, setRecentUsage] = useState<any[]>([])
@@ -28,56 +30,25 @@ export default function OwnerDashboard() {
   useEffect(() => {
     async function load() {
       if (authLoading) return
-      const factoryIds = (profile?.factories ?? []).map((f: any) => f.id).filter(Boolean)
-      if (factoryIds.length === 0) {
+      if (!ctxFactoryId) {
         setSummaries([]); setRecentStock([]); setRecentUsage([]); setLoadedDrilldown([]); setRemainingDrilldown([]); setLoading(false)
         return
       }
-      const dash = await inventoryApi.getOwnerDashboardBundle(factoryIds)
+      const factoryIds = [ctxFactoryId]
+      const [dash, loadedRows, remainingRows] = await Promise.all([
+        inventoryApi.getOwnerDashboard(factoryIds),
+        fetchLoadedDrilldown({ factoryIds }),
+        fetchRemainingDrilldown({ factoryIds }),
+      ])
       setSummaries((dash.summary ?? []) as FactorySummary[])
       setRecentStock(dash.recentStock ?? [])
       setRecentUsage(dash.recentUsage ?? [])
-
-      const normalizeText = (value: string | null | undefined, fallback: string) =>
-        (value ?? '').trim() || fallback
-      const aggregate = (rows: DrilldownRow[]) => {
-        const map = new Map<string, DrilldownRow>()
-        rows.forEach(r => {
-          const key = `${r.supplier}||${r.product}`
-          const existing = map.get(key)
-          if (existing) existing.quantity += r.quantity
-          else map.set(key, { ...r })
-        })
-        return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity)
-      }
-
-      const loadedRows = aggregate(
-        (dash.loadedDrilldown?.rows ?? []).map(d => ({
-          supplier: normalizeText(d.supplier_name, 'Unknown supplier'),
-          product: normalizeText(d.material_type, 'Unknown product'),
-          quantity: Number(d.tons_loaded ?? 0),
-          unit: 'KGS',
-        }))
-      )
-      const supplierMap: Record<string, string> = Object.fromEntries(
-        (dash.remainingDrilldown?.stocks ?? []).map(s => [s.invoice_number, s.supplier_name ?? 'Unknown supplier'])
-      )
-      const remainingRows = aggregate(
-        (dash.remainingDrilldown?.rows ?? [])
-          .filter(b => Number(b.tons_remaining) > 0)
-          .map(b => ({
-            supplier: normalizeText(supplierMap[b.invoice_number] ?? 'Unknown supplier', 'Unknown supplier'),
-            product: normalizeText(b.material_type, 'Unknown product'),
-            quantity: Number(b.tons_remaining ?? 0),
-            unit: 'KGS',
-          }))
-      )
       setLoadedDrilldown(loadedRows)
       setRemainingDrilldown(remainingRows)
       setLoading(false)
     }
     load()
-  }, [authLoading, profile])
+  }, [authLoading, profile, ctxFactoryId])
 
   const openDrilldown = (title: string, rows: DrilldownRow[]) => {
     setDrilldownTitle(title)
@@ -108,17 +79,27 @@ export default function OwnerDashboard() {
     balance: Number(s.closing_balance),
   }))
 
+  // Keep the header in place while loading so the page does not flash empty.
   if (loading) return (
     <AppLayout>
-      <div className="flex items-center justify-center h-96">
-        <div className="w-8 h-8 border-2 border-owner border-t-transparent rounded-full animate-spin" />
+      <div className="w-full p-4 md:p-8">
+        <div className="hidden lg:block">
+        <PageHeader
+          title="Owner Dashboard"
+          subtitle="All Factories · Live Overview"
+          accent="owner"
+        />
+        </div>
+        <SkeletonStatCards count={5} columnsClassName="grid-cols-2 xl:grid-cols-5" className="mb-6 md:mb-8" />
+        <Skeleton className="h-72 w-full rounded-xl" />
       </div>
     </AppLayout>
   )
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
+        <div className="mb-4 hidden lg:block">
         <PageHeader
           title="Owner Dashboard"
           subtitle="All Factories · Live Overview"
@@ -130,6 +111,7 @@ export default function OwnerDashboard() {
             </div>
           }
         />
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
@@ -162,16 +144,19 @@ export default function OwnerDashboard() {
             <div className="font-mono text-xs text-muted uppercase tracking-widest mb-4">Factory-wise Stock Chart</div>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} barGap={4}>
-                <XAxis dataKey="name" tick={{ ...chartTick, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={chartTick} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={chartTooltip.contentStyle} labelStyle={chartTooltip.labelStyle} />
-                <Bar dataKey="loaded"  name="Loaded"  radius={[4,4,0,0]} fill={chartColors[0]} opacity={0.8} />
-                <Bar dataKey="used"    name="Used"    radius={[4,4,0,0]} fill={chartColors[1]} opacity={0.8} />
-                <Bar dataKey="balance" name="Balance" radius={[4,4,0,0]} fill={chartColors[2]} opacity={0.8} />
+                <XAxis dataKey="name" tick={{ fill: '#4a6080', fontSize: 11, fontFamily: 'Share Tech Mono' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#4a6080', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: '#0f1520', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }}
+                  labelStyle={{ color: '#c8d8ea' }}
+                />
+                <Bar dataKey="loaded"  name="Loaded"  radius={[4,4,0,0]} fill="#00c2ff" opacity={0.8} />
+                <Bar dataKey="used"    name="Used"    radius={[4,4,0,0]} fill="#00e5a0" opacity={0.8} />
+                <Bar dataKey="balance" name="Balance" radius={[4,4,0,0]} fill="#f0a500" opacity={0.8} />
               </BarChart>
             </ResponsiveContainer>
             <div className="flex gap-4 mt-2 justify-center">
-              {[[chartColors[0],'Loaded'],[chartColors[1],'Used'],[chartColors[2],'Balance']].map(([c,l])=>(
+              {[['#00c2ff','Loaded'],['#00e5a0','Used'],['#f0a500','Balance']].map(([c,l])=>(
                 <div key={l} className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm" style={{background:c}} />
                   <span className="font-mono text-[10px] text-muted">{l}</span>
@@ -194,10 +179,10 @@ export default function OwnerDashboard() {
                   {summaries.map(s => (
                     <tr key={s.factory_id}>
                       <td className="text-primary font-medium">{s.factory_name}</td>
-                      <td className="text-inputer font-mono">{Number(s.total_tons_loaded).toFixed(1)} KGS</td>
-                      <td className="text-chemist font-mono">{Number(s.total_tons_used).toFixed(1)} KGS</td>
+                      <td className="text-primary font-mono">{Number(s.total_tons_loaded).toFixed(1)} KGS</td>
+                      <td className="text-primary font-mono">{Number(s.total_tons_used).toFixed(1)} KGS</td>
                       <td>
-                        <span className={`font-mono font-bold ${Number(s.closing_balance) < 10 ? 'text-red-400' : 'text-owner'}`}>
+                        <span className={`font-mono font-bold ${Number(s.closing_balance) < 10 ? 'badge badge-warning' : 'text-primary'}`}>
                           {Number(s.closing_balance).toFixed(1)} KGS
                         </span>
                         {Number(s.closing_balance) < 10 && (
@@ -224,13 +209,13 @@ export default function OwnerDashboard() {
                   </div>
                   <div className="data-card-grid">
                     <span className="data-card-label">Loaded</span>
-                    <span className="font-mono text-inputer text-right">{Number(s.total_tons_loaded).toFixed(1)} KGS</span>
+                    <span className="font-mono text-primary text-right">{Number(s.total_tons_loaded).toFixed(1)} KGS</span>
 
                     <span className="data-card-label">Used</span>
-                    <span className="font-mono text-chemist text-right">{Number(s.total_tons_used).toFixed(1)} KGS</span>
+                    <span className="font-mono text-primary text-right">{Number(s.total_tons_used).toFixed(1)} KGS</span>
 
                     <span className="data-card-label">Balance</span>
-                    <span className={`font-mono font-bold text-right ${Number(s.closing_balance) < 10 ? 'text-red-400' : 'text-owner'}`}>
+                    <span className={`font-mono font-bold text-right ${Number(s.closing_balance) < 10 ? 'badge badge-warning' : 'text-primary'}`}>
                       {Number(s.closing_balance).toFixed(1)} KGS
                     </span>
                   </div>
@@ -253,10 +238,10 @@ export default function OwnerDashboard() {
                 <tbody>
                   {recentStock.map((s: any) => (
                     <tr key={s.id}>
-                      <td className="font-mono text-inputer text-xs">{s.invoice_number}</td>
+                      <td className="font-mono text-primary text-xs">{s.invoice_number}</td>
                       <td className="text-primary">{s.supplier_name}</td>
                       <td className="font-mono">{s.tons_loaded} KGS</td>
-                      <td className="font-mono text-owner">₹{s.rate_per_ton}/T</td>
+                      <td className="font-mono text-primary">₹{s.rate_per_ton}/T</td>
                     </tr>
                   ))}
                   {recentStock.length === 0 && (
@@ -274,15 +259,15 @@ export default function OwnerDashboard() {
               {recentStock.map((s: any) => (
                 <div key={s.id} className="data-card">
                   <div className="data-card-header">
-                    <span className="data-card-title text-inputer">{s.invoice_number}</span>
+                    <span className="data-card-title text-primary">{s.invoice_number}</span>
                     <span className="data-card-meta">{s.supplier_name}</span>
                   </div>
                   <div className="data-card-grid">
                     <span className="data-card-label">KGS</span>
-                    <span className="font-mono text-inputer text-right">{s.tons_loaded} KGS</span>
+                    <span className="font-mono text-primary text-right">{s.tons_loaded} KGS</span>
 
                     <span className="data-card-label">Rate</span>
-                    <span className="font-mono text-owner text-right">₹{s.rate_per_ton}/T</span>
+                    <span className="font-mono text-primary text-right">₹{s.rate_per_ton}/T</span>
                   </div>
                 </div>
               ))}
@@ -300,7 +285,7 @@ export default function OwnerDashboard() {
                 <tbody>
                   {recentUsage.map((u: any) => (
                     <tr key={u.id}>
-                      <td className="font-mono text-chemist text-xs">{u.invoice_number}</td>
+                      <td className="font-mono text-primary text-xs">{u.invoice_number}</td>
                       <td className="text-primary">{u.profiles?.full_name ?? '—'}</td>
                       <td className="font-mono">{u.tons_used} KGS</td>
                       <td className="text-muted text-xs">{new Date(u.usage_date).toLocaleDateString('en-IN')}</td>
@@ -321,7 +306,7 @@ export default function OwnerDashboard() {
               {recentUsage.map((u: any) => (
                 <div key={u.id} className="data-card">
                   <div className="data-card-header">
-                    <span className="data-card-title text-chemist">{u.invoice_number}</span>
+                    <span className="data-card-title text-primary">{u.invoice_number}</span>
                     <span className="data-card-meta">{new Date(u.usage_date).toLocaleDateString('en-IN')}</span>
                   </div>
                   <div className="data-card-grid">
@@ -329,7 +314,7 @@ export default function OwnerDashboard() {
                     <span className="data-card-value">{u.profiles?.full_name ?? '—'}</span>
 
                     <span className="data-card-label">Used</span>
-                    <span className="font-mono text-chemist text-right">{u.tons_used} KGS</span>
+                    <span className="font-mono text-primary text-right">{u.tons_used} KGS</span>
                   </div>
                 </div>
               ))}

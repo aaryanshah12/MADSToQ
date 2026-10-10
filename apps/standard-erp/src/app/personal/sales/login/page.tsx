@@ -1,13 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { setCachedAccessToken } from '@madstoq/core'
-import { authClient } from '@/lib/auth-client'
+import { signIn as nextAuthSignIn } from 'next-auth/react'
 import { clearSalesReadCache } from '@madstoq/sales-system/api'
 import { LogIn, Eye, EyeOff } from 'lucide-react'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
-import DemoCredentials from '@/components/auth/DemoCredentials'
-import { DEMO_PORTALS } from '@/lib/demo-portals'
 
 const EMAIL_KEY = 'sales-last-email'
 
@@ -20,7 +17,8 @@ export default function SalesLoginPage() {
   const [loading, setLoading]           = useState(false)
 
   useEffect(() => {
-    persistTheme(readStoredTheme())
+    const saved = (localStorage.getItem('sales-theme') as 'dark' | 'light' | null) ?? 'light'
+    document.documentElement.dataset.theme = saved
 
     const lastEmail = localStorage.getItem(EMAIL_KEY)
     if (lastEmail) setEmail(lastEmail)
@@ -35,10 +33,13 @@ export default function SalesLoginPage() {
 
     clearSalesReadCache()
 
-    const { data, error: signInErr } = await authClient.auth.signInWithPassword({ email, password })
-    if (data.session?.access_token) setCachedAccessToken(data.session.access_token)
-    if (signInErr || !data.user) {
-      setError(signInErr?.message ?? 'Sign-in failed')
+    const res = await nextAuthSignIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    })
+    if (res?.error) {
+      setError(res.error)
       setLoading(false)
       return
     }
@@ -88,7 +89,7 @@ export default function SalesLoginPage() {
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
-                  className="input w-full pr-14"
+                  className="input w-full pr-10"
                 />
                 <button
                   type="button"
@@ -114,10 +115,19 @@ export default function SalesLoginPage() {
                 : <><LogIn size={15}/> Sign In</>
               }
             </button>
+
+            <p className="text-center text-xs text-muted pt-1">
+              <Link href="/personal/sales/forgot-password" className="text-owner hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
-          <DemoCredentials accounts={DEMO_PORTALS.sales.accounts} />
-          <p className="mt-4 text-center text-xs text-muted">Software is managed by MADSToQ</p>
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted text-center">
+              Access is granted manually. If you can&apos;t sign in, contact your admin.
+            </p>
+          </div>
         </div>
       </div>
     </div>

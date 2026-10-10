@@ -1,0 +1,26 @@
+{
+  "name": "@madstoq/reporting-system",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./services": "./src/services/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@madstoq/shared-utils": "*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@madstoq/eslint-config": "*",
+    "@madstoq/typescript-config": "*",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2"
+  }
+}

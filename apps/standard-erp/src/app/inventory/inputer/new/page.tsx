@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
-import PageHeader from "@madstoq/ui/page-header";
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from "@madstoq/ui/erp-page-header";
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { stockApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { CheckCircle } from "lucide-react";
@@ -105,10 +105,10 @@ export default function NewStockEntryPage() {
         <form onSubmit={handleSubmit} className="card p-8 space-y-6">
           {/* Factory */}
           <div>
-            <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+            <label htmlFor="factory" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
               Factory *
             </label>
-            <select
+            <select id="factory"
               className="input-field"
               value={form.factory_id}
               onChange={(e) => {
@@ -133,10 +133,10 @@ export default function NewStockEntryPage() {
           {/* Invoice + Supplier */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="invoice-number" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 Invoice Number *
               </label>
-              <input
+              <input id="invoice-number"
                 className="input-field"
                 value={form.invoice_number}
                 onChange={(e) => update("invoice_number", e.target.value)}
@@ -145,10 +145,10 @@ export default function NewStockEntryPage() {
               />
             </div>
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="supplier-name" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 Supplier Name *
               </label>
-              <select
+              <select id="supplier-name"
                 className="input-field"
                 value={form.supplier_name}
                 onChange={(e) => update("supplier_name", e.target.value)}
@@ -165,10 +165,10 @@ export default function NewStockEntryPage() {
 
           {/* Material type */}
           <div>
-            <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+            <label htmlFor="material-type" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
               Material Type *
             </label>
-            <select
+            <select id="material-type"
               className="input-field"
               value={form.material_type}
               onChange={(e) => update("material_type", e.target.value)}
@@ -185,10 +185,10 @@ export default function NewStockEntryPage() {
           {/* Tons + Rate */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="kgs-loaded" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 KGS Loaded *
               </label>
-              <input
+              <input id="kgs-loaded"
                 type="number"
                 step="0.001"
                 min="0"
@@ -200,10 +200,10 @@ export default function NewStockEntryPage() {
               />
             </div>
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="rate-kgs" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 Rate / KGs (₹) *
               </label>
-              <input
+              <input id="rate-kgs"
                 type="number"
                 step="0.01"
                 min="0"
@@ -231,10 +231,10 @@ export default function NewStockEntryPage() {
           {/* Vehicle + Driver */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="vehicle-number" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 Vehicle Number
               </label>
-              <input
+              <input id="vehicle-number"
                 className="input-field"
                 value={form.vehicle_number}
                 onChange={(e) => update("vehicle_number", e.target.value)}
@@ -242,10 +242,10 @@ export default function NewStockEntryPage() {
               />
             </div>
             <div>
-              <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+              <label htmlFor="driver-name" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
                 Driver Name
               </label>
-              <input
+              <input id="driver-name"
                 className="input-field"
                 value={form.driver_name}
                 onChange={(e) => update("driver_name", e.target.value)}
@@ -256,10 +256,10 @@ export default function NewStockEntryPage() {
 
           {/* Entry date */}
           <div>
-            <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+            <label htmlFor="entry-date" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
               Entry Date *
             </label>
-            <input
+            <input id="entry-date"
               type="date"
               className="input-field"
               value={form.entry_date}
@@ -270,10 +270,10 @@ export default function NewStockEntryPage() {
 
           {/* Notes */}
           <div>
-            <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
+            <label htmlFor="notes" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">
               Notes
             </label>
-            <textarea
+            <textarea id="notes"
               className="input-field resize-none"
               rows={3}
               value={form.notes}

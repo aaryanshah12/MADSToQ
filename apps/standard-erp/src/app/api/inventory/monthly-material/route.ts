@@ -1,4 +1,4 @@
-import { db } from '@madstoq/database'
+import { prisma, serializeMonthlyMaterial } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type EntryInput = {
@@ -36,21 +36,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'fiscal_year and month are required' }, { status: 400 })
   }
 
-  let query = db
-    .from('monthly_material_entries')
-    .select('*')
-    .eq('fiscal_year', fiscalYear)
-    .eq('month', Number(month))
-    .order('updated_at', { ascending: false })
+  const entries = await prisma.monthlyMaterialEntry.findMany({
+    where: {
+      fiscalYear,
+      month: Number(month),
+      ...(factoryIds?.length ? { factoryId: { in: factoryIds } } : {}),
+    },
+    orderBy: { updatedAt: 'desc' },
+  })
 
-  if (factoryIds && factoryIds.length > 0) {
-    query = query.in('factory_id', factoryIds)
-  }
-
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-  return NextResponse.json({ entries: data ?? [] })
+  return NextResponse.json({ entries: entries.map(serializeMonthlyMaterial) })
 }
 
 export async function POST(request: Request) {
@@ -61,27 +56,24 @@ export async function POST(request: Request) {
     }
     const { actualReal, yieldPct, usedPnt } = compute(payload)
 
-    const { data, error } = await db
-      .from('monthly_material_entries')
-      .insert({
-        factory_id: payload.factory_id,
-        batch_id: String(payload.batch_id).trim(),
+    const entry = await prisma.monthlyMaterialEntry.create({
+      data: {
+        factoryId: payload.factory_id,
+        batchId: String(payload.batch_id).trim(),
         month: Number(payload.month),
-        fiscal_year: String(payload.fiscal_year).trim(),
-        oleum_23: payload.oleum_23 ?? null,
-        as_is_kg: payload.as_is_kg ?? null,
-        purity_nv: payload.purity_nv ?? null,
-        free_acidity: payload.free_acidity ?? null,
-        actual_real_kg: actualReal,
-        used_pnt: usedPnt,
-        yield_pct: yieldPct,
-        created_by: payload.created_by,
-      })
-      .select()
-      .single()
+        fiscalYear: String(payload.fiscal_year).trim(),
+        oleum23: payload.oleum_23 ?? null,
+        asIsKg: payload.as_is_kg ?? null,
+        purityNv: payload.purity_nv ?? null,
+        freeAcidity: payload.free_acidity ?? null,
+        actualRealKg: actualReal,
+        usedPnt,
+        yieldPct,
+        createdBy: payload.created_by,
+      },
+    })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ success: true, entry: data })
+    return NextResponse.json({ success: true, entry: serializeMonthlyMaterial(entry) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -93,24 +85,23 @@ export async function PATCH(request: Request) {
     if (!payload.id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
     const { actualReal, yieldPct, usedPnt } = compute(payload)
 
-    const { error } = await db
-      .from('monthly_material_entries')
-      .update({
-        factory_id: payload.factory_id,
-        batch_id: payload.batch_id,
+    await prisma.monthlyMaterialEntry.update({
+      where: { id: payload.id },
+      data: {
+        factoryId: payload.factory_id,
+        batchId: payload.batch_id,
         month: payload.month,
-        fiscal_year: payload.fiscal_year,
-        oleum_23: payload.oleum_23 ?? null,
-        as_is_kg: payload.as_is_kg ?? null,
-        purity_nv: payload.purity_nv ?? null,
-        free_acidity: payload.free_acidity ?? null,
-        actual_real_kg: actualReal,
-        used_pnt: usedPnt,
-        yield_pct: yieldPct,
-      })
-      .eq('id', payload.id)
+        fiscalYear: payload.fiscal_year,
+        oleum23: payload.oleum_23 ?? null,
+        asIsKg: payload.as_is_kg ?? null,
+        purityNv: payload.purity_nv ?? null,
+        freeAcidity: payload.free_acidity ?? null,
+        actualRealKg: actualReal,
+        usedPnt,
+        yieldPct,
+      },
+    })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -122,12 +113,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await db
-      .from('monthly_material_entries')
-      .delete()
-      .eq('id', id)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    await prisma.monthlyMaterialEntry.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

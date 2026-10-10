@@ -1,10 +1,9 @@
 import { createRpcRoute, type RpcHandler } from '@madstoq/database'
-import * as inv from '@madstoq/inventory-system/services'
+import * as inv from "@madstoq/inventory-system/services";
 
 const handlers: Record<string, RpcHandler> = {
   getOwnerDashboard: (p) => inv.getOwnerDashboard((p.factoryIds as string[]) ?? []),
-  getOwnerDashboardBundle: (p) => inv.getOwnerDashboardBundle((p.factoryIds as string[]) ?? []),
-  getStockPage: (p) => inv.getStockPage((p.factoryIds as string[]) ?? []),
+  getStockPage: (p) => inv.getStockPage((p.factoryIds as string[]) ?? [], p),
   getUsagePage: (p) => inv.getUsagePage((p.factoryIds as string[]) ?? []),
   getReportsData: (p) => inv.getReportsData((p.factoryIds as string[]) ?? []),
   getChemistDashboard: (p) => inv.getChemistDashboard((p.factoryIds as string[]) ?? [], p.userId as string),
@@ -17,7 +16,13 @@ const handlers: Record<string, RpcHandler> = {
   upsertPermissionOverride: (p) => inv.upsertPermissionOverride(p as Parameters<typeof inv.upsertPermissionOverride>[0]),
   deletePermissionOverride: (p) => inv.deletePermissionOverride(p.id as string),
   setProfileActive: (p) => inv.setProfileActive(p.profileId as string, p.isActive as boolean),
-  createSupplier: (p) => inv.createSupplier(p.factoryId as string, p.name as string),
+  createSupplier: (p) =>
+    inv.createSupplier(
+      p.factoryId as string,
+      p.name && !p.companyAddress && !p.gstNumber && !p.email
+        ? (p.name as string)
+        : (p as unknown as Parameters<typeof inv.createSupplier>[1]),
+    ),
   deleteSupplier: (p) => inv.deleteSupplier(p.id as string),
   lookupInvoiceByNumber: (p) => inv.lookupInvoiceByNumber(p.invoiceNumber as string),
   lookupInvoicesByDate: (p) => inv.lookupInvoicesByDate(p.entryDate as string),

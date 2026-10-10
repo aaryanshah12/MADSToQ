@@ -1,4 +1,4 @@
-import { getAuthHeaders } from '@madstoq/core'
+import { getAuthHeaders } from '@madstoq/core/api-fetch'
 
 export type MonthlyEntry = {
   id?: string
@@ -21,6 +21,10 @@ export type MonthlyEntry = {
 type ApiResponse<T> = { error?: string; [key: string]: any } & T
 
 const round2 = (v: number) => Math.round((v ?? 0) * 100) / 100
+
+async function authHeaders(): Promise<Record<string, string>> {
+  return getAuthHeaders()
+}
 
 export const getCurrentFiscalYear = () => {
   const today = new Date()
@@ -60,7 +64,7 @@ export const monthOptions = [
 ]
 
 export async function fetchMonthlyEntries(params: { fiscal_year: string; month: number; factoryIds?: string[] }) {
-  const headers = await getAuthHeaders()
+  const headers = await authHeaders()
   const qs = new URLSearchParams({
     fiscal_year: params.fiscal_year,
     month: String(params.month),
@@ -68,7 +72,10 @@ export async function fetchMonthlyEntries(params: { fiscal_year: string; month: 
   if (params.factoryIds && params.factoryIds.length > 0) {
     qs.set('factoryIds', params.factoryIds.join(','))
   }
-  const res = await fetch(`/api/inventory/monthly-material?${qs.toString()}`, { headers })
+  const res = await fetch(`/api/inventory/monthly-material?${qs.toString()}`, {
+    headers,
+    credentials: 'same-origin',
+  })
   const json: ApiResponse<{ entries: MonthlyEntry[] }> = await res.json()
   if (!res.ok) throw new Error(json.error || 'Failed to fetch entries')
   const entries = json.entries ?? []
@@ -82,11 +89,12 @@ export async function fetchMonthlyEntries(params: { fiscal_year: string; month: 
 }
 
 export async function saveMonthlyEntry(entry: MonthlyEntry) {
-  const headers = await getAuthHeaders()
+  const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
   const isUpdate = Boolean(entry.id)
   const res = await fetch('/api/inventory/monthly-material', {
     method: isUpdate ? 'PATCH' : 'POST',
     headers,
+    credentials: 'same-origin',
     body: JSON.stringify(entry),
   })
   const json: ApiResponse<{ entry: MonthlyEntry }> = await res.json()
@@ -95,10 +103,11 @@ export async function saveMonthlyEntry(entry: MonthlyEntry) {
 }
 
 export async function deleteMonthlyEntry(id: string) {
-  const headers = await getAuthHeaders()
+  const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
   const res = await fetch('/api/inventory/monthly-material', {
     method: 'DELETE',
     headers,
+    credentials: 'same-origin',
     body: JSON.stringify({ id }),
   })
   const json: ApiResponse<{}> = await res.json()

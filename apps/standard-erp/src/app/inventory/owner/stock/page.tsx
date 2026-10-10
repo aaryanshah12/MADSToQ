@@ -1,60 +1,202 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { StockEntry } from '@/types'
 import { Download } from 'lucide-react'
-import { ListSearchField, ListSearchToolbar, listSearchBtnClass } from '@/components/layout/ListSearchToolbar'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/components/providers/ToastProvider'
+import { EmptyState, ListPager, SmartFilterBar, SpinnerBlock, useSmartFilter } from '@/components/ui'
 import { useInventoryFactory } from '@/contexts/InventoryFactoryContext'
 import { getCurrentFiscalYear, getFiscalYears, monthOptions } from '@/lib/monthlyMaterial'
+import { LedgerKindTabs } from '@/components/inventory/LedgerKindTabs'
+import { DateRangeChip, inDateRange } from '@/components/inventory/DateRangeChip'
+import { RateRangeChip } from '@/components/inventory/RateRangeChip'
+import { ledgerTabOf, LEDGER_TABS, type LedgerTab } from '@/lib/ledger-kind'
+import { SortTh } from '@/components/inventory/SortTh'
+import { MobileCard, MobileListToolbar, MobileTabs } from '@/components/inventory/MobileList'
+import { LIST_PAGE_SIZE } from '@/lib/list-page'
+
+type SortCol = 'invoice' | 'supplier' | 'material' | 'qty' | 'rate' | 'value' | 'date' | 'bookedBy' | 'lot' | 'product' | 'chemist' | 'mfg' | 'purity'
+
+function cmpText(a: string | null | undefined, b: string | null | undefined) {
+  return (a ?? '').localeCompare(b ?? '', undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function fiscalYearOf(dateInput: string | Date) {
+  const d = new Date(dateInput)
+  const month = d.getMonth() + 1
+  const year = d.getFullYear()
+  const start = month >= 4 ? year : year - 1
+  return `FY${start}-${String(start + 1).slice(-2)}`
+}
 
 export default function OwnerStockPage() {
-  const { profile, loading: authLoading } = useAuth()
+  const { loading: authLoading } = useAuth()
+  const toast = useToast()
   const { factoryId: ctxFactoryId } = useInventoryFactory()
   const [entries, setEntries]     = useState<StockEntry[]>([])
+  const [stockTotal, setStockTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
   const [factories, setFactories] = useState<any[]>([])
   const [rateMin, setRateMin]     = useState('')
   const [rateMax, setRateMax]     = useState('')
-  const [rateOpen, setRateOpen]   = useState(false)
-  const [fiscalYear, setFiscalYear]         = useState(() => getCurrentFiscalYear())
-  const [selectedMonth, setSelectedMonth]   = useState('')
-  const [selectedDate, setSelectedDate]     = useState('')
+  const [dateFrom, setDateFrom]   = useState('')
+  const [dateTo, setDateTo]       = useState('')
+  const [tab, setTab] = useState<LedgerTab>('rm')
+  const [sortCol, setSortCol] = useState<SortCol>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const fiscalYears = getFiscalYears(5)
 
-  useEffect(() => {
-    async function load() {
-      if (authLoading) return
-      const factoryIds = (profile?.factories ?? []).map((f: any) => f.id).filter(Boolean)
-      if (factoryIds.length === 0) {
-        setEntries([]); setFactories([]); setLoading(false); return
-      }
-      const data = await inventoryApi.getStockPage(factoryIds)
-      setEntries((data.stock ?? []) as StockEntry[])
-      setFactories(data.factories ?? [])
-      setLoading(false)
-    }
-    load()
-  }, [authLoading, profile])
+  const scoped = entries
 
-  const filtered = entries.filter(e => {
-    const matchSearch  = !search  || e.invoice_number.toLowerCase().includes(search.toLowerCase()) || e.supplier_name.toLowerCase().includes(search.toLowerCase())
-    const matchFactory = !ctxFactoryId || e.factory_id === ctxFactoryId
-    const rate = Number(e.rate_per_ton ?? 0)
-    const matchRateMin = !rateMin || rate >= Number(rateMin)
-    const matchRateMax = !rateMax || rate <= Number(rateMax)
-    const entryDate = new Date(e.entry_date)
-    const fyStart = Number(fiscalYear.replace('FY', '').split('-')[0])
-    const matchFiscalYear = entryDate >= new Date(fyStart, 3, 1) && entryDate < new Date(fyStart + 1, 3, 1)
-    const matchMonth = !selectedMonth || (entryDate.getMonth() + 1) === Number(selectedMonth)
-    const matchDate = !selectedDate || e.entry_date === selectedDate
-    return matchSearch && matchFactory && matchRateMin && matchRateMax && matchFiscalYear && matchMonth && matchDate
+  const filter = useSmartFilter(scoped, {
+    getSearchText: (e) => [e.invoice_number, e.supplier_name, e.material_type, (e as any).chemist_name],
+    facets: [
+      { key: 'supplier', label: 'Supplier', getValue: (e) => e.supplier_name },
+      { key: 'material', label: 'Material', getValue: (e) => e.material_type },
+      {
+        key: 'fy',
+        label: 'FY',
+        getValue: (e) => fiscalYearOf(e.entry_date),
+        options: fiscalYears.map((fy) => ({ id: fy, label: fy })),
+      },
+      {
+        key: 'month',
+        label: 'Month',
+        getValue: (e) => String(new Date(e.entry_date).getMonth() + 1),
+        options: monthOptions.map((m) => ({ id: String(m.value), label: m.label })),
+      },
+    ],
+    initialSelected: { fy: [getCurrentFiscalYear()] },
   })
 
-  const totalValue = filtered.reduce((s,e) => s + Number(e.total_value), 0)
+  const fyStart = /^FY(\d{4})/.exec(filter.selected.fy?.[0] ?? '')?.[1]
+  const month = filter.selected.month?.[0] ? Number(filter.selected.month[0]) : undefined
+
+  useEffect(() => {
+    setPage(1)
+  }, [ctxFactoryId, fyStart, month, filter.search, dateFrom, dateTo])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!ctxFactoryId) {
+      setEntries([])
+      setFactories([])
+      setStockTotal(0)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    const handle = setTimeout(() => {
+      void (async () => {
+        setLoading(true)
+        const data = await inventoryApi.getStockPage([ctxFactoryId], {
+          page,
+          page_size: LIST_PAGE_SIZE,
+          fy_start: fyStart,
+          month,
+          q: filter.search.trim() || undefined,
+          from: dateFrom || undefined,
+          to: dateTo || undefined,
+        })
+        if (cancelled) return
+        setEntries((data.stock ?? []) as StockEntry[])
+        setFactories(data.factories ?? [])
+        setStockTotal(Number(data.total ?? data.stock?.length ?? 0))
+        setLoading(false)
+      })()
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
+    }
+  }, [authLoading, ctxFactoryId, fyStart, month, filter.search, dateFrom, dateTo, page])
+
+  const filtered = useMemo(() => {
+    return filter.filtered.filter((e) => {
+      if (ledgerTabOf(e) !== tab) return false
+      if (!inDateRange(e.entry_date, dateFrom, dateTo)) return false
+      if (tab !== 'rm') return true
+      const rate = Number(e.rate_per_ton ?? 0)
+      const matchRateMin = !rateMin || rate >= Number(rateMin)
+      const matchRateMax = !rateMax || rate <= Number(rateMax)
+      return matchRateMin && matchRateMax
+    })
+  }, [filter.filtered, tab, rateMin, rateMax, dateFrom, dateTo])
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const ar = a as any
+      const br = b as any
+      let cmp = 0
+      switch (sortCol) {
+        case 'supplier':
+          cmp = cmpText(a.supplier_name, b.supplier_name)
+          break
+        case 'material':
+        case 'product':
+          cmp = cmpText(a.material_type, b.material_type)
+          break
+        case 'qty':
+          cmp = Number(a.tons_loaded ?? 0) - Number(b.tons_loaded ?? 0)
+          break
+        case 'rate':
+          cmp = Number(a.rate_per_ton ?? 0) - Number(b.rate_per_ton ?? 0)
+          break
+        case 'value':
+          cmp = Number(a.total_value ?? 0) - Number(b.total_value ?? 0)
+          break
+        case 'date':
+          cmp = new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
+          break
+        case 'bookedBy':
+          cmp = cmpText(ar.profiles?.full_name, br.profiles?.full_name)
+          break
+        case 'chemist':
+          cmp = cmpText(ar.chemist_name, br.chemist_name)
+          break
+        case 'mfg':
+          cmp =
+            new Date(ar.mfg_date || a.entry_date).getTime() -
+            new Date(br.mfg_date || b.entry_date).getTime()
+          break
+        case 'purity':
+          cmp = Number(ar.purity ?? -1) - Number(br.purity ?? -1)
+          break
+        case 'invoice':
+        case 'lot':
+        default:
+          cmp = cmpText(a.invoice_number, b.invoice_number)
+          break
+      }
+      return cmp * dir || cmpText(a.invoice_number, b.invoice_number)
+    })
+  }, [filtered, sortCol, sortDir])
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortCol(col)
+    setSortDir(
+      col === 'qty' || col === 'rate' || col === 'value' || col === 'date' || col === 'mfg' || col === 'purity'
+        ? 'desc'
+        : 'asc',
+    )
+  }
+
+  function handleTabChange(next: LedgerTab) {
+    setTab(next)
+    setSortCol(next === 'rm' ? 'date' : 'mfg')
+    setSortDir('desc')
+  }
+
+  const totalValue = sorted.reduce((s,e) => s + Number(e.total_value), 0)
 
   const formatCsvValue = (value: any) => {
     if (value === null || value === undefined) return ''
@@ -64,32 +206,41 @@ export default function OwnerStockPage() {
 
   const handleExport = () => {
     if (loading) return
-    if (filtered.length === 0) {
-      alert('No records to export')
+    if (sorted.length === 0) {
+      toast.error('No records to export')
       return
     }
-    const headers = [
-      'Invoice',
-      'Factory',
-      'Supplier',
-      'Material',
-      'KGS_Loaded',
-      'Rate_Per_Ton',
-      'Total_Value',
-      'Entry_Date',
-      'Created_By',
-    ]
-    const rows = filtered.map(e => [
-      e.invoice_number,
-      (e as any).factories?.name ?? '',
-      e.supplier_name,
-      e.material_type,
-      Number(e.tons_loaded ?? 0),
-      Number(e.rate_per_ton ?? 0),
-      Number(e.total_value ?? 0),
-      new Date(e.entry_date).toISOString().slice(0, 10),
-      (e as any).profiles?.full_name ?? '',
-    ])
+    const isRm = tab === 'rm'
+    const showPurity = tab === 'sfg' || tab === 'sfg_rejected' || tab === 'fg' || tab === 'fg_rejected'
+    const headers = isRm
+      ? ['Invoice', 'Supplier', 'Material', 'Quantity_Kg', 'Rate_Per_Kg', 'Total_Value', 'Entry_Date', 'Booked_By']
+      : showPurity
+        ? ['Lot', 'Product', 'Chemist', 'Mfg_Date', 'Quantity_Kg', 'Purity']
+        : ['Lot', 'Product', 'Chemist', 'Mfg_Date', 'Quantity_Kg']
+    const rows = sorted.map(e => {
+      const row = e as any
+      if (isRm) {
+        return [
+          e.invoice_number,
+          e.supplier_name,
+          e.material_type,
+          Number(e.tons_loaded ?? 0),
+          Number(e.rate_per_ton ?? 0),
+          Number(e.total_value ?? 0),
+          new Date(e.entry_date).toISOString().slice(0, 10),
+          row.profiles?.full_name ?? '',
+        ]
+      }
+      const mfg = row.mfg_date || (e.entry_date ? new Date(e.entry_date).toISOString().slice(0, 10) : '')
+      const base = [
+        e.invoice_number,
+        e.material_type,
+        row.chemist_name ?? '',
+        mfg,
+        Number(e.tons_loaded ?? 0),
+      ]
+      return showPurity ? [...base, row.purity ?? ''] : base
+    })
     const lines = [headers.join(','), ...rows.map(r => r.map(formatCsvValue).join(','))]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -104,213 +255,256 @@ export default function OwnerStockPage() {
   const rateSliderMax = entries.length > 0
     ? Math.max(1000, Math.ceil(Math.max(...entries.map(e => Number(e.rate_per_ton ?? 0))) / 500) * 500)
     : 5000
-  const minVal = rateMin ? Number(rateMin) : 0
-  const maxVal = rateMax ? Number(rateMax) : rateSliderMax
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
+        <div className="mb-8 hidden lg:block">
         <PageHeader
           title="Stock Ledger"
-          subtitle="Owner · All Loading Records"
+          subtitle="Owner · RM, SFG, FG, and byproduct"
           accent="owner"
-        />
-
-        <ListSearchToolbar className="mb-6 flex-wrap">
-          <ListSearchField
-            value={search}
-            onChange={setSearch}
-            placeholder="Search invoice or supplier..."
-            inputClassName="owner-focus"
-          />
-          <select
-            className="input list-search-side owner-focus w-full sm:w-[170px] text-sm"
-            value={fiscalYear}
-            onChange={(e) => setFiscalYear(e.target.value)}
-          >
-            {fiscalYears.map((fy) => (
-              <option key={fy} value={fy}>{fy}</option>
-            ))}
-          </select>
-          <div className="relative w-full sm:w-[170px] flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setRateOpen((v) => !v)}
-              className={`input list-search-side owner-focus w-full flex items-center justify-between gap-2 whitespace-nowrap cursor-pointer ${rateMin || rateMax ? 'border-owner' : ''}`}
-            >
-              <span className="text-xs font-mono text-muted">₹ Rate</span>
-              {(rateMin || rateMax) && (
-                <span className="text-xs font-mono text-owner">{rateMin || '0'} – {rateMax || '∞'}</span>
-              )}
-              <span className="text-muted text-[10px] ml-1">▾</span>
+          actions={
+            <button className="btn btn-owner gap-2" onClick={handleExport} disabled={loading || sorted.length === 0}>
+              <Download size={15}/> Export CSV
             </button>
-            {rateOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setRateOpen(false)} />
-                <div className="absolute top-full mt-1 left-0 z-20 card p-4 min-w-[300px] shadow-xl border border-border rounded-xl">
-                  <div className="text-[10px] text-muted font-mono tracking-wider mb-3">Filter by Rate (₹)</div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number" min={0} max={rateSliderMax}
-                      value={minVal}
-                      onChange={e => { const v = Number(e.target.value); setRateMin(v <= 0 ? '' : String(v)) }}
-                      className="w-16 text-center text-xs font-mono bg-layer-sm border border-border rounded-md px-1 py-1.5 text-primary outline-none focus:border-owner transition-colors"
-                    />
-                    <div className="relative flex-1 h-5 flex items-center">
-                      <div className="absolute w-full h-[3px] bg-border rounded-full" />
-                      <div
-                        className="absolute h-[3px] bg-owner rounded-full pointer-events-none"
-                        style={{ left: `${(minVal / rateSliderMax) * 100}%`, right: `${100 - (maxVal / rateSliderMax) * 100}%` }}
-                      />
-                      <input
-                        type="range" min={0} max={rateSliderMax} step={100}
-                        value={minVal}
-                        onChange={e => { const v = Number(e.target.value); if (v <= maxVal) setRateMin(v === 0 ? '' : String(v)) }}
-                        className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-owner [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-runnable-track]:bg-transparent"
-                        style={{ zIndex: minVal >= rateSliderMax ? 5 : 3 }}
-                      />
-                      <input
-                        type="range" min={0} max={rateSliderMax} step={100}
-                        value={maxVal}
-                        onChange={e => { const v = Number(e.target.value); if (v >= minVal) setRateMax(v >= rateSliderMax ? '' : String(v)) }}
-                        className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-owner [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-runnable-track]:bg-transparent"
-                        style={{ zIndex: 4 }}
-                      />
-                    </div>
-                    <input
-                      type="number" min={0} max={rateSliderMax}
-                      value={maxVal}
-                      onChange={e => { const v = Number(e.target.value); setRateMax(!v || v >= rateSliderMax ? '' : String(v)) }}
-                      className="w-16 text-center text-xs font-mono bg-layer-sm border border-border rounded-md px-1 py-1.5 text-primary outline-none focus:border-owner transition-colors"
-                    />
-                  </div>
-                  {(rateMin || rateMax) && (
-                    <button
-                      type="button"
-                      onClick={() => { setRateMin(''); setRateMax('') }}
-                      className="mt-3 text-[10px] font-mono text-muted hover:text-red-400 transition-colors"
-                    >
-                      Clear filter
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <select
-            className="input list-search-side owner-focus w-full sm:w-[160px] text-sm"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            aria-label="Filter by month"
-          >
-            <option value="">All Months</option>
-            {monthOptions.map((m) => (
-              <option key={m.value} value={String(m.value)}>{m.label}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="input list-search-side owner-focus w-full sm:w-[160px] text-sm"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            aria-label="Filter by date"
-          />
-          <div className="flex items-center gap-2 shrink-0 self-center sm:ml-auto">
-            <span className="font-mono text-xs text-muted">Total Value:</span>
-            <span className="font-display text-lg font-bold text-owner">₹{(totalValue / 100000).toFixed(2)}L</span>
-          </div>
-          <button
-            type="button"
-            className={listSearchBtnClass('btn-owner')}
-            onClick={handleExport}
-            disabled={loading || filtered.length === 0}
-          >
-            <Download size={15} /> Export CSV
-          </button>
-        </ListSearchToolbar>
+          }
+        />
+        </div>
 
-        <div className="card overflow-hidden">
+        <div className="md:hidden">
+          <MobileTabs
+            ariaLabel="Stock kind"
+            active={tab}
+            onChange={handleTabChange}
+            tabs={LEDGER_TABS.map((t) => ({
+              key: t.key,
+              label:
+                t.key === 'rm'
+                  ? 'RM'
+                  : t.key === 'sfg'
+                    ? 'SFG'
+                    : t.key === 'sfg_rejected'
+                      ? 'Rej SFG'
+                      : t.key === 'fg'
+                        ? 'FG'
+                        : t.key === 'fg_rejected'
+                          ? 'Rej FG'
+                          : 'BP',
+            }))}
+          />
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-            </div>
+            <SpinnerBlock accent="owner" label="Loading stock ledger" />
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto">
+              <MobileListToolbar
+                filter={filter}
+                placeholder={tab === 'rm' ? 'Search GRN, invoice, or supplier…' : 'Search lot, batch, or product…'}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateChange={(from, to) => {
+                  setDateFrom(from)
+                  setDateTo(to)
+                }}
+                resultCount={sorted.length}
+                noun={{ one: 'lot', many: 'lots' }}
+                sortOptions={
+                  tab === 'rm'
+                    ? [
+                        { col: 'invoice' as const, label: 'Invoice / GRN', kind: 'text' as const },
+                        { col: 'supplier' as const, label: 'Supplier', kind: 'text' as const },
+                        { col: 'material' as const, label: 'Material', kind: 'text' as const },
+                        { col: 'qty' as const, label: 'Qty', kind: 'number' as const },
+                        { col: 'rate' as const, label: 'Rate', kind: 'number' as const },
+                        { col: 'value' as const, label: 'Value', kind: 'number' as const },
+                        { col: 'date' as const, label: 'Date', kind: 'date' as const },
+                      ]
+                    : [
+                        { col: 'lot' as const, label: 'Lot', kind: 'text' as const },
+                        { col: 'product' as const, label: 'Product', kind: 'text' as const },
+                        { col: 'chemist' as const, label: 'Chemist', kind: 'text' as const },
+                        { col: 'mfg' as const, label: 'Mfg date', kind: 'date' as const },
+                        { col: 'qty' as const, label: 'Qty', kind: 'number' as const },
+                        { col: 'purity' as const, label: 'Purity', kind: 'number' as const },
+                      ]
+                }
+                sortCol={sortCol}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              {sorted.length === 0 ? (
+                <EmptyState className="rounded-xl bg-panel" title="No records found" />
+              ) : (
+                <div className="space-y-3">
+                  {sorted.map((e) => {
+                    const row = e as any
+                    const mfg = row.mfg_date || e.entry_date
+                    return (
+                      <MobileCard
+                        key={e.id}
+                        id={e.invoice_number}
+                        title={tab === 'rm' ? e.supplier_name : e.material_type}
+                        subtitle={tab === 'rm' ? e.material_type : (row.chemist_name ?? '—')}
+                        aside={
+                          <>
+                            <span className="block text-base font-medium tabular-nums text-owner">
+                              {e.tons_loaded}
+                            </span>
+                            <span className="block text-[10px] uppercase tracking-wider text-muted">Kg</span>
+                          </>
+                        }
+                        rows={
+                          tab === 'rm'
+                            ? [
+                                { label: 'Rate / Kg', value: `₹${e.rate_per_ton}` },
+                                { label: 'Value', value: `₹${Number(e.total_value).toLocaleString('en-IN')}` },
+                                { label: 'Date', value: new Date(e.entry_date).toLocaleDateString('en-IN') },
+                                { label: 'Booked by', value: row.profiles?.full_name ?? '—' },
+                              ]
+                            : [
+                                {
+                                  label: 'Mfg date',
+                                  value: mfg ? new Date(mfg).toLocaleDateString('en-IN') : '—',
+                                },
+                                ...(tab !== 'byproduct'
+                                  ? [{ label: 'Purity', value: row.purity != null ? `${row.purity}%` : '—' }]
+                                  : []),
+                              ]
+                        }
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="hidden md:block">
+        <LedgerKindTabs tab={tab} onChange={handleTabChange}>
+        {!loading && entries.length > 0 && (
+          <div className="border-b border-border">
+            <SmartFilterBar
+              filter={filter}
+              placeholder={tab === 'rm' ? 'Search GRN, invoice, or supplier…' : 'Search lot, batch, or product…'}
+              accent="owner"
+              chipExtras={
+                <>
+                  <DateRangeChip
+                    from={dateFrom}
+                    to={dateTo}
+                    onChange={(from, to) => {
+                      setDateFrom(from)
+                      setDateTo(to)
+                    }}
+                  />
+                  {tab === 'rm' ? (
+                    <RateRangeChip
+                      min={rateMin}
+                      max={rateMax}
+                      sliderMax={rateSliderMax}
+                      onMinChange={setRateMin}
+                      onMaxChange={setRateMax}
+                      onClear={() => { setRateMin(''); setRateMax('') }}
+                    />
+                  ) : null}
+                </>
+              }
+              actions={
+                tab === 'rm' ? (
+                  <span className="hidden whitespace-nowrap font-mono text-xs text-muted sm:inline">
+                    Total: <span className="font-display text-base font-bold text-owner">₹{(totalValue / 100000).toFixed(2)}L</span>
+                  </span>
+                ) : null
+              }
+            />
+          </div>
+        )}
+
+        <div>
+          {loading ? (
+            <SpinnerBlock accent="owner" label="Loading stock ledger" />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Invoice No.</th>
-                      <th>Factory</th>
-                      <th>Supplier</th>
-                      <th>Material</th>
-                      <th>KGS</th>
-                      <th>Rate / KGs</th>
-                      <th>Total Value</th>
-                      <th>Date</th>
-                      <th>By</th>
+                      {tab === 'rm' ? (
+                        <>
+                          <SortTh label="Invoice / GRN" col="invoice" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Supplier" col="supplier" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Material" col="material" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Quantity (Kg)" col="qty" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Rate / Kg" col="rate" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Total Value" col="value" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Date" col="date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Booked by" col="bookedBy" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                        </>
+                      ) : (
+                        <>
+                          <SortTh label="Lot" col="lot" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Product" col="product" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Chemist" col="chemist" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Mfg date" col="mfg" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          <SortTh label="Quantity (Kg)" col="qty" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          {tab !== 'byproduct' && (
+                            <SortTh label="Purity" col="purity" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} accent="owner" />
+                          )}
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(e => (
+                    {sorted.map(e => {
+                      const row = e as any
+                      const mfg = row.mfg_date || e.entry_date
+                      return (
                       <tr key={e.id}>
                         <td className="font-mono text-inputer text-xs">{e.invoice_number}</td>
-                        <td className="text-primary text-xs">{(e as any).factories?.name}</td>
-                        <td className="text-primary">{e.supplier_name}</td>
-                        <td className="text-muted">{e.material_type}</td>
-                        <td className="font-mono text-inputer">{e.tons_loaded} KGS</td>
-                        <td className="font-mono text-owner">₹{e.rate_per_ton}</td>
-                        <td className="font-mono font-bold text-owner">₹{Number(e.total_value).toLocaleString('en-IN')}</td>
-                        <td className="text-muted text-xs">{new Date(e.entry_date).toLocaleDateString('en-IN')}</td>
-                        <td className="text-muted text-xs">{(e as any).profiles?.full_name}</td>
+                        {tab === 'rm' ? (
+                          <>
+                            <td className="text-primary">{e.supplier_name}</td>
+                            <td className="text-muted">{e.material_type}</td>
+                            <td className="font-mono text-inputer">{e.tons_loaded}</td>
+                            <td className="font-mono text-owner">₹{e.rate_per_ton}</td>
+                            <td className="font-mono font-bold text-owner">₹{Number(e.total_value).toLocaleString('en-IN')}</td>
+                            <td className="text-muted text-xs">{new Date(e.entry_date).toLocaleDateString('en-IN')}</td>
+                            <td className="text-muted text-xs">{row.profiles?.full_name}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="text-primary">{e.material_type}</td>
+                            <td className="text-primary text-xs">{row.chemist_name ?? '—'}</td>
+                            <td className="text-muted text-xs">
+                              {mfg ? new Date(mfg).toLocaleDateString('en-IN') : '—'}
+                            </td>
+                            <td className="font-mono text-inputer">{e.tons_loaded}</td>
+                            {tab !== 'byproduct' && (
+                              <td className="font-mono text-muted">
+                                {row.purity != null ? `${row.purity}%` : '—'}
+                              </td>
+                            )}
+                          </>
+                        )}
                       </tr>
-                    ))}
-                    {filtered.length === 0 && (
+                      )
+                    })}
+                    {sorted.length === 0 && (
                       <tr><td colSpan={9} className="text-center text-muted py-12">No records found</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
-
-              <div className="md:hidden data-card-list p-4">
-                {filtered.length === 0 && (
-                  <div className="text-center text-muted py-6 border border-dashed border-[color-mix(in srgb, var(--color-border) 80%, transparent)] rounded-lg">
-                    No records found
-                  </div>
-                )}
-                {filtered.map(e => (
-                  <div key={e.id} className="data-card">
-                    <div className="data-card-header">
-                      <span className="data-card-title text-inputer">{e.invoice_number}</span>
-                      <span className="data-card-meta">{new Date(e.entry_date).toLocaleDateString('en-IN')}</span>
-                    </div>
-                    <div className="data-card-grid">
-                      <span className="data-card-label">Factory</span>
-                      <span className="data-card-value">{(e as any).factories?.name ?? '—'}</span>
-
-                      <span className="data-card-label">Supplier</span>
-                      <span className="data-card-value">{e.supplier_name}</span>
-
-                      <span className="data-card-label">Material</span>
-                      <span className="text-muted text-right">{e.material_type}</span>
-
-                      <span className="data-card-label">KGS</span>
-                      <span className="font-mono text-inputer text-right">{e.tons_loaded} KGS</span>
-
-                      <span className="data-card-label">Rate / KGs</span>
-                      <span className="font-mono text-owner text-right">₹{e.rate_per_ton}</span>
-
-                      <span className="data-card-label">Total Value</span>
-                      <span className="font-mono text-owner font-bold text-right">₹{Number(e.total_value).toLocaleString('en-IN')}</span>
-
-                      <span className="data-card-label">By</span>
-                      <span className="text-muted text-right">{(e as any).profiles?.full_name ?? '—'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </>
           )}
+        </div>
+        {!loading && (
+          <div className="mt-4 flex justify-center">
+            <ListPager page={page} total={stockTotal} onPage={setPage} />
+          </div>
+        )}
+        </LedgerKindTabs>
         </div>
       </div>
     </AppLayout>

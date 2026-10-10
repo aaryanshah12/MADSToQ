@@ -1,4 +1,11 @@
-export type Role = 'owner' | 'inputer' | 'chemist'
+export type Role =
+  | 'owner'
+  | 'inputer'
+  | 'chemist'
+  | 'accountant'
+  | 'warehouse_manager'
+  | 'lab_incharge'
+  | 'plant_supervisor'
 export type Shift = 'morning' | 'afternoon' | 'night'
 
 export interface Factory {

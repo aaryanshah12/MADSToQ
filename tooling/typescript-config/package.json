@@ -1,0 +1,12 @@
+{
+  "name": "@madstoq/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "exports": {
+    "./base.json": "./base.json",
+    "./nextjs.json": "./nextjs.json",
+    "./react-library.json": "./react-library.json",
+    "./node.json": "./node.json"
+  }
+}

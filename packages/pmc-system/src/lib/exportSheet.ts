@@ -1,4 +1,4 @@
-import type { PMCProduct, PMCPricingResult, PMCReference } from '../lib/types'
+import type { PMCProduct, PMCPricingResult, PMCReference } from '../types'
 
 function safeFilename(part: string): string {
   return part.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 80)

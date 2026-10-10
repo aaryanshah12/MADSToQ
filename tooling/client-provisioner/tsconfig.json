@@ -1,0 +1,4 @@
+{
+  "extends": "@madstoq/typescript-config/node.json",
+  "include": ["src/**/*"]
+}

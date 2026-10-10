@@ -2,17 +2,15 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { authClient } from '@/lib/auth-client'
-import { useAuth } from '@/hooks/useAuth'
+import { useSession, signOut as nextAuthSignOut } from 'next-auth/react'
 import { useIOFactory } from '@/contexts/IOFactoryContext'
-import { PortalWhatsAppHelp } from '@/components/PortalWhatsAppHelp'
-import { persistTheme, readStoredTheme } from '@/hooks/useTheme'
 import clsx from 'clsx'
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpToLine,
   Home, Globe, FileText, BookOpen,
   LogOut, Menu, X, Sun, Moon, ChevronRight, ChevronDown, Building2, Check,
 } from 'lucide-react'
+import { useIoFeatures } from '@/contexts/IoFeaturesContext'
 
 const BASE          = '/inward-outward'
 const SESSION_KEY   = 'io-last-activity'
@@ -20,12 +18,12 @@ const EMAIL_KEY     = 'io-last-email'
 const INACTIVITY_MS = 24 * 60 * 60 * 1000   // 24 hours
 const CHECK_INTERVAL = 60 * 1000             // check every minute
 
-const NAV = [
+const NAV_ALL = [
   { href: `${BASE}/dashboard`,      label: 'Dashboard',     icon: LayoutDashboard },
   { href: `${BASE}/inward`,         label: 'Inward',        icon: ArrowDownToLine },
   { href: `${BASE}/outward`,        label: 'Outward',       icon: ArrowUpToLine },
-  { href: `${BASE}/domestic`,       label: 'Domestic',      icon: Home },
-  { href: `${BASE}/international`,  label: 'International', icon: Globe },
+  { href: `${BASE}/domestic`,       label: 'Domestic',      icon: Home,            module: 'domestic' as const },
+  { href: `${BASE}/international`,  label: 'International', icon: Globe,           module: 'international' as const },
   { href: `${BASE}/quotation`,      label: 'Quotation',     icon: FileText },
   { href: `${BASE}/master`,         label: 'Master',        icon: BookOpen },
 ]
@@ -33,7 +31,14 @@ const NAV = [
 export default function IOLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user: authUser, profile, loading: authLoading } = useAuth()
+  const ioFeatures = useIoFeatures()
+
+  const nav = NAV_ALL.filter((item) => {
+    if (item.module === 'domestic') return ioFeatures.domestic
+    if (item.module === 'international') return ioFeatures.international
+    return true
+  })
+  const { data: session, status } = useSession()
   const { factoryId, setFactoryId, factories } = useIOFactory()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
@@ -41,36 +46,37 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
   const [factorySwitcherOpen, setFactorySwitcherOpen] = useState(false)
   const [topbarSwitcherOpen, setTopbarSwitcherOpen] = useState(false)
 
+  const userEmail = session?.user?.email ?? undefined
+
   useEffect(() => {
-    if (authLoading) return
-    if (!authUser) {
-      router.replace('/portals/demo/inward-outward')
+    if (status === 'loading') return
+    if (status !== 'authenticated' || !session?.user) {
+      router.replace('/inward-outward/login')
       return
     }
 
     const last = parseInt(localStorage.getItem(SESSION_KEY) ?? '0', 10)
     if (last && Date.now() - last > INACTIVITY_MS) {
       localStorage.removeItem('io-factory-id')
-      void authClient.auth.signOut()
-      router.replace('/portals/demo/inward-outward')
-      return
+      void nextAuthSignOut({ redirect: false })
+      router.replace('/inward-outward/login')
     }
-
-  }, [authLoading, authUser, router])
+  }, [status, session, router])
 
   // Activity tracking — update timestamp on every interaction
   useEffect(() => {
+    if (status !== 'authenticated') return
+
     const bump = () => localStorage.setItem(SESSION_KEY, Date.now().toString())
     const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
     events.forEach(ev => window.addEventListener(ev, bump, { passive: true }))
 
-    // Periodic check every minute
     const timer = setInterval(() => {
       const last = parseInt(localStorage.getItem(SESSION_KEY) ?? '0', 10)
       if (last && Date.now() - last > INACTIVITY_MS) {
         localStorage.removeItem('io-factory-id')
-        authClient.auth.signOut()
-        router.replace('/portals/demo/inward-outward')
+        void nextAuthSignOut({ redirect: false })
+        router.replace('/inward-outward/login')
       }
     }, CHECK_INTERVAL)
 
@@ -78,28 +84,38 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
       events.forEach(ev => window.removeEventListener(ev, bump))
       clearInterval(timer)
     }
-  }, [])
+  }, [status, router])
 
   useEffect(() => {
-    const saved = readStoredTheme()
+    const saved = (localStorage.getItem('io-theme') as 'dark' | 'light' | null) ?? 'light'
     setTheme(saved)
-    persistTheme(saved)
+    document.documentElement.dataset.theme = saved
     setThemeMounted(true)
   }, [])
 
   useEffect(() => {
     if (!themeMounted) return
-    persistTheme(theme)
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('io-theme', theme)
   }, [theme, themeMounted])
 
   useEffect(() => { setSidebarOpen(false) }, [pathname])
 
+  useEffect(() => {
+    if (!ioFeatures.domestic && pathname.startsWith(`${BASE}/domestic`)) {
+      router.replace(`${BASE}/dashboard`)
+    }
+    if (!ioFeatures.international && pathname.startsWith(`${BASE}/international`)) {
+      router.replace(`${BASE}/dashboard`)
+    }
+  }, [pathname, router])
+
   const handleLogout = async () => {
-    if (authUser?.email) localStorage.setItem(EMAIL_KEY, authUser.email)
+    if (userEmail) localStorage.setItem(EMAIL_KEY, userEmail)
     localStorage.removeItem(SESSION_KEY)
     localStorage.removeItem('io-factory-id')
-    await authClient.auth.signOut()
-    router.replace('/portals/demo/inward-outward')
+    await nextAuthSignOut({ redirect: false })
+    router.replace('/inward-outward/login')
   }
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
@@ -134,10 +150,10 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
       <div className="px-4 py-4 border-b border-border">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 border text-inputer border-inputer/30 bg-inputer/10">
           <div className="w-8 h-8 rounded-lg bg-inputer/20 flex items-center justify-center text-sm font-bold flex-shrink-0 text-inputer">
-            {authUser?.email?.charAt(0).toUpperCase() ?? '?'}
+            {userEmail?.charAt(0).toUpperCase() ?? '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-primary truncate">{authUser?.email ?? '—'}</div>
+            <div className="text-sm font-semibold text-primary truncate">{userEmail ?? '—'}</div>
             <div className="font-mono text-[10px] uppercase tracking-widest opacity-70">I/O User</div>
           </div>
         </div>
@@ -187,37 +203,27 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = isActive(href)
           return (
             <Link
               key={href}
               href={href}
-              className={clsx(
-                'w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all duration-150 group min-h-[44px]',
-                active
-                  ? 'text-primary font-medium bg-inputer/15 border border-inputer/30'
-                  : 'text-muted hover:text-primary hover:bg-layer-sm'
-              )}
+              className={clsx('nav-item group', active && 'nav-item-active')}
             >
               <Icon
                 size={17}
-                className={active ? 'text-inputer' : 'text-muted group-hover:text-primary'}
+                className={active ? 'text-current' : 'text-muted group-hover:text-primary'}
               />
               {label}
-              {active && <ChevronRight size={13} className="ml-auto opacity-50" />}
+              {!active && <ChevronRight size={13} className="ml-auto text-muted opacity-60" />}
             </Link>
           )
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-border space-y-1">
-        <a
-          href="/inward-outward/manual"
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-primary hover:bg-layer-sm transition-all"
-        >
-          <BookOpen size={16} /> User manual
-        </a>
+      {/* Sign out */}
+      <div className="px-4 py-4 border-t border-border">
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted hover:text-red-400 hover:bg-red-500/10 transition-all"
@@ -312,8 +318,6 @@ export default function IOLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
-
-      <PortalWhatsAppHelp portalName="Inward-Outward Portal" />
     </div>
   )
 }

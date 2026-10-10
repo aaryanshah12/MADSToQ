@@ -1,14 +1,25 @@
 'use client'
 import { useEffect, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import { EmptyState, SmartFilterBar, SpinnerBlock, useSmartFilter } from '@/components/ui'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import { usersApi } from '@/lib/api'
 import { Profile } from '@/types'
 import clsx from 'clsx'
-import { UserCheck, UserX, Plus, CheckCircle, Pencil, X } from 'lucide-react'
+import { UserCheck, UserX, Plus, CheckCircle, Pencil } from 'lucide-react'
+import { MgmtDrawer } from '@/components/inventory/MgmtDrawer'
 import { useAuth } from '@/hooks/useAuth'
 
 const EMPTY_NEW_USER = { full_name: '', email: '', phone: '', role: 'inputer', password: '', factory_ids: [] as string[] }
+
+const ROLE_OPTIONS = [
+  { id: 'owner', label: 'Owner' },
+  { id: 'inputer', label: 'Inputer' },
+  { id: 'chemist', label: 'Chemist' },
+  { id: 'accountant', label: 'Accountant' },
+  { id: 'warehouse_manager', label: 'Warehouse' },
+  { id: 'lab_incharge', label: 'Lab' },
+]
 
 export default function OwnerUsersPage() {
   const { profile, loading: authLoading } = useAuth()
@@ -118,6 +129,30 @@ export default function OwnerUsersPage() {
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: !u.is_active } : u))
   }
 
+  const filter = useSmartFilter(users, {
+    getSearchText: (u) => [u.full_name, u.email, u.phone, u.role],
+    facets: [
+      { key: 'role', label: 'Role', getValue: (u) => u.role, options: ROLE_OPTIONS },
+      {
+        key: 'status',
+        label: 'Status',
+        getValue: (u) => (u.is_active ? 'active' : 'inactive'),
+        options: [
+          { id: 'active', label: 'Active' },
+          { id: 'inactive', label: 'Inactive' },
+        ],
+      },
+      {
+        key: 'factory',
+        label: 'Factory',
+        getValue: (u) =>
+          (pfMap[u.id] ?? [])
+            .map((id) => factories.find((f) => f.id === id)?.name)
+            .filter((n): n is string => Boolean(n)),
+      },
+    ],
+  })
+
   // ─── FACTORY CHECKBOX COMPONENT ─────────────────────────
   function FactoryCheckboxes({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) {
     if (factories.length === 0) return <p className="text-xs text-muted italic">No active factories found.</p>
@@ -152,7 +187,7 @@ export default function OwnerUsersPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="User Management"
           subtitle="Owner · Manage All Users"
@@ -199,8 +234,8 @@ export default function OwnerUsersPage() {
             <form onSubmit={handleAddUser} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Full Name *</label>
-                  <input
+                  <label htmlFor="full-name" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Full Name *</label>
+                  <input id="full-name"
                     className="input-field owner-focus"
                     value={newUser.full_name}
                     onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
@@ -209,8 +244,8 @@ export default function OwnerUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Email *</label>
-                  <input
+                  <label htmlFor="email" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Email *</label>
+                  <input id="email"
                     type="email"
                     className="input-field owner-focus"
                     value={newUser.email}
@@ -220,8 +255,8 @@ export default function OwnerUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Phone</label>
-                  <input
+                  <label htmlFor="phone" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Phone</label>
+                  <input id="phone"
                     className="input-field owner-focus"
                     value={newUser.phone}
                     onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
@@ -229,8 +264,8 @@ export default function OwnerUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Role *</label>
-                  <select
+                  <label htmlFor="role" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Role *</label>
+                  <select id="role"
                     className="input-field owner-focus"
                     value={newUser.role}
                     onChange={e => setNewUser({ ...newUser, role: e.target.value })}
@@ -238,11 +273,12 @@ export default function OwnerUsersPage() {
                     <option value="owner">Owner</option>
                     <option value="inputer">Inputer</option>
                     <option value="chemist">Chemist</option>
+                    <option value="accountant">Accountant</option>
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Password *</label>
-                  <input
+                  <label htmlFor="password" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Password *</label>
+                  <input id="password"
                     type="password"
                     className="input-field owner-focus"
                     value={newUser.password}
@@ -287,11 +323,16 @@ export default function OwnerUsersPage() {
 
         {/* ─── USERS LIST ───────────────────────────────── */}
         <div className="card overflow-hidden">
+          {!loading && users.length > 0 && (
+            <SmartFilterBar
+              filter={filter}
+              placeholder="Search name, email, role…"
+              accent="owner"
+            />
+          )}
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-              </div>
+              <SpinnerBlock accent="owner" label="Loading users" />
             ) : users.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <p className="text-muted text-sm">No users yet.</p>
@@ -299,11 +340,23 @@ export default function OwnerUsersPage() {
                   <Plus size={15}/> Add your first user
                 </button>
               </div>
+            ) : filter.filtered.length === 0 ? (
+              <EmptyState
+                title="No users match"
+                description="Try a different search or clear the filter chips."
+                action={
+                  filter.isFiltering ? (
+                    <button type="button" onClick={() => { filter.setSearch(''); filter.clearAll() }} className="btn btn-ghost text-sm">
+                      Clear all
+                    </button>
+                  ) : undefined
+                }
+              />
             ) : (
               <>
                 {/* Mobile cards */}
                 <div className="md:hidden divide-y divide-border">
-                  {users.map(user => (
+                  {filter.filtered.map(user => (
                     <div key={user.id} className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -311,6 +364,7 @@ export default function OwnerUsersPage() {
                             'w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0',
                             user.role === 'owner'   ? 'bg-owner/15 text-owner'   :
                             user.role === 'inputer' ? 'bg-inputer/15 text-inputer' :
+                            user.role === 'accountant' ? 'bg-pmc/15 text-pmc' :
                                                       'bg-chemist/15 text-chemist'
                           )}>
                             {user.full_name.charAt(0)}
@@ -322,7 +376,8 @@ export default function OwnerUsersPage() {
                         </div>
                         <span className={clsx('badge',
                           user.role === 'owner'   ? 'badge-owner'   :
-                          user.role === 'inputer' ? 'badge-inputer' : 'badge-chemist'
+                          user.role === 'inputer' ? 'badge-inputer' :
+                          user.role === 'accountant' ? 'badge-pmc' : 'badge-chemist'
                         )}>
                           {user.role}
                         </span>
@@ -381,7 +436,7 @@ export default function OwnerUsersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map(user => (
+                    {filter.filtered.map(user => (
                       <tr key={user.id}>
                         <td>
                           <div className="flex items-center gap-3">
@@ -389,6 +444,7 @@ export default function OwnerUsersPage() {
                               'w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0',
                               user.role === 'owner'   ? 'bg-owner/15 text-owner'   :
                               user.role === 'inputer' ? 'bg-inputer/15 text-inputer' :
+                              user.role === 'accountant' ? 'bg-pmc/15 text-pmc' :
                                                         'bg-chemist/15 text-chemist'
                             )}>
                               {user.full_name.charAt(0)}
@@ -402,7 +458,8 @@ export default function OwnerUsersPage() {
                         <td>
                           <span className={clsx('badge',
                             user.role === 'owner'   ? 'badge-owner'   :
-                            user.role === 'inputer' ? 'badge-inputer' : 'badge-chemist'
+                            user.role === 'inputer' ? 'badge-inputer' :
+                            user.role === 'accountant' ? 'badge-pmc' : 'badge-chemist'
                           )}>
                             {user.role}
                           </span>
@@ -458,27 +515,34 @@ export default function OwnerUsersPage() {
         </div>
       </div>
 
-      {/* ─── EDIT USER MODAL ─────────────────────────────── */}
       {editUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-down">
-          <div className="card border-owner/30 w-full max-w-lg p-6 relative">
-            <button
-              onClick={() => setEditUser(null)}
-              className="absolute top-4 right-4 text-muted hover:text-primary transition-colors"
-            >
-              <X size={20}/>
-            </button>
-
-            <h3 className="font-display text-lg font-semibold text-owner uppercase tracking-wide mb-1">
-              Edit User
-            </h3>
-            <p className="text-xs text-muted mb-5">{editUser.email}</p>
-
-            <form onSubmit={handleEditSave} className="space-y-4">
+        <MgmtDrawer
+          eyebrow="People"
+          title="Edit user"
+          subtitle={editUser.email}
+          onClose={() => setEditUser(null)}
+          size="sm"
+          footer={
+            <>
+              <button type="button" onClick={() => setEditUser(null)} className="btn btn-ghost">
+                Cancel
+              </button>
+              <button type="submit" form="edit-user-form" disabled={editSaving} className="btn btn-owner">
+                {editSaving ? 'Saving…' : 'Save changes'}
+              </button>
+            </>
+          }
+        >
+            {editError && (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-sm text-red-400">
+                {editError}
+              </div>
+            )}
+            <form id="edit-user-form" onSubmit={handleEditSave} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Full Name *</label>
-                  <input
+                  <label htmlFor="full-name-2" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Full Name *</label>
+                  <input id="full-name-2"
                     className="input-field owner-focus"
                     value={editForm.full_name}
                     onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
@@ -486,8 +550,8 @@ export default function OwnerUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Phone</label>
-                  <input
+                  <label htmlFor="phone-2" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Phone</label>
+                  <input id="phone-2"
                     className="input-field owner-focus"
                     value={editForm.phone}
                     onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
@@ -496,14 +560,15 @@ export default function OwnerUsersPage() {
                 </div>
                 {editUser.role !== 'owner' && (
                   <div className="md:col-span-2">
-                    <label className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Role *</label>
-                    <select
+                    <label htmlFor="role-2" className="block font-mono text-xs text-muted uppercase tracking-widest mb-2">Role *</label>
+                    <select id="role-2"
                       className="input-field owner-focus"
                       value={editForm.role}
                       onChange={e => setEditForm({ ...editForm, role: e.target.value })}
                     >
                       <option value="inputer">Inputer</option>
                       <option value="chemist">Chemist</option>
+                      <option value="accountant">Accountant</option>
                     </select>
                   </div>
                 )}
@@ -518,23 +583,8 @@ export default function OwnerUsersPage() {
                 <FactoryCheckboxes selected={editForm.factory_ids} onToggle={toggleEditFactory} />
               </div>
 
-              {editError && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2 text-sm text-red-400">
-                  {editError}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={editSaving} className="btn btn-owner flex-1 justify-center py-3">
-                  {editSaving ? 'Saving...' : '✓ Save Changes'}
-                </button>
-                <button type="button" onClick={() => setEditUser(null)} className="btn btn-ghost px-6">
-                  Cancel
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+        </MgmtDrawer>
       )}
     </AppLayout>
   )

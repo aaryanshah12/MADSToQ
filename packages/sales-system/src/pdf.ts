@@ -1,7 +1,7 @@
 import path from 'path'
 import { promises as fs } from 'fs'
 import { PDFDocument } from 'pdf-lib'
-import type { SalesDocument, SalesOrg } from './types/index'
+import type { SalesDocument, SalesOrg } from "./types";
 
 const A4_WIDTH = 595.28
 const A4_HEIGHT = 841.89

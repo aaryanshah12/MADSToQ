@@ -2,16 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
+import PageHeader from '@madstoq/ui/erp-page-header'
 import SimpleModal from '@madstoq/ui/simple-modal'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/components/providers/ToastProvider'
 import { deleteInwardEntry, fetchInwardEntries, InwardEntry, saveInwardEntry, totalsForInward, toInwardCsv } from '@/lib/inward'
-import { Download, Save, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, Download, Save, Trash2 } from 'lucide-react'
+import { CardListSkeleton, EmptyState, Spinner, TableSkeleton, useConfirm } from '@/components/ui'
 import { fetchInOutProducts, InOutProduct } from '@/lib/inoutProducts'
 import { calendarYearForFy, currentFinancialYear, financialYearOptions, fyLabel, monthOptions, monthRangeISO } from '@/lib/monthFilter'
 
 export default function OwnerInwardPage() {
   const { profile } = useAuth()
+  const toast = useToast()
+  const confirm = useConfirm()
   const factories = useMemo(() => profile?.factories ?? [], [profile])
   const factoryIds = useMemo(() => factories.map((f: any) => f.id).filter(Boolean), [factories])
   const { fyStart: defaultFyStart, month: defaultMonth } = useMemo(() => currentFinancialYear(), [])
@@ -96,7 +100,7 @@ export default function OwnerInwardPage() {
   const handleSave = async () => {
     if (!profile) return
     if (!hasTons) {
-      alert('Please complete all fields in order')
+      toast.error('Please complete all fields in order')
       return
     }
     setSaving(true)
@@ -111,7 +115,7 @@ export default function OwnerInwardPage() {
       setModalOpen(false)
       await load()
     } catch (err: any) {
-      alert(err.message)
+      toast.error(err?.message ?? 'Could not save the inward entry.')
     } finally {
       setSaving(false)
     }
@@ -119,7 +123,13 @@ export default function OwnerInwardPage() {
 
   const handleDelete = async (id?: string) => {
     if (!id) return
-    if (!confirm('Delete this entry?')) return
+    const ok = await confirm({
+      title: 'Delete inward entry?',
+      body: 'This removes the entry from the inward register. This cannot be undone.',
+      confirmLabel: 'Delete entry',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteInwardEntry(id)
     await load()
   }
@@ -141,7 +151,7 @@ export default function OwnerInwardPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="Inward"
           subtitle="Owner · Log inward product quantities"
@@ -160,14 +170,14 @@ export default function OwnerInwardPage() {
 
         <div className="card p-4 md:p-6 mb-4 grid gap-4 md:grid-cols-3 items-end">
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Financial Year</label>
-            <select value={fyStart} onChange={e => setFyStart(Number(e.target.value))} className="input">
+            <label htmlFor="financial-year" className="text-xs text-muted font-mono">Financial Year</label>
+            <select id="financial-year" value={fyStart} onChange={e => setFyStart(Number(e.target.value))} className="input">
               {fyOptions.map(y => <option key={y} value={y}>{fyLabel(y)}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-xs text-muted font-mono">Month</label>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input">
+            <label htmlFor="month" className="text-xs text-muted font-mono">Month</label>
+            <select id="month" value={month} onChange={e => setMonth(Number(e.target.value))} className="input">
               {monthOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
@@ -179,7 +189,7 @@ export default function OwnerInwardPage() {
         <div className="card overflow-hidden">
           <div className="px-4 md:px-6 py-4 border-b border-border flex items-center justify-between">
             <div className="font-mono text-xs text-muted uppercase tracking-widest">Entries</div>
-            {loading && <div className="w-4 h-4 border-2 border-owner border-t-transparent rounded-full animate-spin" />}
+            {loading && <Spinner size="sm" accent="owner" label="Loading entries" />}
           </div>
 
           <div className="hidden md:block overflow-x-auto">
@@ -195,11 +205,7 @@ export default function OwnerInwardPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} className="py-12">
-                    <div className="flex justify-center">
-                      <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  </td></tr>
+                  <TableSkeleton columns={5} />
                 ) : (
                   <>
                     {entries.map(e => (
@@ -216,7 +222,15 @@ export default function OwnerInwardPage() {
                       </tr>
                     ))}
                     {entries.length === 0 && (
-                      <tr><td colSpan={5} className="text-center text-muted py-8">No entries yet</td></tr>
+                      <tr>
+                        <td colSpan={5} className="p-0">
+                          <EmptyState
+                            icon={<ArrowDownToLine size={28} strokeWidth={1.5} />}
+                            title="No inward entries this month"
+                            description="Add an entry to record material received for the selected month."
+                          />
+                        </td>
+                      </tr>
                     )}
                   </>
                 )}
@@ -235,9 +249,7 @@ export default function OwnerInwardPage() {
 
           <div className="md:hidden p-4">
             {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-6 h-6 border-2 border-owner border-t-transparent rounded-full animate-spin" />
-              </div>
+              <CardListSkeleton count={3} />
             ) : (
               <div className="data-card-list">
                 {entries.map(e => (
@@ -260,7 +272,10 @@ export default function OwnerInwardPage() {
                   </div>
                 ))}
                 {entries.length === 0 && (
-                  <div className="text-center text-muted py-8">No entries yet</div>
+                  <EmptyState
+                    icon={<ArrowDownToLine size={28} strokeWidth={1.5} />}
+                    title="No inward entries this month"
+                  />
                 )}
               </div>
             )}
@@ -288,8 +303,8 @@ export default function OwnerInwardPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted font-mono">Factory</label>
-            <select
+            <label htmlFor="factory" className="text-xs text-muted font-mono">Factory</label>
+            <select id="factory"
               className="input"
               value={form.factory_id}
               onChange={e => setForm(f => ({ ...f, factory_id: e.target.value }))}
@@ -300,8 +315,8 @@ export default function OwnerInwardPage() {
 
           {hasFactory && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Product</label>
-              <select
+              <label htmlFor="product" className="text-xs text-muted font-mono">Product</label>
+              <select id="product"
                 className="input"
                 value={form.product_id}
                 onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))}
@@ -313,8 +328,8 @@ export default function OwnerInwardPage() {
 
           {hasProduct && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">Date</label>
-              <input
+              <label htmlFor="date" className="text-xs text-muted font-mono">Date</label>
+              <input id="date"
                 className="input"
                 type="date"
                 value={String(form.entry_date ?? '')}
@@ -325,8 +340,8 @@ export default function OwnerInwardPage() {
 
           {hasDate && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted font-mono">TONS (in Kg)</label>
-              <input
+              <label htmlFor="tons-in-kg" className="text-xs text-muted font-mono">TONS (in Kg)</label>
+              <input id="tons-in-kg"
                 className="input"
                 type="number"
                 step="0.001"

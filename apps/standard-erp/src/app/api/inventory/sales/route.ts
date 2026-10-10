@@ -1,4 +1,4 @@
-import { db } from '@madstoq/database'
+import { prisma, serializeSalesEntry, moneyStrOrNull } from '@madstoq/database'
 import { NextResponse } from 'next/server'
 
 type SalesEntryInput = {
@@ -43,19 +43,17 @@ export async function GET(request: Request) {
   if (!fiscalYear) return NextResponse.json({ error: 'fiscal_year is required' }, { status: 400 })
   if (!factoryId)  return NextResponse.json({ error: 'factory_id is required' },  { status: 400 })
 
-  let query = db
-    .from('sales_entries')
-    .select('*, sales_entry_lines(*)')
-    .eq('fiscal_year', fiscalYear)
-    .eq('factory_id', factoryId)
-    .order('month', { ascending: true })
+  const entries = await prisma.salesEntry.findMany({
+    where: {
+      fiscalYear,
+      factoryId,
+      ...(month ? { month: Number(month) } : {}),
+    },
+    include: { lines: true },
+    orderBy: { month: 'asc' },
+  })
 
-  if (month) query = query.eq('month', Number(month))
-
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-  return NextResponse.json({ entries: data ?? [] })
+  return NextResponse.json({ entries: entries.map(serializeSalesEntry) })
 }
 
 export async function POST(request: Request) {
@@ -78,48 +76,50 @@ export async function POST(request: Request) {
     const pntosaLine = byKey('pntosa')
     const hydrazoneLine = byKey('hydrazone')
 
-    // Upsert by FY+month+factory (enforced by unique index)
-    const { data, error } = await db
-      .from('sales_entries')
-      .upsert({
-        fiscal_year: String(payload.fiscal_year).trim(),
+    const data = await prisma.salesEntry.upsert({
+      where: {
+        fiscalYear_month_factoryId: {
+          fiscalYear: String(payload.fiscal_year).trim(),
+          month: Number(payload.month),
+          factoryId: payload.factory_id,
+        },
+      },
+      create: {
+        fiscalYear: String(payload.fiscal_year).trim(),
         month: Number(payload.month),
-        factory_id: payload.factory_id,
-        turnover: toNumOrNull(payload.turnover) ?? (turnoverLine?.price_rupees ?? null),
-        pntosa: toNumOrNull(payload.pntosa) ?? (pntosaLine?.price_rupees ?? null),
-        hydrazone: toNumOrNull(payload.hydrazone) ?? (hydrazoneLine?.price_rupees ?? null),
+        factoryId: payload.factory_id,
+        turnover: moneyStrOrNull(toNumOrNull(payload.turnover) ?? turnoverLine?.price_rupees ?? null),
+        pntosa: moneyStrOrNull(toNumOrNull(payload.pntosa) ?? pntosaLine?.price_rupees ?? null),
+        hydrazone: moneyStrOrNull(toNumOrNull(payload.hydrazone) ?? hydrazoneLine?.price_rupees ?? null),
         notes: payload.notes ?? null,
-        created_by: payload.created_by,
-      }, { onConflict: 'fiscal_year,month,factory_id' })
-      .select()
-      .single()
+        createdBy: payload.created_by,
+      },
+      update: {
+        turnover: moneyStrOrNull(toNumOrNull(payload.turnover) ?? turnoverLine?.price_rupees ?? null),
+        pntosa: moneyStrOrNull(toNumOrNull(payload.pntosa) ?? pntosaLine?.price_rupees ?? null),
+        hydrazone: moneyStrOrNull(toNumOrNull(payload.hydrazone) ?? hydrazoneLine?.price_rupees ?? null),
+        notes: payload.notes ?? null,
+      },
+    })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-    const entryId = data?.id
-    if (entryId) {
-      const { error: delErr } = await db
-        .from('sales_entry_lines')
-        .delete()
-        .eq('sales_entry_id', entryId)
-      if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 })
-
-      if (lines.length > 0) {
-        const { error: insErr } = await db
-          .from('sales_entry_lines')
-          .insert(lines.map(l => ({ ...l, sales_entry_id: entryId })))
-        if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 })
-      }
+    await prisma.salesEntryLine.deleteMany({ where: { salesEntryId: data.id } })
+    if (lines.length > 0) {
+      await prisma.salesEntryLine.createMany({
+        data: lines.map((l) => ({
+          salesEntryId: data.id,
+          productName: l.product_name,
+          priceRupees: moneyStrOrNull(l.price_rupees),
+          quantityKg: l.quantity_kg,
+        })),
+      })
     }
 
-    const { data: fresh, error: freshErr } = await db
-      .from('sales_entries')
-      .select('*, sales_entry_lines(*)')
-      .eq('id', data.id)
-      .single()
-    if (freshErr) return NextResponse.json({ error: freshErr.message }, { status: 400 })
+    const fresh = await prisma.salesEntry.findUnique({
+      where: { id: data.id },
+      include: { lines: true },
+    })
 
-    return NextResponse.json({ success: true, entry: fresh })
+    return NextResponse.json({ success: true, entry: serializeSalesEntry(fresh!) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -130,19 +130,18 @@ export async function PATCH(request: Request) {
     const payload: SalesEntryInput = await request.json()
     if (!payload.id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await db
-      .from('sales_entries')
-      .update({
-        fiscal_year: payload.fiscal_year ? String(payload.fiscal_year).trim() : undefined,
-        month: payload.month ? Number(payload.month) : undefined,
-        turnover: payload.turnover === undefined ? undefined : toNumOrNull(payload.turnover),
-        pntosa: payload.pntosa === undefined ? undefined : toNumOrNull(payload.pntosa),
-        hydrazone: payload.hydrazone === undefined ? undefined : toNumOrNull(payload.hydrazone),
-        notes: payload.notes === undefined ? undefined : (payload.notes ?? null),
-      })
-      .eq('id', payload.id)
+    await prisma.salesEntry.update({
+      where: { id: payload.id },
+      data: {
+        ...(payload.fiscal_year !== undefined ? { fiscalYear: String(payload.fiscal_year).trim() } : {}),
+        ...(payload.month !== undefined ? { month: Number(payload.month) } : {}),
+        ...(payload.turnover !== undefined ? { turnover: moneyStrOrNull(toNumOrNull(payload.turnover)) } : {}),
+        ...(payload.pntosa !== undefined ? { pntosa: moneyStrOrNull(toNumOrNull(payload.pntosa)) } : {}),
+        ...(payload.hydrazone !== undefined ? { hydrazone: moneyStrOrNull(toNumOrNull(payload.hydrazone)) } : {}),
+        ...(payload.notes !== undefined ? { notes: payload.notes ?? null } : {}),
+      },
+    })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -154,15 +153,9 @@ export async function DELETE(request: Request) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-    const { error } = await db
-      .from('sales_entries')
-      .delete()
-      .eq('id', id)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    await prisma.salesEntry.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-

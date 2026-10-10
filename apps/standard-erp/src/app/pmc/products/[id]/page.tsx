@@ -2,397 +2,535 @@
 
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { useMemo, useState, type ReactNode } from 'react'
+import clsx from 'clsx'
+import { Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { usePMC, usePMCData } from '@/contexts/PMCContext'
-import { chartColors } from '@/lib/chart-theme'
-import type { PMCBatch, PMCRawMaterial } from '@madstoq/pmc-system/types'
-
-type ChartPoint = {
-  label: string
-  unitPrice: number
-  kind: 'template' | 'batch'
-}
-
-function formatInr(n: number) {
-  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
-}
-
-function batchTotalEstimate(b: PMCBatch) {
-  return b.unit_price * (b.batch_size > 0 ? b.batch_size : 1)
-}
-
-function statusBadgeClass(status: PMCBatch['status']) {
-  switch (status) {
-    case 'completed':
-      return 'bg-pmc-10 text-pmc border-pmc-30'
-    case 'active':
-      return 'bg-layer-sm text-primary border-border'
-    case 'cancelled':
-      return 'bg-red-500/10 text-red-400 border-red-500/30'
-    default:
-      return 'bg-layer-sm text-muted border-border'
-  }
-}
+import { pmcApi } from '@madstoq/pmc-system/api'
+import {
+  exportPricingSheetToXlsx,
+  exportProductPricingSheetsToXlsx,
+} from '@madstoq/pmc-system'
+import { formatINR, formatQty } from '@madstoq/pmc-system'
+import type { PMCPricingResult } from '@madstoq/pmc-system/types'
 
 export default function PMCProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { refresh } = usePMC()
-  const { api: pmcApi, tick } = usePMCData()
-  const [saving, setSaving] = useState(false)
+  const { tick } = usePMCData()
+  const [expandedRef, setExpandedRef] = useState<string | null>(null)
+  const [refDetailsOpen, setRefDetailsOpen] = useState<string | null>(null)
+  const [draft, setDraft] = useState<
+    Record<string, { overhead: string; batch_multiplier: string; yield_value: string }>
+  >({})
 
   const product = useMemo(() => {
     void tick
     return pmcApi.getProduct(id)
-  }, [id, tick, pmcApi])
+  }, [id, tick])
 
-  const bom = useMemo(() => {
+  const sheet = useMemo(() => {
     void tick
-    return pmcApi.getProductRecipeLines(id)
-  }, [id, tick, pmcApi])
+    return pmcApi.pricingSheetForProduct(id)
+  }, [id, tick])
 
-  const batches = useMemo(() => {
+  const latestRefId = useMemo(() => {
     void tick
-    return pmcApi.listBatches(id)
-  }, [id, tick, pmcApi])
+    return pmcApi.getLatestReference()?.id ?? null
+  }, [tick])
 
-  const procurement = useMemo(() => {
+  const hasPrimary = useMemo(() => {
     void tick
-    return pmcApi.listRawMaterials()
-  }, [tick, pmcApi])
+    return Boolean(pmcApi.getPrimaryMaterial(id))
+  }, [id, tick])
 
-  const [bomEdit, setBomEdit] = useState<{ raw_material_id: string; qty: string }[]>([])
-
-  const bomSlotCount = useMemo(() => {
-    if (bomEdit.length > 0) return bomEdit.length
-    if (bom.length === 0) return 1
-    return bom.length
-  }, [bomEdit.length, bom.length])
-
-  const visibleBatches = useMemo(
-    () => batches.slice(0, bomSlotCount),
-    [batches, bomSlotCount]
+  const exportableSheets = useMemo(
+    () =>
+      sheet
+        .filter((row): row is typeof row & { result: NonNullable<typeof row.result> } => !!row.result)
+        .map(({ reference, result }) => ({ reference, result })),
+    [sheet]
   )
 
-  const emptyBatchSlots = Math.max(0, bomSlotCount - visibleBatches.length)
+  const [exporting, setExporting] = useState<string | null>(null)
+  const [savingRef, setSavingRef] = useState<string | null>(null)
 
-  const chartData = useMemo((): ChartPoint[] => {
-    if (!product) return []
-    const points: ChartPoint[] = [
-      { label: 'Template', unitPrice: product.unit_price, kind: 'template' },
-    ]
-    for (const b of [...batches].reverse()) {
-      points.push({ label: b.batch_code, unitPrice: b.unit_price, kind: 'batch' })
+  async function handleExportOne(referenceId: string) {
+    if (!product) return
+    const row = sheet.find((s) => s.reference.id === referenceId)
+    if (!row?.result) return
+    setExporting(referenceId)
+    try {
+      await exportPricingSheetToXlsx({
+        product,
+        reference: row.reference,
+        result: row.result,
+      })
+    } finally {
+      setExporting(null)
     }
-    return points
-  }, [product, batches])
+  }
+
+  async function handleExportAll() {
+    if (!product || !exportableSheets.length) return
+    setExporting('all')
+    try {
+      await exportProductPricingSheetsToXlsx(product, exportableSheets)
+    } finally {
+      setExporting(null)
+    }
+  }
 
   if (!product) {
     return (
       <div className="pmc-page">
         <p className="text-muted">Product not found.</p>
-        <Link href="/pmc/products" className="text-pmc text-sm mt-2 inline-block">
-          Back to products
+        <Link href="/pmc/products" className="text-sm mt-4 inline-block text-pmc hover:underline">
+          ← Back to products
         </Link>
       </div>
     )
   }
 
-  async function saveBom() {
-    const valid = bomEdit.filter((r) => r.raw_material_id && Number(r.qty) > 0)
-    setSaving(true)
-    try {
-      await pmcApi.setProductMaterials(
-        id,
-        valid.map((r) => ({
-          raw_material_id: r.raw_material_id,
-          qty: Number(r.qty),
-        }))
-      )
-      setBomEdit([])
-      refresh()
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not save BOM.')
-    } finally {
-      setSaving(false)
+  function getDraft(referenceId: string) {
+    const existing = draft[referenceId]
+    if (existing) return existing
+    const params = pmcApi.getProductParams(id, referenceId)
+    const legacyTons = (params as { tons_kg?: number } | undefined)?.tons_kg
+    return {
+      overhead: params ? String(params.overhead) : '',
+      batch_multiplier: params
+        ? String(params.batch_multiplier || legacyTons || 1)
+        : '1',
+      yield_value: params ? String(params.yield_value) : '',
     }
   }
 
-  function startEditBom() {
-    setBomEdit(
-      bom.length
-        ? bom.map((l) => ({
-            raw_material_id: l.raw_material_id,
-            qty: String(l.qty),
-          }))
-        : [{ raw_material_id: '', qty: '1' }]
+  async function saveParams(referenceId: string) {
+    const d = getDraft(referenceId)
+    const overhead = Number(d.overhead) || 0
+    const batch_multiplier = Number(d.batch_multiplier) || 0
+    const yield_value = Number(d.yield_value) || 0
+    if (batch_multiplier <= 0) {
+      alert('Batch multiplier must be greater than zero.')
+      return
+    }
+    if (yield_value <= 0) {
+      alert('Yield value must be greater than zero.')
+      return
+    }
+    if (!hasPrimary) {
+      alert('Set a primary raw material in Master → Products → recipe (Yes).')
+      return
+    }
+    setSavingRef(referenceId)
+    try {
+      await pmcApi.upsertProductParams({
+        product_id: id,
+        reference_id: referenceId,
+        overhead,
+        batch_multiplier,
+        yield_value,
+      })
+      refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not save parameters.')
+    } finally {
+      setSavingRef(null)
+    }
+  }
+
+  return (
+    <div className="pmc-page">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
+          <Link href="/pmc/products" className="text-xs text-muted hover:text-primary">
+            ← Products
+          </Link>
+          <h1 className="pmc-page-title mt-2 break-words">{product.name}</h1>
+          <p className="text-sm text-muted">
+            RMC = material total ÷ (yield × primary qty × batch multiplier) + overhead. Batch
+            multiplier scales all recipe qtys including primary for real final product.
+          </p>
+          {!hasPrimary && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+              No primary raw material — set one in{' '}
+              <Link href={`/pmc/master/products/${id}`} className="underline">
+                recipe
+              </Link>
+              .
+            </p>
+          )}
+        </div>
+        {exportableSheets.length > 0 && (
+          <button
+            type="button"
+            onClick={handleExportAll}
+            disabled={exporting !== null}
+            className="btn btn-ghost w-full sm:w-auto justify-center shrink-0"
+          >
+            <Download size={16} />
+            {exporting === 'all' ? 'Exporting…' : `Export all (${exportableSheets.length})`}
+          </button>
+        )}
+      </div>
+
+      {sheet.length === 0 ? (
+        <p className="text-sm text-muted pmc-card">
+          Create a reference with raw-material prices first.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {sheet.map(({ reference, result }) => {
+            const d = getDraft(reference.id)
+            const open = expandedRef === reference.id
+            const isLatest = reference.id === latestRefId
+            const refDetail = refDetailsOpen === reference.id ? pmcApi.getReferenceDetail(reference.id) : null
+
+            return (
+              <article
+                key={reference.id}
+                className="pmc-card p-0 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (open) {
+                      setExpandedRef(null)
+                      setRefDetailsOpen(null)
+                    } else {
+                      setExpandedRef(reference.id)
+                      setRefDetailsOpen(null)
+                    }
+                  }}
+                  className={clsx(
+                    'w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-4 text-left hover:bg-layer-sm min-h-[44px]',
+                    isLatest && !open && 'pmc-ref-list-latest'
+                  )}
+                >
+                    <div className="min-w-0 flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-semibold break-all">{reference.ref_number}</span>
+                      {isLatest && (
+                        <span className="badge badge-pmc text-[10px] uppercase tracking-wide">
+                          Latest
+                        </span>
+                      )}
+                      <span className="text-xs text-muted w-full sm:w-auto sm:ml-1">
+                        {new Date(reference.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  <div className="text-left sm:text-right shrink-0">
+                    {result ? (
+                      <span className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-base sm:text-lg font-bold text-pmc pmc-rmc-result tabular-nums">
+                        <span className="text-[10px] font-mono uppercase tracking-widest opacity-80">
+                          RMC
+                        </span>
+                        {formatINR(result.final_rmc)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted">
+                        {!hasPrimary ? 'Set primary in recipe' : 'Enter yield & save'}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {open && (
+                  <div className="border-t border-border">
+                    <div className="px-4 sm:px-5 pb-5 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                        <Field
+                          label="Overhead"
+                          value={d.overhead}
+                          onChange={(v) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              [reference.id]: { ...getDraft(reference.id), overhead: v },
+                            }))
+                          }
+                        />
+                        <Field
+                          label="Batch multiplier"
+                          value={d.batch_multiplier}
+                          onChange={(v) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              [reference.id]: { ...getDraft(reference.id), batch_multiplier: v },
+                            }))
+                          }
+                        />
+                        <Field
+                          label="Yield value"
+                          value={d.yield_value}
+                          onChange={(v) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              [reference.id]: { ...getDraft(reference.id), yield_value: v },
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => saveParams(reference.id)}
+                          disabled={savingRef === reference.id}
+                          className="btn btn-pmc w-full sm:w-auto justify-center"
+                        >
+                          {savingRef === reference.id ? 'Saving…' : 'Save for this reference'}
+                        </button>
+                        {result && (
+                          <button
+                            type="button"
+                            onClick={() => handleExportOne(reference.id)}
+                            disabled={exporting !== null}
+                            className="btn btn-ghost w-full sm:w-auto justify-center"
+                          >
+                            <Download size={16} />
+                            {exporting === reference.id ? 'Exporting…' : 'Export sheet'}
+                          </button>
+                        )}
+                      </div>
+
+                      <MaterialBreakdownSection result={result} />
+
+                      {result && <PricingSummaryGrid result={result} />}
+
+                      <CollapsibleSection
+                        id={`ref-prices-${reference.id}`}
+                        title="Reference price list"
+                        open={refDetailsOpen === reference.id}
+                        onToggle={() =>
+                          setRefDetailsOpen(refDetailsOpen === reference.id ? null : reference.id)
+                        }
+                        badge={refDetail ? `${refDetail.prices.length} prices` : undefined}
+                      >
+                        {refDetail ? (
+                          <div className="pmc-card p-0 overflow-hidden -mx-1">
+                            {refDetail.reference.notes && (
+                              <p className="px-4 py-2 text-sm text-muted border-b border-border">
+                                {refDetail.reference.notes}
+                              </p>
+                            )}
+                            <div className="pmc-table-wrap mx-0 px-0">
+                              <table className="data-table w-full text-sm">
+                                <thead>
+                                  <tr>
+                                    <th>Material</th>
+                                    <th>Unit</th>
+                                    <th className="text-right">Price</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {refDetail.prices.map((p) => (
+                                    <tr key={p.id}>
+                                      <td>{p.material_name}</td>
+                                      <td className="text-muted">{p.unit}</td>
+                                      <td className="text-right font-mono">{formatINR(p.price)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ) : refDetailsOpen === reference.id ? (
+                          <p className="text-sm text-muted py-2">Loading prices…</p>
+                        ) : null}
+                      </CollapsibleSection>
+
+
+                    </div>
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+function MaterialBreakdownSection({ result }: { result: PMCPricingResult | null }) {
+  return (
+    <section className="rounded-xl border border-border overflow-hidden bg-layer-sm/50">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-layer-sm">
+        <h3 className="text-sm font-semibold text-primary">Material breakdown</h3>
+        {result && (
+          <span className="badge badge-pmc text-[10px] font-normal">{result.lines.length} items</span>
+        )}
+      </div>
+      <div className="p-4">
+        {result ? (
+          <div className="pmc-table-wrap mx-0 px-0">
+            <LineItemsTable result={result} />
+          </div>
+        ) : (
+          <p className="text-sm text-muted">Save parameters above to calculate the breakdown.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function CollapsibleSection({
+  id,
+  title,
+  open,
+  onToggle,
+  badge,
+  children,
+}: {
+  id?: string
+  title: string
+  open: boolean
+  onToggle: () => void
+  badge?: string
+  children: ReactNode
+}) {
+  return (
+    <section id={id} className="rounded-xl border border-border overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-layer-sm hover:bg-layer min-h-[44px]"
+      >
+        <span className="flex items-center gap-2 text-sm font-medium text-primary min-w-0">
+          {open ? <ChevronUp size={16} className="shrink-0 text-pmc" /> : <ChevronDown size={16} className="shrink-0 text-pmc" />}
+          <span className="truncate">{title}</span>
+          {badge && (
+            <span className="badge badge-pmc text-[10px] font-normal shrink-0">{badge}</span>
+          )}
+        </span>
+      </button>
+      {open && <div className="px-4 pb-4 pt-1 border-t border-border">{children}</div>}
+    </section>
+  )
+}
+
+function PricingSummaryGrid({ result }: { result: PMCPricingResult }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      <SummaryRow label="Material total" value={formatINR(result.material_total)} />
+      <SummaryRow label="Batch multiplier" value={formatQty(result.batch_multiplier)} />
+      <SummaryRow label="Yield" value={formatQty(result.yield_value)} />
+      <SummaryRow
+        label="Primary material"
+        value={`${result.primary_material_name} (${formatQty(result.primary_material_qty)})`}
+        primary
+      />
+      <SummaryRow label="Real Final Product" value={formatQty(result.real_final_product)} />
+      <SummaryRow label="Unit before overhead" value={formatINR(result.unit_before_overhead)} />
+      <SummaryRow label="Overhead" value={formatINR(result.overhead)} />
+      <SummaryRow label="Final RMC" value={formatINR(result.final_rmc)} emphasis />
+    </div>
+  )
+}
+
+function LineItemsTable({ result }: { result: PMCPricingResult }) {
+  return (
+    <table className="data-table w-full text-sm border border-border rounded-lg overflow-hidden">
+      <thead>
+        <tr className="bg-layer text-muted text-left">
+          <th className="px-3 py-2">Raw material</th>
+          <th className="px-3 py-2 text-right">Base qty</th>
+          <th className="px-3 py-2 text-right">Effective qty</th>
+          <th className="px-3 py-2 text-right">Price</th>
+          <th className="px-3 py-2 text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {result.lines.map((line) => (
+          <tr
+            key={line.raw_material_id}
+            className={clsx('border-t border-border', line.is_primary && 'pmc-primary-row')}
+          >
+            <td className="px-3 py-2">
+              {line.raw_material_name}
+              {line.is_primary && (
+                <span className="ml-2 badge badge-pmc text-[10px]">Primary</span>
+              )}
+            </td>
+            <td className="px-3 py-2 text-right font-mono">{formatQty(line.base_qty)}</td>
+            <td className="px-3 py-2 text-right font-mono">{formatQty(line.effective_qty)}</td>
+            <td className="px-3 py-2 text-right font-mono">{formatINR(line.price)}</td>
+            <td className="px-3 py-2 text-right font-mono font-medium">{formatINR(line.line_total)}</td>
+          </tr>
+        ))}
+        <tr className="border-t-2 border-border font-semibold bg-layer-sm">
+          <td colSpan={4} className="px-3 py-2 text-right">
+            Material total
+            {result.batch_multiplier !== 1 && (
+              <span className="text-muted font-normal text-xs ml-1">(×{formatQty(result.batch_multiplier)})</span>
+            )}
+          </td>
+          <td className="px-3 py-2 text-right font-mono">{formatINR(result.material_total)}</td>
+        </tr>
+      </tbody>
+    </table>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  className,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <label className="block text-xs text-muted mb-1">{label}</label>
+      <input
+        type="number"
+        step="any"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input w-full pmc-focus"
+      />
+    </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  value,
+  primary,
+  emphasis,
+}: {
+  label: string
+  value: string
+  primary?: boolean
+  emphasis?: boolean
+}) {
+  if (primary) {
+    return (
+      <div className="flex justify-between px-3 py-2 rounded-lg border gap-3 pmc-primary-row border-pmc-30">
+        <span className="text-pmc font-medium shrink-0">{label}</span>
+        <span className="font-mono text-pmc font-semibold tabular-nums text-right break-all">{value}</span>
+      </div>
+    )
+  }
+
+  if (emphasis) {
+    return (
+      <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3 rounded-lg border border-border bg-layer-sm">
+        <span className="text-sm font-semibold text-primary">{label}</span>
+        <span className="font-mono text-xl sm:text-2xl font-bold text-primary tabular-nums">{value}</span>
+      </div>
     )
   }
 
   return (
-    <div className="pmc-page space-y-6">
-      <Link
-        href="/pmc/products"
-        className="inline-flex items-center gap-1 text-sm text-pmc hover:underline"
-      >
-        <ArrowLeft size={14} /> Products
-      </Link>
-
-      <div>
-        <h1 className="pmc-page-title">{product.name}</h1>
-        <p className="text-sm text-muted font-mono">{product.code}</p>
-        <p className="text-sm mt-2">
-          Template unit price: <strong>{formatInr(product.unit_price)}</strong>
-          <span className="text-muted"> (current BOM, per product unit)</span>
-        </p>
-      </div>
-
-      {/* BOM (left) + Recent batches (right) — matched height by row count */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-        <section className="pmc-card flex flex-col min-h-0">
-          <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
-            <h2 className="font-semibold">Bill of materials</h2>
-            {bomEdit.length === 0 ? (
-              <button type="button" onClick={startEditBom} className="btn btn-ghost text-sm shrink-0">
-                Edit BOM
-              </button>
-            ) : (
-              <div className="flex gap-2 shrink-0">
-                <button type="button" onClick={() => setBomEdit([])} className="btn btn-ghost text-sm">
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={saveBom}
-                  disabled={saving}
-                  className="btn btn-pmc text-sm"
-                >
-                  {saving ? 'Saving…' : 'Save BOM'}
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-h-0">
-            {bomEdit.length > 0 ? (
-              <div className="space-y-2 h-full flex flex-col">
-                <div className="flex-1 space-y-2 min-h-0">
-                  {bomEdit.map((row, idx) => (
-                    <div
-                      key={idx}
-                      className="flex flex-wrap gap-2 items-center min-h-[44px] py-1 border-b border-border/60 last:border-0"
-                    >
-                      <select
-                        value={row.raw_material_id}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          setBomEdit((rows) =>
-                            rows.map((r, i) => (i === idx ? { ...r, raw_material_id: v } : r))
-                          )
-                        }}
-                        className="input flex-1 min-w-0 pmc-focus text-sm"
-                      >
-                        <option value="">Select</option>
-                        {procurement.map((m: PMCRawMaterial) => (
-                          <option key={m.id} value={m.id}>
-                            {m.code} — {m.name}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        value={row.qty}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          setBomEdit((rows) =>
-                            rows.map((r, i) => (i === idx ? { ...r, qty: v } : r))
-                          )
-                        }}
-                        className="input w-24 pmc-focus text-sm shrink-0"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setBomEdit((r) => [...r, { raw_material_id: '', qty: '1' }])}
-                  className="text-xs text-pmc hover:underline shrink-0 pt-1"
-                >
-                  + Add line
-                </button>
-              </div>
-            ) : (
-              <table className="data-table w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Rate</th>
-                    <th>Line</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bom.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-6 text-center text-muted">
-                        No materials in recipe yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    bom.map((l) => (
-                      <tr key={l.raw_material_id}>
-                        <td>
-                          {l.item_code} — {l.raw_material_name}
-                        </td>
-                        <td>{l.qty}</td>
-                        <td>₹{l.unit_price}</td>
-                        <td>₹{l.line_total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-
-        <section className="flex flex-col min-h-0">
-          <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
-            <h2 className="font-semibold text-primary">Recent batches</h2>
-            {batches.length > 0 && (
-              <Link
-                href={`/pmc/batches?product=${id}`}
-                className="inline-flex items-center gap-0.5 text-sm font-medium text-pmc hover:underline shrink-0"
-              >
-                See more
-                <ChevronRight size={14} />
-              </Link>
-            )}
-          </div>
-          <div className="pmc-card flex-1 flex flex-col min-h-0">
-            {batches.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8">
-                <p className="text-sm text-muted">No batches for this product yet.</p>
-                <Link
-                  href={`/pmc/batches?product=${id}`}
-                  className="text-sm text-pmc hover:underline mt-2"
-                >
-                  Create a batch
-                </Link>
-              </div>
-            ) : (
-              <div className="flex flex-col flex-1 gap-2 min-h-0">
-                {visibleBatches.map((b) => (
-                  <Link
-                    key={b.id}
-                    href={`/pmc/batches/${b.id}`}
-                    className="flex-1 min-h-[44px] flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-layer-sm/50 hover:border-pmc-40 hover:bg-pmc-10 transition-colors"
-                  >
-                    <span className="font-mono text-sm font-semibold text-pmc shrink-0">
-                      {b.batch_code}
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0 ${statusBadgeClass(b.status)}`}
-                    >
-                      {b.status}
-                    </span>
-                    <span className="text-xs text-muted shrink-0">×{b.batch_size}</span>
-                    <span className="text-sm ml-auto text-right shrink-0">
-                      <span className="text-muted text-xs">/ unit </span>
-                      <strong>{formatInr(b.unit_price)}</strong>
-                      <span className="text-muted text-xs block sm:inline sm:ml-2">
-                        · {formatInr(batchTotalEstimate(b))} total
-                      </span>
-                    </span>
-                  </Link>
-                ))}
-                {Array.from({ length: emptyBatchSlots }, (_, i) => (
-                  <div
-                    key={`batch-slot-${i}`}
-                    className="flex-1 min-h-[44px] rounded-lg border border-dashed border-border bg-layer-sm/30"
-                    aria-hidden
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      <section className="pmc-card">
-        <h2 className="font-semibold mb-1">Unit price per product</h2>
-        <p className="text-xs text-muted mb-4">
-          Template (live BOM) vs frozen unit price from each batch (total batch cost ÷ batch size).
-        </p>
-        {chartData.length <= 1 && batches.length === 0 ? (
-          <p className="text-sm text-muted">Add a batch to compare pricing over time.</p>
-        ) : (
-          <>
-            <div className="w-full h-[260px] min-h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: 'var(--color-muted)', fontSize: 11 }}
-                    axisLine={{ stroke: 'var(--color-border)' }}
-                    tickLine={false}
-                    interval={0}
-                    angle={chartData.length > 4 ? -25 : 0}
-                    textAnchor={chartData.length > 4 ? 'end' : 'middle'}
-                    height={chartData.length > 4 ? 56 : 32}
-                  />
-                  <YAxis
-                    tick={{ fill: 'var(--color-muted)', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                    width={56}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'color-mix(in srgb, var(--color-pmc) 8%, transparent)' }}
-                    contentStyle={{
-                      background: 'var(--color-panel)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--color-text)', fontWeight: 600 }}
-                    formatter={(value) => [formatInr(Number(value)), 'Per unit']}
-                  />
-                  <Bar dataKey="unitPrice" name="Per unit" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                    {chartData.map((entry) => (
-                      <Cell
-                        key={entry.label}
-                        fill={entry.kind === 'template' ? chartColors[1] : chartColors[0]}
-                        fillOpacity={entry.kind === 'template' ? 0.9 : 0.75}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-wrap gap-4 mt-3 justify-center text-xs text-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm" style={{ background: chartColors[1] }} /> Template
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm opacity-80" style={{ background: chartColors[0] }} /> Batch
-              </span>
-            </div>
-          </>
-        )}
-      </section>
+    <div className="flex justify-between px-3 py-2 rounded-lg border border-border bg-layer-sm gap-3">
+      <span className="text-muted shrink-0">{label}</span>
+      <span className="font-mono text-primary tabular-nums text-right break-all">{value}</span>
     </div>
   )
 }

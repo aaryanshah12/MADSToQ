@@ -1,8 +1,43 @@
-import { db, requireOwnerAccess } from '@madstoq/database'
+import { getSessionUserId, prisma, serializeFactory, serializeProfile } from '@madstoq/database'
+import { hash } from 'bcryptjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'node:crypto'
 
-// GET /api/users — Only return users tied to factories the signed-in owner can access
+function mapProfileRoleToUserRole(role: string): 'OWNER' | 'OPERATOR' {
+  return role === 'owner' ? 'OWNER' : 'OPERATOR'
+}
+
+async function getDefaultClientId(): Promise<string | null> {
+  const slug = process.env.CLIENT_SLUG || 'default'
+  const client = await prisma.client.findUnique({ where: { slug }, select: { id: true } })
+  return client?.id ?? null
+}
+
+async function requireOwnerAccess(request: NextRequest) {
+  const userId = await getSessionUserId(request)
+  if (!userId) {
+    return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+
+  const ownerProfile = await prisma.profile.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  })
+
+  if (!ownerProfile || ownerProfile.role !== 'owner') {
+    return { response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+
+  const ownerFactories = await prisma.profileFactory.findMany({
+    where: { profileId: userId },
+    select: { factoryId: true },
+  })
+
+  const allowedFactoryIds = ownerFactories.map((r) => r.factoryId).filter(Boolean)
+  return { userId, allowedFactoryIds }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const access = await requireOwnerAccess(request)
@@ -13,34 +48,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ users: [], factories: [], pfMap: {}, assignedFactories: [] })
     }
 
-    // Fetch profile-factory links limited to owner’s factories
-    const { data: pfRows } = await db
-      .from('profile_factories')
-      .select('profile_id, factory_id')
-      .in('factory_id', allowedFactoryIds)
+    const pfRows = await prisma.profileFactory.findMany({
+      where: { factoryId: { in: allowedFactoryIds } },
+      select: { profileId: true, factoryId: true },
+    })
 
-    const profileIds = Array.from(new Set((pfRows ?? []).map((r: any) => r.profile_id)))
+    const profileIds = Array.from(new Set(pfRows.map((r) => r.profileId)))
 
     if (profileIds.length === 0) {
       return NextResponse.json({ users: [], factories: [], pfMap: {}, assignedFactories: allowedFactoryIds })
     }
 
-    const [{ data: users, error: usersError }, { data: factories }] = await Promise.all([
-      db.from('profiles').select('*').in('id', profileIds).order('role').order('full_name'),
-      db.from('factories').select('*').in('id', allowedFactoryIds).eq('is_active', true).order('name'),
+    const [users, factories] = await Promise.all([
+      prisma.profile.findMany({
+        where: { id: { in: profileIds } },
+        orderBy: [{ role: 'asc' }, { fullName: 'asc' }],
+      }),
+      prisma.factory.findMany({
+        where: { id: { in: allowedFactoryIds }, isActive: true },
+        orderBy: { name: 'asc' },
+      }),
     ])
 
-    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 400 })
-
     const pfMap: Record<string, string[]> = {}
-    ;(pfRows ?? []).forEach((r: any) => {
-      if (!pfMap[r.profile_id]) pfMap[r.profile_id] = []
-      pfMap[r.profile_id].push(r.factory_id)
+    pfRows.forEach((r) => {
+      if (!pfMap[r.profileId]) pfMap[r.profileId] = []
+      pfMap[r.profileId].push(r.factoryId)
     })
 
     return NextResponse.json({
-      users: users ?? [],
-      factories: factories ?? [],
+      users: users.map(serializeProfile),
+      factories: factories.map(serializeFactory),
       pfMap,
       assignedFactories: allowedFactoryIds,
     })
@@ -49,8 +87,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
-// POST /api/users — Create new user
 export async function POST(request: NextRequest) {
   try {
     const access = await requireOwnerAccess(request)
@@ -67,36 +103,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data, error } = await db.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name, role }
+    const clientId = await getDefaultClientId()
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client not provisioned. Run tenant provisioning first.' }, { status: 400 })
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: String(email).toLowerCase() }, select: { id: true } })
+    if (existing) {
+      return NextResponse.json({ error: 'Email already exists' }, { status: 400 })
+    }
+
+    const userId = randomUUID()
+    const passwordHash = await hash(password, 12)
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email: String(email).toLowerCase(),
+        name: String(full_name),
+        passwordHash,
+        role: mapProfileRoleToUserRole(String(role)),
+        clientId,
+        isActive: true,
+      },
     })
 
-    if (error || !data.user) return NextResponse.json({ error: error?.message ?? 'Could not create user' }, { status: 400 })
+    await prisma.profile.upsert({
+      where: { id: userId },
+      create: {
+        id: userId,
+        fullName: full_name,
+        email: String(email).toLowerCase(),
+        role: role as 'owner' | 'inputer' | 'chemist' | 'accountant' | 'warehouse_manager' | 'lab_incharge' | 'plant_supervisor',
+        phone: phone || null,
+        isActive: true,
+      },
+      update: {
+        fullName: full_name,
+        email: String(email).toLowerCase(),
+        role: role as 'owner' | 'inputer' | 'chemist' | 'accountant' | 'warehouse_manager' | 'lab_incharge' | 'plant_supervisor',
+        phone: phone || null,
+        isActive: true,
+      },
+    })
 
-    // Upsert profile — works whether trigger fired or not
-    await db.from('profiles').upsert({
-      id:        data.user.id,
-      full_name,
-      email,
-      role,
-      phone:     phone || null,
-      is_active: true,
-    }, { onConflict: 'id' })
-
-    // Assign factories if provided
     if (Array.isArray(factory_ids) && factory_ids.length > 0) {
       const safeIds = factory_ids.filter((id: string) => allowedFactoryIds.includes(id))
       if (safeIds.length === 0) {
         return NextResponse.json({ error: 'You can only assign factories you own' }, { status: 403 })
       }
-      const rows = safeIds.map((factory_id: string) => ({
-        profile_id: data.user.id,
-        factory_id,
-      }))
-      await db.from('profile_factories').insert(rows)
+      await prisma.profileFactory.createMany({
+        data: safeIds.map((factoryId: string) => ({ profileId: userId, factoryId })),
+        skipDuplicates: true,
+      })
     }
 
     return NextResponse.json({ success: true })
@@ -105,7 +163,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/users — Update user profile + factory assignments
 export async function PATCH(request: NextRequest) {
   try {
     const access = await requireOwnerAccess(request)
@@ -119,34 +176,40 @@ export async function PATCH(request: NextRequest) {
     const { id, full_name, phone, role, is_active, factory_ids } = await request.json()
     if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
 
-    // Update profile fields
-    const updates: any = {}
-    if (full_name  !== undefined) updates.full_name  = full_name
-    if (phone      !== undefined) updates.phone      = phone
-    if (role       !== undefined) updates.role       = role
-    if (is_active  !== undefined) updates.is_active  = is_active
+    if (full_name !== undefined || phone !== undefined || role !== undefined || is_active !== undefined) {
+      await prisma.profile.update({
+        where: { id },
+        data: {
+          ...(full_name !== undefined ? { fullName: full_name } : {}),
+          ...(phone !== undefined ? { phone } : {}),
+          ...(role !== undefined ? { role: role as 'owner' | 'inputer' | 'chemist' | 'accountant' | 'warehouse_manager' | 'lab_incharge' | 'plant_supervisor' } : {}),
+          ...(is_active !== undefined ? { isActive: is_active } : {}),
+        },
+      })
 
-    if (Object.keys(updates).length > 0) {
-      const { error } = await db.from('profiles').update(updates).eq('id', id)
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+      const userUpdates: { name?: string; isActive?: boolean; role?: 'OWNER' | 'OPERATOR' } = {}
+      if (full_name !== undefined) userUpdates.name = full_name
+      if (is_active !== undefined) userUpdates.isActive = Boolean(is_active)
+      if (role !== undefined) userUpdates.role = mapProfileRoleToUserRole(String(role))
+      if (Object.keys(userUpdates).length > 0) {
+        await prisma.user.update({ where: { id }, data: userUpdates }).catch(() => null)
+      }
     }
 
-    // Replace factory assignments if factory_ids is provided
     if (Array.isArray(factory_ids)) {
       const safeIds = factory_ids.filter((fid: string) => allowedFactoryIds.includes(fid))
 
-      // Only touch factory links the owner actually controls
       if (allowedFactoryIds.length > 0) {
-        await db
-          .from('profile_factories')
-          .delete()
-          .eq('profile_id', id)
-          .in('factory_id', allowedFactoryIds)
+        await prisma.profileFactory.deleteMany({
+          where: { profileId: id, factoryId: { in: allowedFactoryIds } },
+        })
       }
 
       if (safeIds.length > 0) {
-        const rows = safeIds.map((factory_id: string) => ({ profile_id: id, factory_id }))
-        await db.from('profile_factories').insert(rows)
+        await prisma.profileFactory.createMany({
+          data: safeIds.map((factoryId: string) => ({ profileId: id, factoryId })),
+          skipDuplicates: true,
+        })
       }
     }
 
@@ -156,7 +219,6 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE /api/users
 export async function DELETE(request: NextRequest) {
   try {
     const access = await requireOwnerAccess(request)
@@ -170,16 +232,16 @@ export async function DELETE(request: NextRequest) {
     const { id } = await request.json()
     if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
 
-    const { data: targetFactories } = await db
-      .from('profile_factories')
-      .select('factory_id')
-      .eq('profile_id', id)
+    const targetFactories = await prisma.profileFactory.findMany({
+      where: { profileId: id },
+      select: { factoryId: true },
+    })
 
-    const hasAccess = (targetFactories ?? []).some((r: any) => allowedFactoryIds.includes(r.factory_id))
+    const hasAccess = targetFactories.some((r) => allowedFactoryIds.includes(r.factoryId))
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { error } = await db.auth.admin.deleteUser(id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    await prisma.profile.update({ where: { id }, data: { isActive: false } })
+    await prisma.user.update({ where: { id }, data: { isActive: false } }).catch(() => null)
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

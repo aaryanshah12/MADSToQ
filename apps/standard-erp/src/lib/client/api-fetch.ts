@@ -1,1 +1,1 @@
-export { getAuthHeaders, rpcPost, apiGet } from '@madstoq/core'
+export { getAuthHeaders, rpcPost, apiGet } from "@madstoq/core";

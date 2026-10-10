@@ -1,8 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import PageHeader from '@madstoq/ui/page-header'
-import { inventoryApi } from '@madstoq/inventory-system/api'
+import { EmptyState, SmartFilterBar, SpinnerBlock, useSmartFilter } from '@/components/ui'
+import { DateRangeChip, inDateRange } from '@/components/inventory/DateRangeChip'
+import PageHeader from '@madstoq/ui/erp-page-header'
+import { inventoryApi } from '@/lib/client/inventory-api'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
@@ -11,6 +13,8 @@ export default function InputerHistoryPage() {
   const { profile } = useAuth()
   const [entries, setEntries] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -20,9 +24,28 @@ export default function InputerHistoryPage() {
     })
   }, [profile])
 
+  const filter = useSmartFilter(entries, {
+    getSearchText: (e) => [
+      e.invoice_number,
+      e.supplier_name,
+      e.material_type,
+      e.vehicle_number,
+      e.factories?.name,
+    ],
+    facets: [
+      { key: 'supplier', label: 'Supplier', getValue: (e) => e.supplier_name || '—' },
+      { key: 'material', label: 'Material', getValue: (e) => e.material_type || '—' },
+    ],
+  })
+
+  const visible = useMemo(
+    () => filter.filtered.filter((e) => inDateRange(e.entry_date, dateFrom, dateTo)),
+    [filter.filtered, dateFrom, dateTo],
+  )
+
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <PageHeader
           title="My Stock Entries"
           subtitle="Inputer · Entry History"
@@ -31,10 +54,33 @@ export default function InputerHistoryPage() {
         />
         <div className="card overflow-hidden">
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-inputer border-t-transparent rounded-full animate-spin" />
-            </div>
+            <SpinnerBlock accent="inputer" label="Loading entries" />
+          ) : entries.length === 0 ? (
+            <EmptyState
+              title="No entries yet"
+              description="Stock you log will appear here."
+              action={<Link href="/inventory/inputer/new" className="btn btn-inputer gap-2"><Plus size={15}/> New Entry</Link>}
+            />
           ) : (
+            <>
+              <SmartFilterBar
+                filter={filter}
+                placeholder="Search invoice, supplier, material…"
+                accent="inputer"
+                chipExtras={
+                  <DateRangeChip
+                    from={dateFrom}
+                    to={dateTo}
+                    onChange={(from, to) => {
+                      setDateFrom(from)
+                      setDateTo(to)
+                    }}
+                  />
+                }
+              />
+              {visible.length === 0 ? (
+                <EmptyState title="No entries match" description="Try a different search or clear the filter chips." />
+              ) : (
             <>
               {/* Desktop table */}
               <div className="hidden md:block overflow-x-auto">
@@ -51,7 +97,7 @@ export default function InputerHistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map(e => (
+                  {visible.map(e => (
                     <tr key={e.id}>
                       <td className="font-mono text-inputer text-xs">{e.invoice_number}</td>
                       <td className="text-primary text-xs">{e.factories?.name}</td>
@@ -62,23 +108,13 @@ export default function InputerHistoryPage() {
                       <td className="text-muted text-xs">{new Date(e.entry_date).toLocaleDateString('en-IN')}</td>
                     </tr>
                   ))}
-                  {entries.length === 0 && (
-                    <tr><td colSpan={7} className="text-center text-muted py-12">
-                      No entries yet. <Link href="/inventory/inputer/new" className="text-inputer">Create one →</Link>
-                    </td></tr>
-                  )}
                 </tbody>
               </table>
               </div>
 
               {/* Mobile cards */}
               <div className="md:hidden space-y-3 p-4">
-                {entries.length === 0 && (
-                  <div className="text-center text-muted py-6 border border-dashed border-[color-mix(in srgb, var(--color-border) 80%, transparent)] rounded-lg">
-                    No entries yet. <Link href="/inventory/inputer/new" className="text-inputer">Create one →</Link>
-                  </div>
-                )}
-                {entries.map(e => (
+                {visible.map(e => (
                   <div
                     key={e.id}
                     className="rounded-lg border border-[color-mix(in srgb, var(--color-border) 70%, transparent)] bg-layer-sm px-4 py-3 space-y-2"
@@ -108,6 +144,8 @@ export default function InputerHistoryPage() {
                   </div>
                 ))}
               </div>
+            </>
+              )}
             </>
           )}
         </div>

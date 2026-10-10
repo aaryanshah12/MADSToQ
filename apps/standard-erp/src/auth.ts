@@ -17,14 +17,18 @@ if (authUrl) {
   process.env.NEXTAUTH_URL = authUrl
 }
 
-/** Secure cookie names (__Host-/__Secure-) only work on HTTPS — never on http://localhost. */
-const useSecureCookies = Boolean(authUrl?.startsWith('https://'))
+/**
+ * Secure cookie names only work on HTTPS.
+ * Leave this unset when AUTH_URL is absent so Auth.js follows the request
+ * (https://madstoq.com uses __Secure- cookies, http://localhost does not).
+ */
+const useSecureCookies = authUrl ? authUrl.startsWith('https://') : undefined
 
 /** Auth.js session layer using app-managed credentials (Neon/Prisma). */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: authSecret,
   trustHost: true,
-  useSecureCookies,
+  ...(useSecureCookies === undefined ? {} : { useSecureCookies }),
   providers: [
     Credentials({
       id: 'credentials',
